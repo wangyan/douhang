@@ -1,0 +1,506 @@
+import { z } from 'zod';
+import {
+  DATE_ITEM_WIDGET_KEYS as registryDateItemKeys,
+  WIDGET_KEYS,
+} from '@/lib/widgets/registry';
+
+import {
+  FONT_SIZE_MAX,
+  FONT_SIZE_MIN,
+  WALLPAPER_SCRIM_MAX,
+  WALLPAPER_SCRIM_MIN,
+} from '@/types';
+
+/**
+ * URL 校验：支持 http(s) 协议，也允许常见自托管格式
+ * - http://192.168.1.10:8096
+ * - https://jellyfin.example.com
+ * - http://localhost:3000
+ *
+ * 不强制要求 https，自托管场景内网地址常用 http。
+ */
+const urlSchema = z
+  .string()
+  .trim()
+  .min(1, '地址必填')
+  .refine(
+    (val) => {
+      try {
+        const u = new URL(val);
+        return u.protocol === 'http:' || u.protocol === 'https:';
+      } catch {
+        return false;
+      }
+    },
+    { message: '请输入合法的 http/https 地址' },
+  );
+
+// ============ 卡片 ============
+
+/**
+ * 卡片创建 schema（也用作前端表单 schema）
+ *
+ * - name：必填，1-50 字符
+ * - internalUrl / externalUrl：合法 URL，二选一即可，至少填一个
+ * - icon：选填
+ * - description：选填，最长 200 字符（空字符串 = 无描述）
+ * - categoryId：选填，空字符串表示未分类
+ * - openInDialog：选填，默认 false
+ */
+/** 卡片字段共享定义（创建全量校验，更新走 partial） */
+const cardBaseSchema = z.object({
+  name: z.string().trim().min(1, '名称必填').max(50, '名称最多 50 个字符'),
+  /** 内外网地址至少填一个：留空的由服务端回退为另一个 */
+  internalUrl: z.union([z.literal(''), urlSchema]).optional(),
+  externalUrl: z.union([z.literal(''), urlSchema]).optional(),
+  /** 图标选填：留空时卡片渲染首字母色块 */
+  icon: z.string().optional(),
+  /** 选填，最长 200 字符（不传或空字符串 = 无描述） */
+  description: z.string().trim().max(200, '描述最多 200 个字符').optional(),
+  /** 选填，空字符串 / undefined 表示未分类 */
+  categoryId: z.string().optional(),
+  /** 点击是否用弹框 iframe 打开（选填，默认 false） */
+  openInDialog: z.boolean().optional(),
+});
+
+export const cardCreateSchema = cardBaseSchema.superRefine((val, ctx) => {
+  if (!val.internalUrl && !val.externalUrl) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['internalUrl'],
+      message: '内网与外网地址至少填一个',
+    });
+  }
+});
+
+export type CardFormValues = z.infer<typeof cardCreateSchema>;
+
+/** 卡片部分更新 schema（PATCH，所有字段可选） */
+export const cardUpdateSchema = cardBaseSchema.partial();
+
+/** 卡片重排项 */
+export const cardReorderSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        order: z.number().int().min(0),
+        /** 跨分类拖拽时的新分类 id，null 表示归到未分类 */
+        categoryId: z.string().nullable(),
+      }),
+    )
+    .min(1, '至少一项'),
+});
+
+/** 卡片批量删除（POST /api/cards/batch-delete） */
+export const cardBatchDeleteSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1, '至少选择一张卡片'),
+});
+
+// ============ 分类 ============
+
+/** 分类创建 schema */
+export const categoryCreateSchema = z.object({
+  name: z
+    .string({ error: '名称必填' })
+    .trim()
+    .min(1, '名称必填')
+    .max(30, '名称最多 30 个字符'),
+  icon: z.string().nullish(),
+  color: z
+    .string()
+    .nullish()
+    .refine((v) => !v || /^#[\da-fA-F]{6}$/.test(v), '请输入合法的 hex 色值'),
+});
+
+/** 分类部分更新 schema（PATCH） */
+export const categoryUpdateSchema = categoryCreateSchema.partial();
+
+/** 分类重排 schema */
+export const categoryReorderSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        order: z.number().int().min(0),
+      }),
+    )
+    .min(1, '至少一项'),
+});
+
+// ============ 账号 ============
+
+/**
+ * 账号更新 schema（PATCH，username 和 password 可同时改也可单独改）
+ *
+ * - newPassword 存在时 currentPassword 必填
+ * - username 和 newPassword 至少有一个
+ */
+export const accountUpdateSchema = z
+  .object({
+    username: z
+      .string()
+      .trim()
+      .min(1, '用户名必填')
+      .max(50, '用户名最多 50 个字符')
+      .optional(),
+    currentPassword: z.string().optional(),
+    newPassword: z
+      .string()
+      .min(6, '密码至少 6 位')
+      .max(100, '密码最多 100 位')
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    // 改密码必须带原密码
+    if (data.newPassword && !data.currentPassword) {
+      ctx.addIssue({
+        code: 'custom',
+        message: '当前密码必填',
+        path: ['currentPassword'],
+      });
+    }
+    // 至少改一个字段
+    if (!data.username && !data.newPassword) {
+      ctx.addIssue({
+        code: 'custom',
+        message: '至少修改用户名或密码',
+        path: ['root'],
+      });
+    }
+  });
+
+// ============ 备份导入 ============
+
+/**
+ * 备份文件结构校验（version 1）
+ *
+ * 备份由本系统导出、单用户场景还原，故做结构级校验即可；
+ * 字段级业务校验（长度 / URL 格式）由导出时的表单保证。
+ */
+export const backupImportSchema = z.object({
+  version: z.literal(1),
+  exportedAt: z.string(),
+  categories: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string(),
+      icon: z.string().nullish(),
+      color: z.string().nullish(),
+      order: z.number().int(),
+    }),
+  ),
+  cards: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string(),
+      internalUrl: z.string(),
+      externalUrl: z.string(),
+      icon: z.string(),
+      description: z.string().nullish(),
+      categoryId: z.string().nullish(),
+      openInDialog: z.boolean().optional(),
+      order: z.number().int(),
+      createdAt: z.string(),
+      updatedAt: z.string(),
+    }),
+  ),
+  widgetInstances: z.array(
+    z.object({
+      id: z.string().min(1),
+      widgetKey: z.string(),
+      order: z.number().int(),
+      size: z.string(),
+    }),
+  ),
+  dateItems: z.array(
+    z.object({
+      id: z.string().min(1),
+      instanceId: z.string().min(1),
+      widgetKey: z.string(),
+      name: z.string(),
+      date: z.string(),
+      recurUnit: z.string().nullish(),
+      createdAt: z.string(),
+    }),
+  ),
+  searchEngines: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string(),
+        urlTemplate: z.string(),
+        iconPath: z.string().nullish(),
+        order: z.number().int(),
+      }),
+    )
+    .min(1, '备份必须包含至少一个搜索引擎'),
+  wallpapers: z.array(
+    z.object({
+      id: z.string().min(1),
+      name: z.string(),
+      source: z.string(),
+      path: z.string(),
+      thumbnail: z.string().nullish(),
+      createdAt: z.string(),
+    }),
+  ),
+  preferences: z.array(
+    z.object({
+      key: z.string().min(1),
+      value: z.string(),
+    }),
+  ),
+});
+
+export type BackupData = z.infer<typeof backupImportSchema>;
+
+// ============ 自定义搜索引擎 ============
+
+/** 自定义引擎表单（创建与更新共用，id 不由表单提供） */
+export const searchEngineFormSchema = z.object({
+  name: z.string().trim().min(1, '名称必填').max(30, '名称最多 30 个字符'),
+  urlTemplate: z
+    .string()
+    .trim()
+    .min(1, 'URL 必填')
+    .max(500, 'URL 最多 500 个字符')
+    .refine((v) => /^https?:\/\//.test(v), 'URL 必须以 http(s):// 开头'),
+  iconPath: z
+    .string()
+    .trim()
+    .max(500, '图标路径最多 500 个字符')
+    .refine(
+      (v) => v === '' || v.startsWith('/') || /^https?:\/\//.test(v),
+      '图标仅支持本地图标路径或 http(s) 地址',
+    )
+    .nullish()
+    .transform((v) => v || null),
+});
+
+/** 引擎重排 schema（拖拽排序，与分类重排同构） */
+export const searchEngineReorderSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        order: z.number().int().min(0),
+      }),
+    )
+    .min(1, '至少一项'),
+});
+
+/** 自定义引擎更新（PATCH，全部字段可选；order 用于上下移排序） */
+export const searchEngineUpdateSchema = z.object({
+  name: searchEngineFormSchema.shape.name.optional(),
+  urlTemplate: searchEngineFormSchema.shape.urlTemplate.optional(),
+  iconPath: searchEngineFormSchema.shape.iconPath.optional(),
+  order: z.number().int().min(0).optional(),
+});
+
+// ============ Widget 配置 ============
+
+// widget key 与日期类判定均由 widget 注册表派生（单一来源）
+const DATE_ITEM_WIDGET_KEYS = registryDateItemKeys;
+
+/** 日期项输入（name/date/recurUnit，实例创建与单项创建共用） */
+const dateItemInputSchema = z.object({
+  name: z.string().trim().min(1, '名称必填').max(50, '名称最多 50 个字符'),
+  date: z.string().refine((v) => !Number.isNaN(Date.parse(v)), '无效的日期'),
+  recurUnit: z.enum(['week', 'month', 'year']).nullish(),
+});
+
+/**
+ * Widget 实例创建 schema（多实例，可重复添加同类型）
+ *
+ * 日期类 widget（countdown/countup）必须随实例提供首个日期项 initialItem，
+ * 服务端保证「有卡片必有日期」，不存在没有日期项的日期实例。
+ */
+export const widgetInstanceCreateSchema = z
+  .object({
+    widgetKey: z.enum(WIDGET_KEYS),
+    size: z.enum(['S', 'M', 'L']).optional(),
+    order: z.number().int().min(0).optional(),
+    initialItem: dateItemInputSchema.optional(),
+  })
+  .superRefine((val, ctx) => {
+    const isDateWidget = DATE_ITEM_WIDGET_KEYS.includes(
+      val.widgetKey as (typeof DATE_ITEM_WIDGET_KEYS)[number],
+    );
+    if (isDateWidget && !val.initialItem) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['initialItem'],
+        message: '日期类 widget 必须提供首个日期项',
+      });
+    }
+    if (!isDateWidget && val.initialItem) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['initialItem'],
+        message: '该 widget 不支持日期项',
+      });
+    }
+    if (val.widgetKey === 'countup' && val.initialItem?.recurUnit) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['initialItem', 'recurUnit'],
+        message: '正数日不支持循环',
+      });
+    }
+  });
+
+/** Widget 实例更新 schema（size / order 可选） */
+export const widgetInstanceUpdateSchema = z.object({
+  size: z.enum(['S', 'M', 'L']).optional(),
+  order: z.number().int().min(0).optional(),
+});
+
+// ============ 日期项 ============
+
+/** 日期项创建 schema（正数日不支持循环） */
+export const dateItemCreateSchema = dateItemInputSchema
+  .extend({
+    widgetKey: z.enum(DATE_ITEM_WIDGET_KEYS),
+  })
+  .superRefine((val, ctx) => {
+    if (val.widgetKey === 'countup' && val.recurUnit) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['recurUnit'],
+        message: '正数日不支持循环',
+      });
+    }
+  });
+
+/** 日期项更新 schema（部分字段，widgetKey 不可改；recurUnit 传 null 表示取消循环；正数日不支持重复，更新时由路由校验） */
+export const dateItemUpdateSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, '名称必填')
+    .max(50, '名称最多 50 个字符')
+    .optional(),
+  date: z
+    .string()
+    .refine((v) => !Number.isNaN(Date.parse(v)), '无效的日期')
+    .optional(),
+  recurUnit: z.enum(['week', 'month', 'year']).nullish(),
+});
+
+// ============ 偏好 ============
+
+/**
+ * 偏好更新 schema
+ *
+ * value 是任意类型（前端可传 string/number/boolean），但必须有值
+ */
+export const preferencesUpdateSchema = z
+  .object({
+    key: z.string().min(1, 'key 必填'),
+    value: z.unknown(),
+  })
+  .refine((data) => data.value !== undefined, {
+    message: 'value 必填',
+    path: ['value'],
+  });
+
+/** 已知偏好 key 的 value schema（未列出的 key 不做校验） */
+const PREFERENCE_VALUE_SCHEMAS: Record<string, z.ZodSchema> = {
+  networkMode: z.enum(['auto', 'internal', 'external']),
+  theme: z.enum(['light', 'dark', 'system']),
+  fontSize: z.number().int().min(FONT_SIZE_MIN).max(FONT_SIZE_MAX),
+  /** 壁纸遮罩强度（百分比） */
+  wallpaperScrim: z.number().min(WALLPAPER_SCRIM_MIN).max(WALLPAPER_SCRIM_MAX),
+  searchEngine: z.string().min(1),
+  /** 卡片简洁模式（仅图标，隐藏标题） */
+  cardSimpleMode: z.boolean(),
+  /** 卡片状态徽章（右上角在线/离线圆点） */
+  cardStatusBadge: z.boolean(),
+  /** 版本更新检测开关（关闭后不再请求远端） */
+  versionCheckEnabled: z.boolean(),
+  /** 版本更新检测授权令牌（用于私有仓库鉴权，可为空） */
+  versionCheckToken: z.string().max(255),
+  brand: z.object({
+    title: z.string().trim().min(1, '标题必填').max(30, '标题最多 30 个字符'),
+    logo: z
+      .string()
+      .trim()
+      .max(500, 'Logo 地址最多 500 个字符')
+      .refine(
+        (value) =>
+          value === '' ||
+          value.startsWith('/api/icons/file') ||
+          /^https?:\/\//.test(value),
+        'Logo 仅支持上传文件或 http(s) 地址',
+      ),
+    // 未提供显隐字段时视为显示
+    showLogo: z.boolean().default(true),
+    showTitle: z.boolean().default(true),
+  }),
+};
+
+/** 校验偏好值，未注册的 key 直接通过 */
+export function validatePreferenceValue(key: string, value: unknown): boolean {
+  const schema = PREFERENCE_VALUE_SCHEMAS[key];
+  if (!schema) return true;
+  return schema.safeParse(value).success;
+}
+
+// ============ 工具函数 ============
+
+/**
+ * 将 Zod 错误树转换为扁平的字段错误映射对象 `{ [field]: string[] }`。
+ *
+ * 键名规则：
+ * - 顶层字段使用字段名（如 `name`、`internalUrl`）
+ * - 根级错误使用 `_root`
+ * - 嵌套字段使用点号路径（如 `items.0.id`）
+ *
+ * @param tree z.treeifyError(error) 的返回值
+ */
+type ZodErrorTreeLike = {
+  errors?: unknown[];
+  properties?: Record<string, ZodErrorTreeLike>;
+  items?: ZodErrorTreeLike[];
+};
+
+function flattenZodErrorTree(
+  tree: ZodErrorTreeLike,
+  prefix = '',
+): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+
+  const errs = Array.isArray(tree.errors) ? tree.errors.filter(Boolean) : [];
+  if (errs.length > 0) {
+    out[prefix || '_root'] = errs.map(String);
+  }
+
+  if (tree.properties) {
+    for (const [k, v] of Object.entries(tree.properties)) {
+      const key = prefix ? `${prefix}.${k}` : k;
+      Object.assign(out, flattenZodErrorTree(v, key));
+    }
+  }
+
+  if (tree.items) {
+    tree.items.forEach((v, i) => {
+      const key = prefix ? `${prefix}.${i}` : String(i);
+      Object.assign(out, flattenZodErrorTree(v, key));
+    });
+  }
+
+  return out;
+}
+
+/**
+ * 把 zod 校验错误转成 `{ 字段名: 错误消息[] }` 扁平结构
+ *
+ * 用 z.treeifyError（非弃用 API）拿到树形结构，再递归展平。
+ * 供 API 路由 validateBody 在校验失败时构造响应使用。
+ */
+export function extractFieldErrors<T>(
+  error: z.ZodError<T>,
+): Record<string, string[]> {
+  return flattenZodErrorTree(z.treeifyError(error) as ZodErrorTreeLike);
+}

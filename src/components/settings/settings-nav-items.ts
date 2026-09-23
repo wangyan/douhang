@@ -1,0 +1,47 @@
+import {
+  FolderTree,
+  Image as ImageIcon,
+  Palette,
+  Search,
+  Settings,
+} from 'lucide-react';
+
+interface SettingsNavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+}
+
+export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
+  {
+    href: '/settings/general',
+    label: '通用',
+    icon: Settings,
+  },
+  {
+    href: '/settings/appearance',
+    label: '外观',
+    icon: Palette,
+  },
+  {
+    href: '/settings/search',
+    label: '搜索',
+    icon: Search,
+  },
+  {
+    href: '/settings/categories',
+    label: '分类',
+    icon: FolderTree,
+  },
+  {
+    href: '/settings/assets',
+    label: '素材',
+    icon: ImageIcon,
+  },
+];
+
+export function getActiveSettingsNavItem(pathname: string) {
+  return SETTINGS_NAV_ITEMS.find(
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+  );
+}

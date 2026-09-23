@@ -1,0 +1,173 @@
+import { IconButton } from '@astryxdesign/core/IconButton';
+import { Text } from '@astryxdesign/core/Text';
+import { Plus } from 'lucide-react';
+import { CardGrid } from '@/components/cards/CardGrid';
+import { SortableCardGrid } from '@/components/cards/SortableCardGrid';
+import { CategoryBadge } from '@/components/categories/CategoryBadge';
+import { SectionHeader } from '@/components/layout/SectionHeader';
+import { ICON_SIZE } from '@/lib/design-tokens';
+import type { CardStatus, Card as CardType, NetworkMode } from '@/types';
+
+interface CategorySectionProps {
+  /** 分类名称（null = 未分类） */
+  title: string | null;
+  /** 分类图标名（kebab-case） */
+  icon?: string | null;
+  /** 分类强调色（hex） */
+  color?: string | null;
+  /** 分类 ID（null = 未分类），透传给 SortableCardGrid 作 droppable id */
+  categoryId?: string | null;
+  cards: CardType[];
+  statuses?: Record<string, CardStatus>;
+  networkMode?: NetworkMode;
+  onEditCard?: (card: CardType) => void;
+  onDeleteCard?: (card: CardType) => void;
+  /** 点击卡片时触发（fire-and-forget 单卡片探测） */
+  onCardClick?: (cardId: string) => void;
+  /** 简洁模式：仅图标，不显示标题 */
+  simple?: boolean;
+  /** 是否显示右上角状态徽章 */
+  showStatus?: boolean;
+  /** 批量选择模式：隐藏新建入口，卡片点击切换选中 */
+  selectionMode?: boolean;
+  /** 批量选择模式下已选中的卡片 id 集合 */
+  selectedIds?: Set<string>;
+  /** 批量选择模式下切换选中 */
+  onToggleSelect?: (cardId: string) => void;
+  /** 标题右侧的新建入口（categoryId 由父组件闭包绑定） */
+  onAddCard?: () => void;
+  /** 是否启用拖拽（默认 false，外层 DndContext 控制） */
+  sortable?: boolean;
+  /** 是否处于排序模式（透传给 SortableCardGrid） */
+  reorderMode?: boolean;
+  /** 当前正在拖拽的卡片（跨分类拖拽时在目标分类插入位置渲染半透明预览） */
+  activeCard?: CardType | null;
+}
+
+/**
+ * 分类分区
+ *
+ * 视觉规范（ui-spec §2.6 + §4.5）：
+ * - 分类标题：Text as=h2（1.3125rem + bold），primary 色，无横线无下划线
+ * - 分类徽章：md 尺寸（32px），与标题视觉重量匹配
+ * - 分组间 py-3 留白（比卡片间距 gap-5 紧，避免分区过于空旷）
+ * - 标题到网格 mb-3
+ * - 未分类排最后
+ *
+ * 新建入口设计：
+ * - + IconButton 紧挨标题文字右侧（在同一个 HStack 内）
+ * - 默认隐藏，hover 或 focus-within 当前分类时淡入显示，符合 Notion / Linear 模式
+ * - tooltip 提示"新建卡片"
+ *
+ * sortable=true 时用 SortableCardGrid（卡片可拖拽），
+ * 外层必须包在 DndContext 内。
+ */
+export function CategorySection({
+  title,
+  icon,
+  color,
+  categoryId = null,
+  cards,
+  statuses,
+  networkMode = 'auto',
+  onEditCard,
+  onDeleteCard,
+  onCardClick,
+  simple = false,
+  showStatus = true,
+  selectionMode = false,
+  selectedIds,
+  onToggleSelect,
+  onAddCard,
+  sortable = false,
+  reorderMode = false,
+  activeCard = null,
+}: CategorySectionProps) {
+  if (cards.length === 0) return null;
+
+  const displayTitle = title ?? '未分类';
+
+  return (
+    <section className="group py-3 first:pt-0 last:pb-0">
+      <SectionHeader
+        className="mb-3"
+        icon={
+          icon || color ? (
+            <CategoryBadge
+              name={displayTitle}
+              icon={icon}
+              color={color}
+              size="md"
+            />
+          ) : undefined
+        }
+        title={
+          <Text
+            as="h2"
+            className="text-primary"
+            style={{
+              fontSize: '1.3125rem',
+              fontWeight: 700,
+              lineHeight: '1.875rem',
+            }}
+          >
+            {displayTitle}
+          </Text>
+        }
+        actions={
+          onAddCard ? (
+            <span
+              className={`transition-opacity ${
+                reorderMode || selectionMode
+                  ? 'opacity-0 pointer-events-none'
+                  : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 max-md:pointer-coarse:opacity-100'
+              }`}
+            >
+              <IconButton
+                label={`新建卡片到${displayTitle}`}
+                icon={<Plus size={ICON_SIZE.sm} />}
+                variant="ghost"
+                size="sm"
+                tooltip="新建卡片"
+                onClick={onAddCard}
+              />
+            </span>
+          ) : undefined
+        }
+      />
+
+      {sortable ? (
+        <SortableCardGrid
+          cards={cards}
+          statuses={statuses}
+          networkMode={networkMode}
+          onEditCard={onEditCard}
+          onDeleteCard={onDeleteCard}
+          onCardClick={onCardClick}
+          simple={simple}
+          showStatus={showStatus}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
+          onToggleSelect={onToggleSelect}
+          reorderMode={reorderMode}
+          categoryId={categoryId}
+          activeCard={activeCard}
+        />
+      ) : (
+        <CardGrid
+          cards={cards}
+          statuses={statuses}
+          networkMode={networkMode}
+          onEditCard={onEditCard}
+          onDeleteCard={onDeleteCard}
+          onCardClick={onCardClick}
+          simple={simple}
+          showStatus={showStatus}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
+          onToggleSelect={onToggleSelect}
+        />
+      )}
+    </section>
+  );
+}

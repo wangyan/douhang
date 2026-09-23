@@ -1,0 +1,26 @@
+# 生产部署：拉取容器镜像。首次部署在同目录创建 .env（设置 AUTH_SECRET
+# 与账号密码）后 docker compose -f docker-compose.prod.yml up -d 即可，
+# 数据目录 ./data 自动创建，Docker 监控自动获取 socket 权限
+services:
+  douhang:
+    image: ${CONTAINER_REGISTRY:-code.idiswy.cn}/${REPO_NAME:-zhdmcourt/douhang}:latest   # 锁定版本可改为具体 tag（如 :1.0.0）
+    container_name: douhang
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data                     # 数据库 + 上传文件持久化
+      - /var/run/docker.sock:/var/run/docker.sock   # Docker 状态监控
+    environment:
+      - AUTH_SECRET=${AUTH_SECRET:?请在 .env 中设置 AUTH_SECRET}
+      - AUTH_USERNAME=${AUTH_USERNAME:-admin}
+      - AUTH_PASSWORD=${AUTH_PASSWORD:?请在 .env 中设置 AUTH_PASSWORD}
+      - AUTH_URL=${AUTH_URL:-}
+      - CODE_HOST=${CODE_HOST:-code.idiswy.cn}
+      - REPO_NAME=${REPO_NAME:-zhdmcourt/douhang}
+      - REPO_TOKEN=${REPO_TOKEN:-}
+      - UPDATE_CHECK_TOKEN=${UPDATE_CHECK_TOKEN:-}
+      # 可选：DOCKER_GID（手动指定 socket 组，默认自动探测）；PUID/PGID（匹配宿主机用户）
+      - DOCKER_GID=${DOCKER_GID:-}
+      - PUID=${PUID:-}
+      - PGID=${PGID:-}
+    restart: unless-stopped

@@ -1,0 +1,1120 @@
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+@import "@astryxdesign/theme-neutral/theme.css";
+@import "@astryxdesign/core/tailwind-theme.css";
+@import "react-grid-layout/css/styles.css";
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* 主题闪烁修复：强制 Theme 组件的 wrapper div 跟随 html[data-theme] 的 color-scheme
+ *
+ * 问题：Astryx <Theme mode="system"> 时，wrapper div 有 color-scheme: light dark 类
+ *      (如 .x108lcm5)，覆盖了从 html 继承的 color-scheme。useSyncExternalStore
+ *      客户端 hydration 时先用服务端快照（mode='system'），导致系统 dark 时页面内容
+ *      短暂显示为 dark，然后切换到用户偏好（light），造成闪烁。
+ *
+ * 修复：用 html[data-theme] [data-astryx-theme] 后代选择器（特异性 0,2,1）覆盖
+ *      Theme wrapper 的单类选择器（特异性 0,1,0），强制 color-scheme 跟随 html。
+ *      ThemeScript 在 hydration 前已设置好 html 的 data-theme，因此 Theme 组件
+ *      hydration 时即使 mode='system'，内容颜色也正确。
+ */
+html[data-theme="light"] [data-astryx-theme] {
+  color-scheme: light;
+}
+
+html[data-theme="dark"] [data-astryx-theme] {
+  color-scheme: dark;
+}
+
+/* 让 AppShell 内部 main 元素背景透明，让 BackgroundLayer 的 fixed div 透出来
+ *
+ * 问题：AppShell 默认 variant='elevated'，但因为没有 topNav/sideNav，
+ *      contentAreaStyle 走到 contentBgSurface 分支（见 AppShell.tsx#L551-558），
+ *      给 main 元素（id=astryx-app-shell-main）设置不透明的 --color-background-surface 色，
+ *      挡住了 z-index: -10 的 BackgroundLayer fixed div。
+ *
+ * 修复：用 ID 选择器（特异性 1,0,0）覆盖 StyleX 单类选择器（0,1,0），
+ *      强制 main 背景透明。不依赖 html[data-theme] 属性（避免 data-theme
+ *      在某些时序下丢失导致选择器不匹配）。所有用 AppShell 的页面都受益。
+ *      页面若需要不透明背景，可在自己 page.tsx 里给根元素加背景色。
+ */
+[id="astryx-app-shell-main"] {
+  background-color: transparent;
+  scrollbar-gutter: stable;
+}
+
+/* === Tooltip 主题适配：对齐 EditModeBanner / FloatingToolbar 的毛玻璃浮层 ===
+ * 问题：Astryx Tooltip 默认用 --color-text-primary 做底色、--color-background-surface
+ *      做文字色（反色高对比）。light 下正常（黑底白字），dark 下变成刺眼的白底黑字，
+ *      与整体深色氛围不搭。
+ *
+ * 修复：改成与编辑态提示条同族的 surface 浮层——85% 半透明 surface +
+ *      backdrop blur + hairline 边框 + 主题感知阴影，light/dark 自动切换。
+ *      双写类名提升特异性（0,2,0），压过 StyleX 单类选择器（0,1,0）。
+ */
+.astryx-tooltip.astryx-tooltip {
+  background-color: color-mix(
+    in srgb,
+    var(--color-background-surface) 85%,
+    transparent
+  );
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-med);
+}
+
+/* === Toast 主题适配：对齐 Tooltip / EditModeBanner 的毛玻璃浮层 ===
+ * 问题：Astryx Toast 默认反色方案（文字色做底），dark 下白底白字完全不可读。
+ * 修复：与 tooltip 同族——85% 半透明 surface + backdrop blur + hairline 边框
+ *      + 主题感知阴影。双写类名提升特异性（0,2,0）压过 StyleX 单类选择器。
+ * error 类型用左侧 3px 强调条保持可辨识，不回到反色底。
+ */
+.astryx-toast.astryx-toast {
+  background-color: color-mix(
+    in srgb,
+    var(--color-background-surface) 85%,
+    transparent
+  );
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-med);
+}
+
+.astryx-toast.astryx-toast[data-type="error"] {
+  border-left: 3px solid var(--color-error);
+}
+
+/* 内容层内边距加大一档：4px/8px → 8px/12px，避免文字贴边 */
+.astryx-tooltip.astryx-tooltip > div {
+  padding-block: var(--spacing-2);
+  padding-inline: var(--spacing-3);
+}
+
+/* === 圆角 token 语义分层 ===
+ * control / panel 对齐 Astryx 标准层级；widget 承载 DouHang 视觉配方。
+ * 通过 @theme 暴露语义 utility；Astryx 组件原生 rounded 由 StyleX 控制不受影响。
+ */
+@theme {
+  --radius-control: var(--radius-element); /* 8px - 按钮/输入框/选项 */
+  --radius-panel: var(--radius-container); /* 12px - 面板/列表容器 */
+  --radius-widget: 1.125rem; /* 18px - widget/服务卡片/图标 */
+}
+
+/* === 语义扩展 token ===
+ * highlight：搜索命中等中性强调场景。
+ * inline 修饰让 var(--color-accent) 在 utility 使用处解析，跟随主题切换。
+ */
+@theme inline {
+  --color-highlight: color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+
+/* 浮层族统一阴影：tooltip / toast / banner / 悬浮工具栏同源（Astryx med 档） */
+@utility shadow-float {
+  box-shadow: var(--shadow-med);
+}
+
+:root {
+  --z-raised: 10;
+  --z-selected: 20;
+  --z-chrome: 50;
+  /* 品牌/装饰强调色（非危险语义，区别于 --color-error） */
+  --color-brand-pixel-accent: #e5484d;
+  --color-date-widget-accent: #d71921;
+}
+
+/* z 层级语义（约定见 docs/ARCHITECTURE.md）：
+ * raised   = 卡片内覆盖（状态灯 / 角标 / widget 拖拽手柄层）
+ * selected = 批量选择勾选框（需压过 raised 角标）
+ * chrome   = 视口级悬浮 chrome（Logo / 工具栏 / 横幅 / 全屏提示）
+ * 固定例外：背景层 -z-10、RGL 拖拽中 z-index:100 不纳入 scale。
+ */
+@utility z-raised {
+  z-index: var(--z-raised);
+}
+
+@utility z-selected {
+  z-index: var(--z-selected);
+}
+
+@utility z-chrome {
+  z-index: var(--z-chrome);
+}
+
+/* Astryx Dialog 渲染为原生 <dialog>（modal 时处于 top layer，z-index 天然失效）；
+ * 此规则覆盖非 top-layer 场景（如非模态 dialog），数值取 z-chrome 档。
+ * 注意：不能用 [role="dialog"]——Astryx 仅在 purpose='required' 时显式
+ * 设置 role="alertdialog"，普通弹窗是隐式 dialog 语义、无 role 属性。
+ */
+dialog,
+[role="dialog"],
+[role="alertdialog"] {
+  z-index: var(--z-chrome);
+}
+
+/* 弹窗标题统一刻度：DialogHeader（1.25rem）与 AlertDialog（Heading level 2）
+ * 各自带偏大的默认字号，在 420-560px 表单弹窗里过重，且与 widget 弹窗标题
+ * （1.125rem/600，见 AddWidgetDialog 等的内联样式）不一致。统一到区块标题档；
+ * 带内联样式的 h2 不受本规则影响。原生 <dialog> 需用元素选择器（无 role
+ * 属性可依）；[aria-modal] 限定模态弹窗并抬高效能以压过 StyleX。 */
+[role="alertdialog"] h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+}
+
+dialog[aria-modal="true"] h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5rem;
+}
+
+/* 键盘焦点环：Astryx IconButton/Button 之外的自写按钮统一接入 */
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+/* === widget-surface：3 层阴影 + inset 顶部高光（参考 NaviDash 视觉配方） ===
+ * 外层大阴影造氛围、近距小阴影撑起立体感、inset 顶部白边模拟玻璃边缘高光。
+ * 仅用于 widget 卡片，与 Astryx Card 默认 elevation 共存，不替换。
+ *
+ * 注意：阴影色用 RGBA 而非 hsl(var(--foreground))，因为 neutral 主题下
+ * --foreground 是 hsl 值不能直接拼到 rgba() 里。改用 slate-900 的 RGB 近似值
+ * （15, 23, 42）匹配 neutral 主题的冷灰基调。
+ */
+.widget-card {
+  /* Astryx Card 的圆角私有变量只在这里收敛，业务组件不直接覆盖 */
+  --_card-radius: var(--radius-widget);
+}
+
+.widget-surface {
+  --shadow-widget-rest:
+    0 8px 24px rgba(15, 23, 42, 0.07), 0 2px 6px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  --shadow-widget-hover:
+    0 12px 30px rgba(15, 23, 42, 0.09), 0 3px 8px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  border-radius: var(--radius-widget);
+  background-color: var(--color-surface);
+  /* 撑满 WidgetWrapper 固定高度容器，让 widget 卡片高度统一 */
+  height: 100%;
+  box-shadow: var(--shadow-widget-rest);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.widget-surface:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-widget-hover);
+}
+
+/* dark 主题：阴影更深，inset 高光减弱（暗色背景不需要强反光） */
+html[data-theme="dark"] .widget-surface {
+  --shadow-widget-rest:
+    0 8px 24px rgba(0, 0, 0, 0.32), 0 2px 6px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-widget-hover:
+    0 12px 30px rgba(0, 0, 0, 0.4), 0 3px 8px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+@font-face {
+  font-family: "KWGTDot47";
+  src: url("/fonts/date-widgets/ndot-47.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "NType82Regular";
+  src: url("/fonts/date-widgets/NType82-Regular.otf") format("opentype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "NType82Headline";
+  src: url("/fonts/date-widgets/NType82-Headline.otf") format("opentype");
+  font-display: swap;
+}
+
+/* 品牌像素强调色：参考 KWGT，仅用于单个终点像素 */
+.brand-pixel-accent {
+  color: var(--color-brand-pixel-accent);
+}
+/* 品牌标题：与像素标识 / 首屏时钟共用 KWGTDot47 点阵语言 */
+.brand-title {
+  font-family: "KWGTDot47", var(--font-geist-sans), system-ui, sans-serif;
+  font-size: 1.25rem;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  text-rendering: geometricPrecision;
+}
+
+.brand-title-sm {
+  font-size: 0.85em;
+}
+
+.brand-title-floating {
+  font-size: 1.625rem;
+}
+
+.brand-title-lg {
+  font-size: 2.25rem;
+  letter-spacing: 0.04em;
+}
+
+/* 日期 widget 参考 Nothing Date Time：纯色底板 + 左对齐四段式排版
+ * 圆角与 --radius-widget 统一（18px，与链接卡片、其他 widget 一致） */
+.date-widget-surface {
+  --date-widget-bg: #ffffff;
+  --date-widget-fg: #1b1b1d;
+  --date-widget-muted: rgba(27, 27, 29, 0.66);
+  --date-widget-border: rgba(27, 27, 29, 0.08);
+  --date-widget-rail: rgba(27, 27, 29, 0.14);
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-widget);
+  border: 1px solid var(--date-widget-border);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(245, 245, 246, 0.96) 100%
+  );
+  color: var(--date-widget-fg);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.date-widget-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at top,
+    rgba(255, 255, 255, 0.38) 0%,
+    transparent 52%
+  );
+}
+
+.date-widget-surface:active {
+  transform: translateY(0);
+}
+
+.date-widget-panel {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  color: inherit;
+  padding: 0.1rem 0.15rem 0.15rem;
+}
+
+/* 空态：居中虚线圈图标 + 标题/提示；可点击时 hover 高亮图标引导点击 */
+.date-widget-empty {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 0.25rem;
+  text-align: center;
+}
+
+.date-widget-empty-compact {
+  flex-direction: row;
+  gap: 0.5rem;
+}
+
+.date-widget-empty-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 1.5px dashed
+    color-mix(in srgb, var(--date-widget-fg) 22%, transparent);
+  border-radius: 9999px;
+  color: var(--date-widget-muted);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.date-widget-empty-compact .date-widget-empty-icon {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-width: 1px;
+}
+
+.date-widget-empty-icon.is-actionable {
+  color: color-mix(in srgb, var(--date-widget-fg) 55%, transparent);
+}
+
+button.date-widget-empty:hover .date-widget-empty-icon {
+  border-color: var(--color-accent);
+  background-color: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  color: var(--color-accent);
+  transform: scale(1.06);
+}
+
+button.date-widget-empty:active .date-widget-empty-icon {
+  transform: scale(0.97);
+}
+
+button.date-widget-empty:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+}
+.date-widget-hero {
+  flex: none;
+}
+
+/* S 档：hero 贴顶排布，与其他 widget 的 kicker 顶部对齐保持一致 */
+.date-widget-hero-compact {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.date-widget-hero-with-mode {
+  position: relative;
+  padding-right: 1.55rem;
+}
+
+/* S 档：按钮只占右上角自身区域，下方日期行可铺满到内边距边缘 */
+.date-widget-hero-compact.date-widget-hero-with-mode {
+  padding-right: 0.25rem;
+}
+
+.date-widget-mode-trigger {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: var(--z-selected);
+  width: 1.4rem;
+  height: 1.4rem;
+  min-width: 1.4rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--date-widget-fg) 7%, transparent);
+  color: var(--date-widget-muted);
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.date-widget-mode-trigger:hover,
+.date-widget-mode-trigger:focus-visible {
+  background-color: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
+}
+
+.date-widget-mode-trigger:active {
+  transform: scale(0.94);
+}
+
+.widget-drag-handle {
+  /* 编辑态保留右上角切换按钮的可点击区域 */
+  clip-path: polygon(
+    0 0,
+    calc(100% - 2.2rem) 0,
+    calc(100% - 2.2rem) 2.2rem,
+    100% 2.2rem,
+    100% 100%,
+    0 100%
+  );
+}
+
+.date-widget-reference {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 0.52rem;
+  padding: 0.15rem 0.2rem 0.2rem 0.15rem;
+}
+
+.date-widget-reference-compact {
+  gap: 0.35rem;
+  justify-content: center;
+  padding: 0.05rem 0.1rem 0.05rem 0;
+}
+
+.date-widget-hero-with-mode .date-widget-reference {
+  gap: 0.4rem;
+}
+
+.date-widget-hero-with-mode .date-widget-reference-compact {
+  gap: 0.35rem;
+}
+
+.date-widget-reference-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.32rem;
+  min-width: 0;
+  flex: none;
+  overflow: hidden;
+  color: var(--date-widget-muted);
+  font-family: "KWGTDot47", "NType82Regular", system-ui, sans-serif;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  letter-spacing: 0.14em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.date-widget-reference-compact .date-widget-reference-kicker {
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+}
+
+.date-widget-reference-metric {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  gap: 0;
+  margin-top: 0.28rem;
+  padding-block: 0.08rem 0.14rem;
+}
+
+.date-widget-reference-compact .date-widget-reference-metric {
+  gap: 0;
+  width: 100%;
+  margin-top: 0;
+  padding-block: 0;
+}
+
+.date-widget-value {
+  font-family: "KWGTDot47", "NType82Headline", system-ui, sans-serif;
+  font-feature-settings: "tnum" 1;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: -0.03em;
+  word-spacing: -0.25em;
+  line-height: 1;
+  text-rendering: geometricPrecision;
+}
+
+.date-widget-reference-unit {
+  padding-bottom: 0.22rem;
+  color: var(--date-widget-muted);
+  font-family: "NType82Regular", system-ui, sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.date-widget-reference-line {
+  overflow: hidden;
+  color: var(--date-widget-fg);
+  font-family: "KWGTDot47", "NType82Regular", system-ui, sans-serif;
+  font-size: 0.9rem;
+  line-height: 1.16;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.date-widget-reference-compact .date-widget-reference-line {
+  font-size: 0.8rem;
+  line-height: 1.12;
+}
+
+.date-widget-meta-line {
+  width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+
+.date-widget-narrow-date {
+  flex: none;
+  overflow: hidden;
+  color: var(--date-widget-fg);
+  font-family: "KWGTDot47", "NType82Regular", system-ui, sans-serif;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+
+.date-widget-detail-line {
+  color: var(--date-widget-muted);
+  font-family: "NType82Regular", system-ui, sans-serif;
+  font-size: 0.68rem;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+}
+
+.date-widget-reference-footer,
+.date-widget-copy {
+  overflow: hidden;
+  color: var(--date-widget-muted);
+  display: -webkit-box;
+  font-family: "NType82Regular", system-ui, sans-serif;
+  font-size: 0.68rem;
+  line-height: 1.42;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.date-widget-reference-footer {
+  margin-top: 0.32rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--date-widget-border);
+}
+
+.date-widget-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  flex: none;
+  overflow: hidden;
+  display: -webkit-box;
+  font-family: "NType82Headline", "NType82Regular", system-ui, sans-serif;
+  line-height: 1.28;
+  text-wrap: balance;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@container (max-width: 383px) {
+  .date-widget-title {
+    -webkit-line-clamp: 1;
+  }
+}
+
+.date-widget-value-accent {
+  color: var(--color-date-widget-accent);
+}
+
+.date-widget-value-warning {
+  color: var(--color-warning);
+}
+
+.date-widget-value-muted {
+  color: color-mix(in srgb, var(--date-widget-fg) 82%, transparent);
+}
+
+html[data-theme="dark"] .date-widget-surface {
+  --date-widget-bg: #1b1b1d;
+  --date-widget-fg: #ffffff;
+  --date-widget-muted: rgba(255, 255, 255, 0.72);
+  --date-widget-border: rgba(255, 255, 255, 0.08);
+  --date-widget-rail: rgba(255, 255, 255, 0.16);
+  background: linear-gradient(
+    180deg,
+    rgba(35, 35, 38, 0.98) 0%,
+    rgba(27, 27, 29, 0.99) 100%
+  );
+}
+
+html[data-theme="dark"] .date-widget-surface::before {
+  background: radial-gradient(
+    circle at top,
+    rgba(255, 255, 255, 0.06) 0%,
+    transparent 56%
+  );
+}
+
+@media (max-width: 480px) {
+  .date-widget-reference-line {
+    font-size: 0.88rem;
+  }
+}
+
+/* widget 栏空态：整面可点击的虚线卡片，hover 时边框/图标转 accent 引导添加 */
+.widget-bar-empty {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 2.25rem 1.5rem;
+  border: 1.5px dashed var(--color-border-strong);
+  border-radius: var(--radius-widget);
+  /* 壁纸背景上垫一层半透明 surface + 模糊，保证文案可读 */
+  background-color: color-mix(in srgb, var(--color-surface) 55%, transparent);
+  backdrop-filter: blur(10px);
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.widget-bar-empty:hover {
+  border-color: var(--color-accent);
+  background-color: color-mix(in srgb, var(--color-surface) 72%, transparent);
+}
+
+.widget-bar-empty:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.widget-bar-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  margin-bottom: 0.2rem;
+  border: 1.5px dashed var(--color-border-strong);
+  border-radius: 9999px;
+  color: var(--color-secondary);
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.widget-bar-empty:hover .widget-bar-empty-icon {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  transform: scale(1.06);
+}
+/* === react-grid-layout 自定义样式 ===
+ * 对齐 iOS 主屏 widget 编辑态：
+ * - 编辑态 widget cell 加 scale + ring（由 Tailwind class 控制）
+ * - 拖拽中关闭 transition（RGL 内部用 useCSSTransforms 处理跟手）
+ */
+.widget-grid-wrap .react-grid-item {
+  /* 柔和过渡：ease-out 无过冲，避免拖拽释放时的弹跳感。
+   * transform 过渡仅在 .cssTransforms 后启用：RGL 首帧以
+   * top/left 定位，挂载后切 transform；若首帧就过渡 transform，
+   * 每次开页都会把这次切换播成飞入动画（闪烁）。 */
+  transition:
+    width 220ms ease-out,
+    height 220ms ease-out;
+}
+
+.widget-grid-wrap .react-grid-item.cssTransforms {
+  transition:
+    transform 220ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    width 220ms ease-out,
+    height 220ms ease-out;
+}
+
+.widget-grid-wrap .react-grid-item.react-grid-placeholder {
+  /* 柔和中性色，不抢视觉焦点 */
+  background: rgba(148, 163, 184, 0.08);
+  border: 2px dashed rgba(148, 163, 184, 0.45);
+  border-radius: var(--radius-widget);
+  opacity: 1;
+  transition-duration: 120ms;
+  z-index: var(--z-raised);
+  user-select: none;
+}
+
+html[data-theme="dark"]
+  .widget-grid-wrap
+  .react-grid-item.react-grid-placeholder {
+  background: rgba(148, 163, 184, 0.06);
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+/* 拖拽中的 widget：阴影增强造浮起感（RGL 被拖元素由 react-draggable 加 dragging class） */
+.widget-grid-wrap .react-grid-item.react-draggable-dragging {
+  z-index: 100;
+  cursor: grabbing;
+  /* 与 widget 内容 rounded-widget / 占位遮罩保持一致，随根字号等比缩放 */
+  border-radius: var(--radius-widget);
+  box-shadow:
+    0 16px 32px rgba(15, 23, 42, 0.14),
+    0 4px 10px rgba(15, 23, 42, 0.06);
+}
+
+.widget-grid-wrap .react-grid-item.react-draggable-dragging > div {
+  box-shadow: none;
+}
+
+html[data-theme="dark"]
+  .widget-grid-wrap
+  .react-grid-item.react-draggable-dragging {
+  box-shadow:
+    0 16px 32px rgba(0, 0, 0, 0.4),
+    0 4px 10px rgba(0, 0, 0, 0.24);
+}
+
+/* === eyebrow 文字层级：大写字间距小标签 ===
+ * 用于 widget 栏顶部"WIDGETS"这类 section 标签，
+ * 与卡片分类标题视觉同源，提升信息层级。
+ */
+.text-eyebrow {
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-foreground-secondary);
+}
+
+/* Widget 分区标题沿用品牌点阵语言，字号略大于普通 eyebrow 以保证点阵可读 */
+.widget-bar-title {
+  color: var(--color-foreground-secondary);
+  font-family: "KWGTDot47", "NType82Regular", system-ui, sans-serif;
+  font-size: 0.75rem;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-rendering: geometricPrecision;
+}
+
+/* 搜索框占位文案空间不足时省略号截断，避免贴边生硬裁切 */
+.search-input::placeholder {
+  text-overflow: ellipsis;
+}
+
+/* === 首屏安静时钟：wallpaper ink ===
+ * 方向：不做 UI 默认黑/白，也不用灰蒙蒙的低对比色。
+ * 亮色用 rosewood（紫檀深棕红），和暖色壁纸同族但足够深；
+ * 暗色用 warm pearl（暖珍珠白），避免纯白的刺眼和发灰。
+ * meta 只降透明度、不改色相，保证亮/暗/跟随系统都统一。
+ * 可读性依靠无边界椭圆柔光和贴近文字的近/远两层 halo。
+ *
+ * 生效机制：用 light-dark() 跟随 color-scheme，而不是 html[data-theme]。
+ * Astryx 根 Theme 在 mode='system' 时会从 <html> 移除 data-theme
+ * （改靠 wrapper 的 color-scheme: light dark），若时钟 keyed 在
+ * html[data-theme="dark"] 上，跟随系统 + 暗色系统会错误落回亮色。
+ * light-dark() 按元素计算的 color-scheme 取值：
+ * - 显式亮/暗：wrapper 的 color-scheme 是单一值，直接命中；
+ * - 跟随系统：wrapper 是 light dark，按系统偏好实时解析。
+ */
+.home-clock-halo {
+  --home-clock-ink: light-dark(#41272d, #f4e7e7);
+  --home-clock-ink-muted: light-dark(
+    rgba(65, 39, 45, 0.78),
+    rgba(244, 231, 231, 0.78)
+  );
+  --home-clock-halo-near: light-dark(
+    rgba(255, 246, 246, 0.72),
+    rgba(20, 8, 10, 0.68)
+  );
+  --home-clock-halo-far: light-dark(
+    rgba(255, 246, 246, 0.36),
+    rgba(20, 8, 10, 0.4)
+  );
+  position: relative;
+  isolation: isolate;
+}
+
+.home-clock-halo::before {
+  content: "";
+  position: absolute;
+  inset: -0.75rem -1.5rem;
+  background: radial-gradient(
+    60% 100%,
+    color-mix(in srgb, var(--color-background-body) 82%, transparent) 0%,
+    color-mix(in srgb, var(--color-background-body) 42%, transparent) 55%,
+    transparent 76%
+  );
+  filter: blur(0.75rem);
+  pointer-events: none;
+}
+
+.home-clock-time {
+  position: relative;
+  z-index: var(--z-raised);
+  color: var(--home-clock-ink);
+  font-family: "KWGTDot47", "NType82Headline", system-ui, sans-serif;
+  font-size: 3.75rem;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  text-rendering: geometricPrecision;
+  text-shadow:
+    0 1px 2px var(--home-clock-halo-near),
+    0 0 12px var(--home-clock-halo-far),
+    0 0 32px var(--home-clock-halo-far);
+}
+
+.home-clock-meta {
+  position: relative;
+  z-index: var(--z-raised);
+  color: var(--home-clock-ink-muted);
+  font-family: "NType82Regular", system-ui, sans-serif;
+  font-size: 0.875rem;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-shadow:
+    0 1px 2px var(--home-clock-halo-near),
+    0 0 10px var(--home-clock-halo-far);
+}
+
+@media (max-width: 640px) {
+  .home-clock-time {
+    font-size: 2.875rem;
+  }
+
+  .home-clock-meta {
+    font-size: 0.75rem;
+  }
+
+  .home-clock-halo::before {
+    inset: -0.75rem 0;
+  }
+}
+
+/* === hover-scrollbar：默认隐藏滚动条，hover/focus 才显示 ===
+ * 用于 widget 内容区，避免永久显示滚动条打断视觉节奏。
+ */
+.hover-scrollbar {
+  scrollbar-width: none;
+}
+.hover-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.hover-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.hover-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+}
+.hover-scrollbar:hover,
+.hover-scrollbar:focus,
+.hover-scrollbar:focus-visible {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.72) transparent;
+}
+.hover-scrollbar:hover::-webkit-scrollbar,
+.hover-scrollbar:focus::-webkit-scrollbar,
+.hover-scrollbar:focus-visible::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.hover-scrollbar:hover::-webkit-scrollbar-thumb,
+.hover-scrollbar:focus::-webkit-scrollbar-thumb,
+.hover-scrollbar:focus-visible::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.72);
+}
+.hover-scrollbar:hover::-webkit-scrollbar-thumb:hover,
+.hover-scrollbar:focus::-webkit-scrollbar-thumb:hover,
+.hover-scrollbar:focus-visible::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.9);
+}
+
+/* === card-fly-in：卡片错峰入场（会话内仅首访播放） ===
+ * 每张卡从下方 16px + scale(0.96) 淡入归位。
+ * 父容器加 .stagger-cards，每张卡由内联 style 设置 animation-delay 错峰。
+ * layout.tsx 的 entrance-gate 脚本在会话内二次访问时给 html 标记
+ * data-entered='1'，配合下方规则跳过入场动画。
+ *
+ * 使用：
+ *   <div className="stagger-cards">
+ *     <div style={{ animationDelay: `${idx * 40}ms` }}>...</div>
+ *   </div>
+ */
+:root {
+  /* Spring easing：带回弹过冲的 cubic-bezier */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes card-fly-in {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.stagger-cards > * {
+  animation: card-fly-in 400ms var(--ease-spring) both;
+}
+
+/* 会话内二次访问：跳过入场动画 */
+html[data-entered="1"] .stagger-cards > * {
+  animation: none;
+}
+
+/* 尊重用户偏好：减少动效时关闭位移与缩放，仅保留淡入 */
+@media (prefers-reduced-motion: reduce) {
+  .stagger-cards > * {
+    animation: 200ms ease-out both;
+  }
+  @keyframes card-fly-in {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+}
+
+/* === edit-banner：编辑态底部提示条滑入 === */
+@keyframes edit-banner-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.edit-banner-enter {
+  animation: edit-banner-in 0.25s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edit-banner-enter {
+    animation: none;
+  }
+}
+
+/* ===== NAS 状态 widget（Nothing / KWGT 点阵风格） ===== */
+.widget-kicker {
+  color: var(--color-secondary);
+  font-family: "KWGTDot47", "NType82Regular", system-ui, sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.nas-widget-value {
+  font-family: "KWGTDot47", "NType82Headline", system-ui, sans-serif;
+  font-feature-settings: "tnum" 1;
+  display: inline-block;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  text-rendering: geometricPrecision;
+}
+
+.nas-widget-hero-total {
+  color: var(--color-secondary);
+  font-family: "KWGTDot47", "NType82Regular", system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.nas-widget-legend {
+  font-family: "KWGTDot47", "NType82Regular", system-ui, sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.nas-widget-foot {
+  color: var(--color-secondary);
+  font-family: "NType82Regular", system-ui, sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nas-widget-containers {
+  color: var(--color-secondary);
+  font-family: "KWGTDot47", "NType82Regular", system-ui, sans-serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 资源水位 widget 点阵数字 */
+.resource-widget-value {
+  font-family: "KWGTDot47", "NType82Headline", system-ui, sans-serif;
+  font-feature-settings: "tnum" 1;
+  display: inline-block;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  text-rendering: geometricPrecision;
+}
+
+.resource-widget-unit {
+  font-family: "KWGTDot47", "NType82Regular", system-ui, sans-serif;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding-left: 0.15rem;
+}
+
+/* S 档日期卡辅助行：单行跟随大数字基线；名称不收缩，
+   空间不足时日期从最右侧收缩并以省略号收尾 */
+.date-widget-compact-inline {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: baseline;
+  margin-left: 0.6rem;
+  padding-bottom: 0.15rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.date-widget-compact-name {
+  flex: none;
+  white-space: nowrap;
+}
+
+.date-widget-compact-date {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  padding-left: 0.5rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* === 空状态插画浮动动画：中间卡片轻微漂浮 ===
+ * 尊重 prefers-reduced-motion：用户偏好减少动效时完全禁用。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .empty-float {
+    animation: empty-float 3s ease-in-out infinite;
+  }
+
+  @keyframes empty-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-3px);
+    }
+  }
+}

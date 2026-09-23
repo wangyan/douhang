@@ -1,0 +1,69 @@
+import { stat } from 'node:fs/promises';
+import { basename, join } from 'node:path';
+import { prisma } from '@/lib/db';
+import { getUserPreference } from '@/lib/preferences';
+import type { Wallpaper, WallpaperPreferences } from '@/types';
+
+// 本文件含 prisma import，仅服务端使用。
+// 客户端安全的纯函数在 wallpaper-client.ts。
+
+/**
+ * 壁纸读取工具
+ *
+ * 服务端取数 + 客户端类型安全消费。
+ * 偏好通过 UserPreference 存储（单个 wallpaper 字段，light/dark 共用）。
+ */
+
+/**
+ * 取所有壁纸（按 createdAt 升序，预设在前、上传在后）
+ */
+export async function getWallpapers(): Promise<Wallpaper[]> {
+  const rows = await prisma.wallpaper.findMany({
+    orderBy: [{ source: 'asc' }, { createdAt: 'asc' }],
+  });
+  return Promise.all(
+    rows.map(async (w) => {
+      let size: number | undefined;
+
+      if (w.source === 'upload') {
+        const filename = new URL(w.path, 'http://localhost').searchParams.get(
+          'path',
+        );
+        if (filename) {
+          const filePath = join(
+            process.cwd(),
+            'data',
+            'uploads',
+            'wallpapers',
+            basename(filename),
+          );
+          try {
+            size = (await stat(filePath)).size;
+          } catch {
+            size = undefined;
+          }
+        }
+      }
+
+      return {
+        id: w.id,
+        name: w.name,
+        source: w.source as Wallpaper['source'],
+        path: w.path,
+        thumbnail: w.thumbnail,
+        size,
+        createdAt: w.createdAt.toISOString(),
+      };
+    }),
+  );
+}
+
+/**
+ * 取壁纸偏好（单个 wallpaperId，light/dark 共用）
+ *
+ * 未设置时返回 null（表示不使用壁纸，回退到主题默认背景色）。
+ */
+export async function getWallpaperPreferences(): Promise<WallpaperPreferences> {
+  const wallpaper = await getUserPreference<string | null>('wallpaper', null);
+  return { wallpaper };
+}

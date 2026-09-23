@@ -1,0 +1,168 @@
+import { AppShell } from '@astryxdesign/core/AppShell';
+import { VStack } from '@astryxdesign/core/VStack';
+import { BackgroundLayer } from '@/components/layout/BackgroundLayer';
+import { DefaultPasswordBanner } from '@/components/layout/DefaultPasswordBanner';
+import { EditModeBanner } from '@/components/layout/EditModeBanner';
+import { FloatingLogo } from '@/components/layout/FloatingLogo';
+import { FloatingToolbar } from '@/components/layout/FloatingToolbar';
+import { HomeClock } from '@/components/layout/HomeClock';
+import { HomeContent } from '@/components/layout/HomeContent';
+import { WidgetBar } from '@/components/layout/WidgetBar';
+import { SearchBox } from '@/components/search/SearchBox';
+import { getBrandConfig } from '@/lib/brand';
+import { prisma } from '@/lib/db';
+import { getUserPreference } from '@/lib/preferences';
+import { listSearchEngines } from '@/lib/search-engines';
+import { isUsingDefaultPassword } from '@/lib/security';
+import { getManualUrl, getRepoUrl } from '@/lib/version';
+import { getWallpaperPreferences, getWallpapers } from '@/lib/wallpaper';
+import {
+  type Card,
+  type Category,
+  type NetworkMode,
+  type SearchEngine,
+  WALLPAPER_SCRIM_DEFAULT,
+  type WidgetKey,
+} from '@/types';
+
+/**
+ * 主页（服务端取数）
+ *
+ * 结构：
+ * - 左上：FloatingLogo（fixed）
+ * - 右上：FloatingToolbar（fixed floating pill）
+ * - 主体容器：max-w-1360px 居中
+ *   - 首屏三段：居中时钟/搜索、widget 横条、图标分类区
+ *   - 搜索保持独立焦点，widget 以等宽横条承载状态信息
+ */
+// 主页读库（分类/卡片/偏好），必须每请求动态渲染；
+// 否则生产构建会预渲染空库快照并永久缓存，同步/新建的卡片永远不出现
+export const dynamic = 'force-dynamic';
+
+export default async function HomePage() {
+  // 并行获取所有独立数据（无依赖关系，Promise.all 减少总等待时间）
+  const [
+    categories,
+    unclassifiedCards,
+    networkMode,
+    searchEngine,
+    widgetInstances,
+    wallpapers,
+    wallpaperPreferences,
+    brand,
+    engines,
+    cardSimpleMode,
+    cardStatusBadge,
+    usingDefaultPassword,
+    wallpaperScrim,
+  ] = await Promise.all([
+    // 取所有分类（含卡片），按 order 排序
+    prisma.category.findMany({
+      orderBy: { order: 'asc' },
+      include: { cards: { orderBy: { order: 'asc' } } },
+    }),
+    // 取未分类卡片
+    prisma.card.findMany({
+      where: { categoryId: null },
+      orderBy: { order: 'asc' },
+    }),
+    // 网络模式（供 NetworkToggle 初始值，避免客户端闪烁）
+    getUserPreference<NetworkMode>('networkMode', 'auto'),
+    // 搜索引擎（供 SearchBox 初始值，避免客户端闪烁）
+    getUserPreference<SearchEngine>('searchEngine', 'google'),
+    // widget 实例（SSR 初始值，避免客户端闪烁）
+    prisma.widgetInstance.findMany({ orderBy: { order: 'asc' } }),
+    // 壁纸列表 + 偏好（SSR 初始值，客户端根据当前主题选择显示）
+    getWallpapers(),
+    getWallpaperPreferences(),
+    getBrandConfig(),
+    // 合并引擎列表（内置 + 自定义，SSR 传入避免客户端闪烁）
+    listSearchEngines(),
+    // 卡片简洁模式（SSR 初始值，避免客户端闪烁）
+    getUserPreference<boolean>('cardSimpleMode', false),
+    // 卡片状态徽章显隐（SSR 初始值，避免客户端闪烁）
+    getUserPreference<boolean>('cardStatusBadge', true),
+    // 默认密码检测（安全提示横幅）
+    isUsingDefaultPassword(),
+    // 壁纸遮罩强度（外观设置可调）
+    getUserPreference<unknown>('wallpaperScrim', WALLPAPER_SCRIM_DEFAULT),
+  ]);
+
+  const initialInstances = widgetInstances.map((i) => ({
+    id: i.id,
+    widgetKey: i.widgetKey as WidgetKey,
+    order: i.order,
+    size: i.size as 'S' | 'M' | 'L',
+  }));
+
+  // 序列化日期为字符串（Prisma Date → JSON 友好，Category 无 createdAt/updatedAt）
+  const serializedCategories: Category[] = categories.map((c) => ({
+    id: c.id,
+    name: c.name,
+    icon: c.icon,
+    color: c.color,
+    order: c.order,
+    cards: c.cards.map((card) => ({
+      ...card,
+      // Prisma Boolean → 显式携带，保证序列化结构稳定
+      openInDialog: card.openInDialog,
+      createdAt: card.createdAt.toISOString(),
+      updatedAt: card.updatedAt.toISOString(),
+    })),
+  }));
+
+  const serializedUnclassified: Card[] = unclassifiedCards.map((c) => ({
+    ...c,
+    createdAt: c.createdAt.toISOString(),
+    updatedAt: c.updatedAt.toISOString(),
+  }));
+
+  return (
+    <>
+      <BackgroundLayer
+        wallpapers={wallpapers}
+        preferences={wallpaperPreferences}
+        scrim={
+          typeof wallpaperScrim === 'number'
+            ? wallpaperScrim
+            : WALLPAPER_SCRIM_DEFAULT
+        }
+      />
+      <AppShell
+        contentPadding={4}
+        height="fill"
+        // 背景透明：StyleX 的 x1eiddq6 类设置了不透明 background-body 色，
+        // 用 inline style 覆盖让 BackgroundLayer 透出来
+        style={{ backgroundColor: 'transparent' }}
+      >
+        <FloatingLogo brand={brand} />
+        <FloatingToolbar
+          networkMode={networkMode}
+          cardSimpleMode={cardSimpleMode}
+          repoUrl={getRepoUrl()}
+          manualUrl={getManualUrl()}
+        />
+        <EditModeBanner />
+
+        {/* 首屏分三段：时钟/搜索聚焦入口、widget 状态横条、图标内容区。 */}
+        <VStack gap={10} className="mx-auto w-full max-w-[1360px] pt-28">
+          {usingDefaultPassword && <DefaultPasswordBanner />}
+          <VStack gap={4} className="mx-auto w-full max-w-[720px]">
+            <HomeClock />
+            <SearchBox initialEngine={searchEngine} engines={engines} />
+          </VStack>
+
+          <WidgetBar initialInstances={initialInstances} />
+
+          <HomeContent
+            categories={serializedCategories}
+            unclassifiedCards={serializedUnclassified}
+            networkMode={networkMode}
+            cardSimpleMode={cardSimpleMode}
+            cardStatusBadge={cardStatusBadge}
+          />
+        </VStack>
+      </AppShell>
+    </>
+  );
+}

@@ -1,0 +1,39 @@
+import { NextResponse } from 'next/server';
+import { validateBody, withAuth } from '@/lib/api';
+import { prisma } from '@/lib/db';
+import { categoryReorderSchema } from '@/lib/validation';
+
+/**
+ * 分类重排 API
+ * - PATCH: 批量更新 order（拖拽重排）
+ *
+ * 请求体：{ items: CategoryReorderItem[] }
+ * 响应：{ success: true }
+ */
+export const PATCH = withAuth(async (_session, req) => {
+  const body = await req.json();
+  const parsed = validateBody(categoryReorderSchema, body);
+  if (!parsed.ok) return parsed.response;
+  const { items } = parsed.data;
+
+  // 事务前校验：所有分类必须存在
+  const ids = [...new Set(items.map((item) => item.id))];
+  const found = await prisma.category.findMany({
+    where: { id: { in: ids } },
+    select: { id: true },
+  });
+  if (found.length !== ids.length) {
+    return NextResponse.json({ error: '分类不存在' }, { status: 400 });
+  }
+
+  await prisma.$transaction(
+    items.map((item) =>
+      prisma.category.update({
+        where: { id: item.id },
+        data: { order: item.order },
+      }),
+    ),
+  );
+
+  return NextResponse.json({ success: true });
+});

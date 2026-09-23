@@ -1,0 +1,210 @@
+'use client';
+
+import { Button } from '@astryxdesign/core/Button';
+import { DialogHeader, useImperativeDialog } from '@astryxdesign/core/Dialog';
+import { Text } from '@astryxdesign/core/Text';
+import { useToast } from '@astryxdesign/core/Toast';
+import { VStack } from '@astryxdesign/core/VStack';
+import {
+  DateItemForm,
+  type DateItemFormInput,
+} from '@/components/widgets/DateItemForm';
+import { DIALOG_WIDTH } from '@/lib/design-tokens';
+import type { DateItem } from '@/types';
+
+type DateWidgetKey = 'countdown' | 'countup';
+
+/** 两类日期 widget 的文案差异（结构完全一致，仅文案与是否支持循环不同） */
+const PANEL_META: Record<
+  DateWidgetKey,
+  {
+    title: string;
+    subtitle: string;
+    namePlaceholder: string;
+    dateLabel: string;
+    requiredHint: string;
+    deleteTitle: string;
+    deleteHint: string;
+  }
+> = {
+  countdown: {
+    title: '管理倒数日',
+    subtitle: '循环项会按下一次发生时间计算，临近 3 天内会高亮提醒。',
+    namePlaceholder: '如：春节',
+    dateLabel: '日期',
+    requiredHint: '请填写名称和日期',
+    deleteTitle: '删除倒数日',
+    deleteHint: '删除后不会保留历史记录。',
+  },
+  countup: {
+    title: '管理正数日',
+    subtitle: '从开始日期起持续累计，每年临近周年会显示提醒。',
+    namePlaceholder: '如：在一起的日子',
+    dateLabel: '起始日期',
+    requiredHint: '请填写名称和起始日期',
+    deleteTitle: '删除正数日',
+    deleteHint: '删除后累计天数会一起清空。',
+  },
+};
+
+type DateItemInput = DateItemFormInput;
+
+interface DateItemConfigPanelProps {
+  /** 决定文案与是否展示循环设置（循环仅倒数日支持） */
+  widgetKey: DateWidgetKey;
+  items: DateItem[];
+  onAdd: (input: DateItemInput) => Promise<void>;
+  onUpdate: (id: string, input: Partial<DateItemInput>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  /** 保存成功 / 取消后关闭弹窗 */
+  onDone: () => void;
+}
+
+/** 倒数日 / 正数日共用的日期项管理面板（单卡片单日期项，编辑首个 item） */
+export function DateItemConfigPanel({
+  widgetKey,
+  items,
+  onAdd,
+  onUpdate,
+  onDelete,
+  onDone,
+}: DateItemConfigPanelProps) {
+  const primaryItem = items[0] ?? null;
+  // key 跟随编辑对象：新增 ↔ 编辑切换、删除后回到空表单时整体重挂载，
+  // 表单 state 自然重置（替代 effect 监听 prop 变化逐个 setState）
+  return (
+    <PanelForm
+      key={primaryItem?.id ?? 'new'}
+      widgetKey={widgetKey}
+      primaryItem={primaryItem}
+      onAdd={onAdd}
+      onUpdate={onUpdate}
+      onDelete={onDelete}
+      onDone={onDone}
+    />
+  );
+}
+
+interface PanelFormProps extends Omit<DateItemConfigPanelProps, 'items'> {
+  /** 当前编辑的日期项；null 表示新增 */
+  primaryItem: DateItem | null;
+}
+
+function PanelForm({
+  widgetKey,
+  primaryItem,
+  onAdd,
+  onUpdate,
+  onDelete,
+  onDone,
+}: PanelFormProps) {
+  const meta = PANEL_META[widgetKey];
+  const confirmDialog = useImperativeDialog();
+  const showToast = useToast();
+
+  const handleSubmit = async (input: DateItemInput) => {
+    if (primaryItem) {
+      await onUpdate(primaryItem.id, input);
+      showToast({ body: `已更新「${input.name}」`, type: 'info' });
+    } else {
+      await onAdd(input);
+      showToast({ body: `已添加「${input.name}」`, type: 'info' });
+    }
+  };
+
+  const handleDelete = async (item: DateItem) => {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      confirmDialog.show(
+        <VStack gap={4}>
+          <DialogHeader
+            title={meta.deleteTitle}
+            onOpenChange={(open) => !open && resolve(false)}
+          />
+          <VStack gap={1}>
+            <Text>确认删除「{item.name}」吗？</Text>
+            <Text size="sm" color="secondary">
+              {meta.deleteHint}
+            </Text>
+          </VStack>
+          <div className="flex justify-end gap-2">
+            <Button
+              label="取消"
+              variant="ghost"
+              onClick={() => {
+                confirmDialog.hide();
+                resolve(false);
+              }}
+            />
+            <Button
+              label="删除"
+              variant="destructive"
+              onClick={() => {
+                confirmDialog.hide();
+                resolve(true);
+              }}
+            />
+          </div>
+        </VStack>,
+        { purpose: 'required', width: DIALOG_WIDTH.md },
+      );
+    });
+
+    if (!confirmed) return;
+
+    try {
+      await onDelete(item.id);
+      showToast({
+        body: `已删除「${item.name}」`,
+        type: 'info',
+      });
+    } catch (e) {
+      showToast({
+        body: e instanceof Error ? e.message : '删除失败',
+        type: 'error',
+      });
+    }
+  };
+
+  return (
+    <VStack gap={3}>
+      <VStack gap={0.5}>
+        <Text as="h2">{meta.title}</Text>
+        <Text size="sm" color="secondary">
+          {meta.subtitle}
+        </Text>
+      </VStack>
+
+      <DateItemForm
+        widgetKey={widgetKey}
+        initial={
+          primaryItem
+            ? {
+                name: primaryItem.name,
+                date: primaryItem.date.slice(0, 10),
+                recurUnit: primaryItem.recurUnit,
+              }
+            : undefined
+        }
+        namePlaceholder={meta.namePlaceholder}
+        dateLabel={meta.dateLabel}
+        requiredHint={meta.requiredHint}
+        submitLabel="保存"
+        onSubmit={handleSubmit}
+        onSuccess={onDone}
+        onCancel={primaryItem ? onDone : undefined}
+        extraActions={
+          primaryItem && (
+            <Button
+              label="删除"
+              variant="ghost"
+              size="sm"
+              onClick={() => void handleDelete(primaryItem)}
+            />
+          )
+        }
+      />
+
+      {confirmDialog.element}
+    </VStack>
+  );
+}

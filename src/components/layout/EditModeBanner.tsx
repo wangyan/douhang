@@ -1,0 +1,59 @@
+'use client';
+
+import { HStack } from '@astryxdesign/core/HStack';
+import { Text } from '@astryxdesign/core/Text';
+import { Pencil } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { BATCH_DELETE_MODE_EVENT } from '@/components/layout/card-view-events';
+import { EDIT_MODE_CHANGE_EVENT } from '@/components/layout/edit-mode-event';
+import { ICON_SIZE } from '@/lib/design-tokens';
+
+/**
+ * 编辑态底部提示条
+ *
+ * - 监听 FloatingToolbar 的 edit-mode-change 事件
+ * - 编辑态时从底部滑入，提示「拖拽排序 · ESC 退出」
+ * - 与 FloatingToolbar 同族的 surface 浮层；图标 + 文案提高编辑态辨识度
+ */
+export function EditModeBanner() {
+  const [editMode, setEditMode] = useState(false);
+  // 批量删除模式下操作条占据同一位置，此时隐藏编辑提示条避免重叠
+  const [batchMode, setBatchMode] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setEditMode((e as CustomEvent<boolean>).detail);
+    };
+    window.addEventListener(EDIT_MODE_CHANGE_EVENT, handler);
+    return () => window.removeEventListener(EDIT_MODE_CHANGE_EVENT, handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setBatchMode((e as CustomEvent<boolean>).detail);
+    };
+    window.addEventListener(BATCH_DELETE_MODE_EVENT, handler);
+    return () => window.removeEventListener(BATCH_DELETE_MODE_EVENT, handler);
+  }, []);
+
+  if (!editMode || batchMode) return null;
+
+  return (
+    <HStack
+      justify="center"
+      role="status"
+      className="pointer-events-none fixed inset-x-0 bottom-5 z-chrome edit-banner-enter"
+    >
+      <HStack
+        align="center"
+        gap={2}
+        paddingInline={4}
+        paddingBlock={2}
+        className="rounded-widget bg-surface/85 text-primary border border-border shadow-float backdrop-blur-md"
+      >
+        <Pencil size={ICON_SIZE.md} aria-hidden="true" />
+        <Text type="label">编辑模式 · 拖拽排序 · ESC 退出</Text>
+      </HStack>
+    </HStack>
+  );
+}

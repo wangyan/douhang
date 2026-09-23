@@ -1,0 +1,81 @@
+'use client';
+
+import { useCallback, useEffect, useMemo } from 'react';
+import useSWR from 'swr';
+import { NETWORK_MODE_CHANGE_EVENT } from '@/lib/network-mode';
+import { cardsApi } from '@/services/cards';
+import type { CardStatus, CardStatusResult } from '@/types';
+
+interface UseCardStatusesResult {
+  statuses: Record<string, CardStatus>;
+  isLoading: boolean;
+  refresh: () => Promise<void>;
+  /** 单卡片刷新（点击卡片时触发，乐观更新） */
+  refreshOne: (cardId: string) => Promise<void>;
+}
+
+/**
+ * 卡片状态灯 hook
+ *
+ * - useSWR 拉取批量状态
+ * - 监听 'network-mode-change' 事件触发 mutate
+ * - refreshOne 用乐观更新（局部 mutate）
+ */
+export function useCardStatuses(): UseCardStatusesResult {
+  const {
+    data,
+    isLoading,
+    mutate: swrMutate,
+  } = useSWR(cardsApi.statusKey, cardsApi.listStatuses, {
+    // 服务端真实探测，60 秒轮询让「服务挂了」能被持续发现
+    refreshInterval: 60_000,
+  });
+
+  // 错误由 errorMiddleware 统一处理（toast / 401 跳转），业务层不重复 console.error
+
+  const statuses = useMemo(() => {
+    const map: Record<string, CardStatus> = {};
+    data?.items.forEach((i: CardStatusResult) => {
+      map[i.id] = i.status;
+    });
+    return map;
+  }, [data]);
+
+  const refresh = useCallback(async () => {
+    await swrMutate();
+  }, [swrMutate]);
+
+  const refreshOne = useCallback(
+    async (cardId: string) => {
+      try {
+        const result = await cardsApi.getStatus(cardId);
+        // 局部 mutate：只更新单卡片状态，不重新请求
+        await swrMutate(
+          (prev) => {
+            if (!prev) return prev;
+            return {
+              items: prev.items.map((i) =>
+                i.id === cardId ? { ...i, status: result.status } : i,
+              ),
+            };
+          },
+          { revalidate: false },
+        );
+      } catch (e) {
+        console.error('单卡片探测失败', e);
+      }
+    },
+    [swrMutate],
+  );
+
+  // 网络模式切换时重新探测
+  useEffect(() => {
+    const handler = () => {
+      void swrMutate();
+    };
+    window.addEventListener(NETWORK_MODE_CHANGE_EVENT, handler);
+    return () => window.removeEventListener(NETWORK_MODE_CHANGE_EVENT, handler);
+  }, [swrMutate]);
+
+  return { statuses, isLoading, refresh, refreshOne };
+}

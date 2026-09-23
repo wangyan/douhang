@@ -1,0 +1,394 @@
+/**
+ * 日期计算工具（基于 date-fns）
+ *
+ * 统一使用 date-fns 的日历日比较，避免夏令时与时区带来的 24 小时误差。
+ */
+
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  addYears,
+  differenceInCalendarDays,
+  format,
+  getDate,
+  getDay,
+  getDaysInMonth,
+  intervalToDuration,
+} from 'date-fns';
+import { zhCN } from 'date-fns/locale';
+
+/** 循环粒度：每周 / 每月 / 每年 */
+export type RecurUnit = 'week' | 'month' | 'year';
+
+/** 将日期截到当月有效范围（如 1 月 31 日的月循环在 2 月落到 28 日） */
+function clampToMonth(year: number, month: number, day: number): Date {
+  return new Date(
+    year,
+    month,
+    Math.min(day, getDaysInMonth(new Date(year, month))),
+  );
+}
+
+/**
+ * 解析 `YYYY-MM-DD` 为该日的 UTC 零点；格式或日历日非法返回 null
+ *
+ * 日期项按日历日语义存储，读取侧由下方的 `itemCalendarDate` 还原；
+ * 写入前统一在此校验，避免 `new Date()` 对非法字符串静默回绕（如 2 月 30 日）。
+ */
+export function parseDateOnly(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  // 回绕校验：排除 2 月 30 日等非法日历日
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+/**
+ * 日期项日历日还原
+ *
+ * 日期项按日历日存储为该日 UTC 零点（写入见 `parseDateOnly`），
+ * 展示与计算前统一还原为本地日历日，日历字段以 UTC 日号为准。
+ */
+
+/** 将日期项的 ISO 时间戳（UTC 零点）还原为本地日历日 */
+export function itemCalendarDate(iso: string): Date {
+  const d = new Date(iso);
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+/** 日期项的日号（UTC 日号，用于「每月 X 号」锚点） */
+export function itemDayOfMonth(iso: string): number {
+  return new Date(iso).getUTCDate();
+}
+
+/** 「今天」的本地日历日 */
+export function todayCalendarDate(now: Date = new Date()): Date {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+/** 日历日差（to − from），两侧各取 (y, m, d) 转 UTC 零点后求差 */
+export function calendarDayDiff(from: Date, to: Date): number {
+  const fromUtc = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate());
+  const toUtc = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate());
+  return Math.round((toUtc - fromUtc) / 86_400_000);
+}
+
+/**
+ * 循环日期的下一次发生（周/月/年循环共用）
+ *
+ * - week：锚定目标日期的星期几
+ * - month：锚定几号；小月截到月末（锚 31 号时 2 月落 28 日，3 月恢复 31 日）
+ * - year：锚定月日；2 月 29 日平年落 2 月 28 日
+ * - 当天发生返回今天（不后跳）
+ */
+export function nextOccurrence(
+  target: Date,
+  unit: RecurUnit,
+  now: Date = new Date(),
+): Date {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (unit === 'week') {
+    const delta = (getDay(target) - getDay(today) + 7) % 7;
+    return addDays(today, delta);
+  }
+
+  if (unit === 'month') {
+    let next = clampToMonth(now.getFullYear(), now.getMonth(), getDate(target));
+    if (differenceInCalendarDays(next, now) < 0) {
+      const nextMonth = addMonths(today, 1);
+      next = clampToMonth(
+        nextMonth.getFullYear(),
+        nextMonth.getMonth(),
+        getDate(target),
+      );
+    }
+    return next;
+  }
+
+  let next = clampToMonth(
+    now.getFullYear(),
+    target.getMonth(),
+    getDate(target),
+  );
+  if (differenceInCalendarDays(next, now) < 0) {
+    next = clampToMonth(
+      now.getFullYear() + 1,
+      target.getMonth(),
+      getDate(target),
+    );
+  }
+  return next;
+}
+
+/** 下一次发生的上一个周期起点（用于循环进度计算） */
+export function prevOccurrence(next: Date, unit: RecurUnit): Date {
+  if (unit === 'week') return addWeeks(next, -1);
+  if (unit === 'month') return addMonths(next, -1);
+  return addYears(next, -1);
+}
+
+/**
+ * 倒数日：返回距离目标日期的天数
+ *
+ * - target 在未来或今天：直接返回差值（>=0）
+ * - target 已过去：自动推到今年的同月同日；今年也过去则推到明年
+ *   （用于"每年循环"倒数日场景，调用方负责区分 recurring 语义；
+ *   与 nextOccurrence 的年循环同口径：2 月 29 日平年落 2 月 28 日）
+ *
+ * "已过去"按日历日判断（differenceInCalendarDays < 0），
+ * 避免同一天内时间差导致"已过"误判
+ */
+export function daysUntil(
+  target: Date,
+  now: Date = new Date(),
+): { days: number; nextDate: Date; isFuture: boolean } {
+  let next = target;
+
+  // 按日历日判断"已过去"：target 在 now 之前（且非同一天）
+  if (differenceInCalendarDays(target, now) < 0) {
+    // 已过去：推到今年的同月同日（号数不存在时截到月末）
+    next = clampToMonth(now.getFullYear(), target.getMonth(), target.getDate());
+    if (differenceInCalendarDays(next, now) < 0) {
+      // 今年也过去：推到明年（同样截到月末）
+      next = clampToMonth(
+        now.getFullYear() + 1,
+        target.getMonth(),
+        target.getDate(),
+      );
+    }
+  }
+
+  const days = differenceInCalendarDays(next, now);
+  return { days, nextDate: next, isFuture: days >= 0 };
+}
+
+/** 格式化为 YYYY-MM-DD */
+export function formatDate(date: Date): string {
+  return format(date, 'yyyy-MM-dd');
+}
+
+/** 格式化为 M月D日（紧凑显示，不补零） */
+export function formatDateShort(date: Date): string {
+  return format(date, 'M月d日');
+}
+
+/** 格式化为星期几（如「星期六」） */
+export function formatWeekday(date: Date): string {
+  return format(date, 'EEEE', { locale: zhCN });
+}
+
+/**
+ * 计算从 start 到 end 的流逝进度（0~1，超出范围自动截断）
+ *
+ * end <= start（区间无效）时视为已完成，返回 1
+ */
+export function progressBetween(
+  start: Date,
+  end: Date,
+  now: Date = new Date(),
+): number {
+  const total = end.getTime() - start.getTime();
+  if (total <= 0) return 1;
+  const elapsed = now.getTime() - start.getTime();
+  return Math.min(1, Math.max(0, elapsed / total));
+}
+
+/** 日期主指标展示单位：天 / 周 / 月 / 年 / 完整年月 */
+export type DateDurationDisplayMode =
+  | 'day'
+  | 'week'
+  | 'month'
+  | 'year'
+  | 'full';
+
+/** 日期主指标（年/月模式下包含剩余天数） */
+interface DateDurationMetric {
+  value: number;
+  unit: '天' | '周' | '个月' | '年';
+  totalDays: number;
+  remainderDays: number;
+  label: string;
+  breakdownLabel: string;
+}
+
+/** 已经过的时长分解（年/月/周/日，日历口径） */
+interface ElapsedBreakdown {
+  years: number;
+  months: number;
+  weeks: number;
+  days: number;
+}
+
+function calendarDate(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+/** 计算两日期间的日历时长分解（与方向无关，始终取绝对时长） */
+function calendarDurationBreakdown(start: Date, end: Date): ElapsedBreakdown {
+  const from = calendarDate(start);
+  const to = calendarDate(end);
+  const days = differenceInCalendarDays(to, from);
+  if (days === 0) {
+    return { years: 0, months: 0, weeks: 0, days: 0 };
+  }
+  const duration = intervalToDuration({
+    start: days > 0 ? from : to,
+    end: days > 0 ? to : from,
+  });
+  const remDays = duration.days ?? 0;
+  return {
+    years: duration.years ?? 0,
+    months: duration.months ?? 0,
+    weeks: Math.floor(remDays / 7),
+    days: remDays % 7,
+  };
+}
+
+/** 按展示单位换算日期间隔，并保留完整分解用于辅助信息 */
+export function dateDurationMetric(
+  start: Date,
+  end: Date,
+  mode: DateDurationDisplayMode,
+): DateDurationMetric {
+  const from = calendarDate(start);
+  const to = calendarDate(end);
+  const directionalDays = differenceInCalendarDays(to, from);
+  const earlier = directionalDays > 0 ? from : to;
+  const later = directionalDays > 0 ? to : from;
+  const breakdown = calendarDurationBreakdown(earlier, later);
+  const totalDays = Math.abs(directionalDays);
+  const weekRemainderDays = totalDays % 7;
+  const fullMonths = breakdown.years * 12 + breakdown.months;
+  const monthRemainderDays = Math.abs(
+    differenceInCalendarDays(later, addMonths(earlier, fullMonths)),
+  );
+  const yearRemainderDays = Math.abs(
+    differenceInCalendarDays(later, addYears(earlier, breakdown.years)),
+  );
+  const fullRemainderDays = Math.abs(
+    differenceInCalendarDays(later, addMonths(earlier, fullMonths)),
+  );
+  const base = {
+    totalDays,
+    breakdownLabel: formatElapsedBreakdown(breakdown),
+  };
+  const formatPrimaryLabel = (
+    value: number,
+    unit: string,
+    remainderDays: number,
+  ) => {
+    return remainderDays > 0
+      ? `${value}${unit} ${remainderDays}天`
+      : `${value}${unit}`;
+  };
+
+  if (mode === 'week') {
+    return {
+      ...base,
+      value: Math.floor(totalDays / 7),
+      unit: '周',
+      remainderDays: weekRemainderDays,
+      label: formatPrimaryLabel(
+        Math.floor(totalDays / 7),
+        '周',
+        weekRemainderDays,
+      ),
+    };
+  }
+
+  if (mode === 'year') {
+    return {
+      ...base,
+      value: breakdown.years,
+      unit: '年',
+      remainderDays: yearRemainderDays,
+      label: formatPrimaryLabel(breakdown.years, '年', yearRemainderDays),
+    };
+  }
+
+  if (mode === 'month') {
+    return {
+      ...base,
+      value: fullMonths,
+      unit: '个月',
+      remainderDays: monthRemainderDays,
+      label: formatPrimaryLabel(fullMonths, '个月', monthRemainderDays),
+    };
+  }
+
+  if (mode === 'full') {
+    return {
+      ...base,
+      value: breakdown.years,
+      unit: '年',
+      remainderDays: fullRemainderDays,
+      label: `${breakdown.years}年 ${breakdown.months}个月 ${fullRemainderDays}天`,
+    };
+  }
+
+  return {
+    ...base,
+    value: totalDays,
+    unit: '天',
+    remainderDays: 0,
+    label: `${totalDays}天`,
+  };
+}
+
+/** 格式化为「3 年 3 个月 1 周 2 天」，零值省略，全零返回「0 天」 */
+function formatElapsedBreakdown(b: ElapsedBreakdown): string {
+  const parts: string[] = [];
+  if (b.years) parts.push(`${b.years} 年`);
+  if (b.months) parts.push(`${b.months} 个月`);
+  if (b.weeks) parts.push(`${b.weeks} 周`);
+  if (b.days || parts.length === 0) parts.push(`${b.days} 天`);
+  return parts.join(' ');
+}
+/**
+ * 循环锚点日期合成（日期选择器按循环粒度适配时使用）
+ *
+ * 锚点只需承载对应粒度信息：
+ * - week：承载星期几
+ * - month：承载号数（必须保留原号数，否则「每月 31 号」会被截成 28 号）
+ * - year：承载月日
+ */
+
+/** 指定星期几的锚点日期：今天起最近的一个该星期几（0=周日） */
+export function dateForWeekday(weekday: number, now: Date = new Date()): Date {
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return addDays(today, (weekday - getDay(today) + 7) % 7);
+}
+
+/** 指定号数的锚点日期：取最近一个能容纳该号数的月份（保留号数供循环锚定） */
+export function dateForDayOfMonth(day: number, now: Date = new Date()): Date {
+  let year = now.getFullYear();
+  let month = now.getMonth();
+  // 小月没有 29/30/31 号时往后找能容纳的月份
+  while (day > getDaysInMonth(new Date(year, month, 1))) {
+    const next = addMonths(new Date(year, month, 1), 1);
+    year = next.getFullYear();
+    month = next.getMonth();
+  }
+  return new Date(year, month, day);
+}
+
+/** 指定月日的锚点日期：取今年，号数超出该月则截到月末（month 为 1~12） */
+export function dateForMonthDay(
+  month: number,
+  day: number,
+  now: Date = new Date(),
+): Date {
+  return clampToMonth(now.getFullYear(), month - 1, day);
+}
