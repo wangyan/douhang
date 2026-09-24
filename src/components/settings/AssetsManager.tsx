@@ -1,32 +1,17 @@
 'use client';
 
 import { AlertDialog } from '@astryxdesign/core/AlertDialog';
-import { DropdownMenu } from '@astryxdesign/core/DropdownMenu';
 import { useMediaQuery } from '@astryxdesign/core/hooks';
-import { IconButton } from '@astryxdesign/core/IconButton';
-import {
-  SegmentedControl,
-  SegmentedControlItem,
-} from '@astryxdesign/core/SegmentedControl';
 import { Text } from '@astryxdesign/core/Text';
-import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
-import {
-  ArrowUpDown,
-  Check,
-  ImagePlus,
-  LayoutGrid,
-  List,
-  Search,
-  Shapes,
-  Upload,
-} from 'lucide-react';
+import { ImagePlus, Shapes } from 'lucide-react';
 import { useAssetsController } from '@/components/settings/assets/useAssetsController';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { ICON_SIZE } from '@/lib/design-tokens';
 import type { Wallpaper } from '@/types';
+import { AssetsControls } from './AssetsControls';
 import { EmptyState, GridContent, ListContent } from './assets/AssetsContent';
-import { AssetsToolbar, BulkActionsBar } from './assets/AssetsToolbar';
+import { BulkActionsBar } from './assets/AssetsToolbar';
 import {
   bulkDeleteDescription,
   type UploadedIcon,
@@ -63,118 +48,14 @@ export function AssetsManager({
     iconUsage,
   });
 
-  const typeControl = (
-    <SegmentedControl
-      value={ctl.tab}
-      onChange={(v) => ctl.setTab(v as Parameters<typeof ctl.setTab>[0])}
-      label="素材类型"
-    >
-      <SegmentedControlItem
-        value="icon"
-        label={`图标 ${icons.length}`}
-        icon={<Shapes size={ICON_SIZE.sm} />}
-      />
-      <SegmentedControlItem
-        value="wallpaper"
-        label={`壁纸 ${wallpapers.length}`}
-        icon={<ImagePlus size={ICON_SIZE.sm} />}
-      />
-    </SegmentedControl>
-  );
-
-  const searchInput = (
-    <TextInput
-      label="搜索文件名"
-      isLabelHidden
-      value={ctl.query}
-      onChange={ctl.setQuery}
-      placeholder="搜索文件名"
-      startIcon={Search}
-      hasClear
-      width={isCompact ? '100%' : 160}
-    />
-  );
-
-  const sortMenu = (
-    <DropdownMenu
-      button={{
-        label: '排序',
-        icon: <ArrowUpDown size={ICON_SIZE.sm} />,
-        variant: 'ghost',
-      }}
-      items={[
-        {
-          id: 'name',
-          label: '按名称',
-          icon: ctl.sort === 'name' ? <Check size={ICON_SIZE.sm} /> : undefined,
-          onClick: () => ctl.setSort('name'),
-        },
-        {
-          id: 'mtime',
-          label: '按修改时间',
-          icon:
-            ctl.sort === 'mtime' ? <Check size={ICON_SIZE.sm} /> : undefined,
-          onClick: () => ctl.setSort('mtime'),
-        },
-      ]}
-      menuWidth={140}
-      hasChevron={false}
-    />
-  );
-
-  const viewButton = (
-    <IconButton
-      label={ctl.view === 'grid' ? '切换到列表' : '切换到网格'}
-      tooltip={ctl.view === 'grid' ? '切换到列表' : '切换到网格'}
-      icon={
-        ctl.view === 'grid' ? (
-          <List size={ICON_SIZE.sm} />
-        ) : (
-          <LayoutGrid size={ICON_SIZE.sm} />
-        )
-      }
-      variant="ghost"
-      onClick={() => ctl.setView(ctl.view === 'grid' ? 'list' : 'grid')}
-    />
-  );
-
-  const uploadMenu = (
-    <DropdownMenu
-      button={{
-        label: ctl.uploading ? '上传中…' : '上传',
-        icon: <Upload size={ICON_SIZE.sm} />,
-        variant: 'primary',
-        size: 'sm',
-      }}
-      items={[
-        {
-          id: 'icon',
-          label: '上传图标',
-          icon: <Shapes size={ICON_SIZE.sm} />,
-          onClick: () => ctl.iconUpload.open(),
-        },
-        {
-          id: 'wallpaper',
-          label: '上传壁纸',
-          icon: <ImagePlus size={ICON_SIZE.sm} />,
-          onClick: () => ctl.imageUpload.open(),
-        },
-      ]}
-      menuWidth={160}
-    />
-  );
-
   return (
     <SettingsSection title="素材管理" description="已上传的卡片图标与壁纸文件">
       <VStack gap={5}>
-        {/* 主工具栏常驻；批量操作独立出现，避免筛选上下文被替换 */}
-        <AssetsToolbar
+        <AssetsControls
+          ctl={ctl}
           isCompact={isCompact}
-          typeControl={typeControl}
-          searchInput={searchInput}
-          sortMenu={sortMenu}
-          viewButton={viewButton}
-          uploadMenu={uploadMenu}
+          icons={icons}
+          wallpapers={wallpapers}
         />
 
         {ctl.hasSelection && (

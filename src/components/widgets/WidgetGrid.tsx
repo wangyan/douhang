@@ -39,6 +39,7 @@ import { QbittorrentReconfigureDialog } from './QbittorrentReconfigureDialog';
 import { WIDGET_RENDERERS } from './registry';
 import {
   buildWidgetLayout,
+  fillMissingPositions,
   resolveLayoutMode,
   WIDGET_GRID_COLUMNS,
   WIDGET_GRID_MARGIN_X,
@@ -75,6 +76,7 @@ const INITIAL_QB_STATS: QbittorrentStats = {
     paused: 0,
   },
   lifetime: { uploaded: 0, downloaded: 0, total: 0 },
+  freeSpace: null,
 };
 
 /**
@@ -228,7 +230,7 @@ function getWidgetMenuContent(inst: WidgetInstance, cb: WidgetMenuCallbacks) {
 interface WidgetGridProps {
   instances: WidgetInstance[];
   isEditMode: boolean;
-  onReorder: (ids: string[]) => Promise<void>;
+  onMove: (moves: Array<{ id: string; x: number; y: number }>) => Promise<void>;
   onResize: (id: string, size: WidgetSize) => Promise<void>;
   onRemove: (id: string) => void;
 }
@@ -242,7 +244,7 @@ interface WidgetGridProps {
 export function WidgetGrid({
   instances,
   isEditMode,
-  onReorder,
+  onMove,
   onResize,
   onRemove,
 }: WidgetGridProps) {
@@ -290,7 +292,21 @@ export function WidgetGrid({
     );
   }, [mounted, width]);
 
-  // instances → RGL layout（按列数 bin-packing）
+  // 存量数据坐标回填：迁移后 x/y 为 null 的实例按 order 扫描补位并持久化
+  // （渲染端 buildWidgetLayout 已兜底显示，此处负责落库）
+  useEffect(() => {
+    if (!mounted) return;
+    if (instances.length === 0) return;
+    if (instances.every((i) => i.x !== null && i.y !== null)) return;
+    const fills = fillMissingPositions(instances).filter((f) => {
+      const inst = instances.find((i) => i.id === f.id);
+      return inst && (inst.x !== f.x || inst.y !== f.y);
+    });
+    if (fills.length === 0) return;
+    void onMove(fills);
+  }, [mounted, instances, onMove]);
+
+  // instances → RGL layout（坐标持久化 + 垂直紧凑：拖放后自动收敛不留空）
   const layout = useMemo<LayoutItem[]>(
     () => buildWidgetLayout(instances, layoutMode ?? 'four'),
     [instances, layoutMode],
@@ -310,25 +326,20 @@ export function WidgetGrid({
     }
   }, [mounted]);
 
-  // 拖拽结束：新 layout → 反推 order
+  // 拖拽结束：RGL 已按垂直紧凑收敛布局，把有变化的坐标持久化（永不留空）
   const handleDragStop = useCallback(
     (newLayout: readonly LayoutItem[]) => {
-      const sorted = [...newLayout].sort((a, b) => {
-        if (a.y !== b.y) return a.y - b.y;
-        return a.x - b.x;
+      const moves = newLayout.flatMap((l) => {
+        const inst = instances.find((i) => i.id === l.i);
+        if (!inst) return [];
+        if (inst.x === l.x && inst.y === l.y) return [];
+        return [{ id: l.i, x: l.x, y: l.y }];
       });
-      const newOrder = sorted.map((l) => l.i);
-      const oldOrder = [...instances]
-        .sort((a, b) => a.order - b.order)
-        .map((i) => i.id);
-      const changed =
-        newOrder.length !== oldOrder.length ||
-        newOrder.some((id, i) => id !== oldOrder[i]);
-      if (changed) {
-        void onReorder(newOrder);
+      if (moves.length > 0) {
+        void onMove(moves);
       }
     },
-    [instances, onReorder],
+    [instances, onMove],
   );
 
   return (

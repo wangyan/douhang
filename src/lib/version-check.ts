@@ -13,8 +13,10 @@ const VERSION_CHECK_ENABLED_KEY = 'versionCheckEnabled';
 const VERSION_CHECK_TOKEN_KEY = 'versionCheckToken';
 /** 最近一次检查结果缓存（UserPreference key） */
 const VERSION_CHECK_CACHE_KEY = 'versionCheckCache';
-/** 自动检查间隔：24h，用户可随时手动强制检查 */
-const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+/** 无更新结果缓存 1h：新版本发布后最迟 1 小时内被检测到 */
+const CHECK_INTERVAL_NO_UPDATE_MS = 60 * 60 * 1000;
+/** 已发现更新的结果缓存 6h：期间有更新发布也能及时跟上 */
+const CHECK_INTERVAL_UPDATE_FOUND_MS = 6 * 60 * 60 * 1000;
 
 /** 获取用于版本检测的有效授权令牌（数据库设置优先，回落环境变量） */
 async function getEffectiveToken(): Promise<string | undefined> {
@@ -55,7 +57,7 @@ async function fetchLatestRelease(): Promise<Omit<
  * 检查远端是否有新版本
  *
  * - 开关关闭时不发起任何请求
- * - 距上次成功检查不足 24h 直接返回缓存（force = true 跳过节流）
+ * - 距上次成功检查未过期直接返回缓存（无更新 1h / 有更新 6h，force = true 跳过节流）
  * - 请求失败时回落缓存并带 error 提示
  */
 export async function checkForUpdate(
@@ -77,7 +79,10 @@ export async function checkForUpdate(
   const cacheFresh =
     cached !== null &&
     Number.isFinite(Date.parse(cached.checkedAt)) &&
-    Date.now() - Date.parse(cached.checkedAt) < CHECK_INTERVAL_MS;
+    Date.now() - Date.parse(cached.checkedAt) <
+      (isNewerVersion(currentVersion, cached.tag)
+        ? CHECK_INTERVAL_UPDATE_FOUND_MS
+        : CHECK_INTERVAL_NO_UPDATE_MS);
   const resolve = (info: VersionUpdateInfo | null): VersionCheckResult => ({
     enabled: true,
     currentVersion,

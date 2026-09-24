@@ -263,7 +263,7 @@ export function CardPreviewDialog({
           <iframe
             src={href}
             title={name}
-            sandbox="allow-scripts allow-forms allow-popups allow-downloads"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads"
             className={frameClassName}
             style={frameStyle}
           />

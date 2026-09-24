@@ -135,7 +135,7 @@ datasource db { provider = "sqlite" }
 | `User` | 单用户账号，保存 `username` 与 `passwordHash`（bcrypt） | `username` 唯一 |
 | `Category` | 分类，单层扁平结构，`order` 支持拖拽排序 | 一对多 `cards`，删除时置空 |
 | `Card` | 服务卡片，含内外网地址、图标、描述与 `openInDialog` | 多对一 `category` |
-| `WidgetInstance` | Widget 实例，含 `widgetKey`、`order`、`size`（S/M/L） | 一对多 `dateItems`，级联删除 |
+| `WidgetInstance` | Widget 实例，含 `widgetKey`、`order`、`size`（S/M/L）、自由坐标 `x`/`y` | 一对多 `dateItems`，级联删除 |
 | `DateItem` | 日期项，倒数日与正数日共用，含 `instanceId`、`date`、`recurUnit` | 多对一 `instance` |
 | `UserPreference` | 全局键值配置 | `key` 唯一 |
 | `Wallpaper` | 壁纸，区分预设与上传 | `source`、`path`、`thumbnail` |

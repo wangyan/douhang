@@ -150,6 +150,8 @@ export interface QbittorrentStats {
   summary: QbittorrentSummary;
   /** 全生命周期累计统计（空闲状态下的填充内容） */
   lifetime: QbLifetimeStats;
+  /** 下载目录剩余空间（bytes；首次同步成功前为 null） */
+  freeSpace: number | null;
 }
 
 /** 卡片探测结果 */
@@ -196,6 +198,9 @@ export interface WidgetInstance {
   widgetKey: WidgetKey;
   order: number;
   size: WidgetSize;
+  /// 自由布局网格坐标（4 列制，null = 未定制，按 order 装箱回填）
+  x: number | null;
+  y: number | null;
 }
 
 /** Widget 库条目（可添加的 widget 类型元信息） */

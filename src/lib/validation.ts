@@ -350,10 +350,12 @@ export const widgetInstanceCreateSchema = z
     }
   });
 
-/** Widget 实例更新 schema（size / order 可选） */
+/** Widget 实例更新 schema（size / order / x / y 可选） */
 export const widgetInstanceUpdateSchema = z.object({
   size: z.enum(['S', 'M', 'L']).optional(),
   order: z.number().int().min(0).optional(),
+  x: z.number().int().min(0).optional(),
+  y: z.number().int().min(0).optional(),
 });
 
 // ============ 日期项 ============

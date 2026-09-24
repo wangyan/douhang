@@ -9,6 +9,7 @@ CREATE TABLE "users" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "username" TEXT NOT NULL,
     "passwordHash" TEXT NOT NULL,
+    "tokenVersion" INTEGER NOT NULL DEFAULT 0,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
@@ -43,7 +44,9 @@ CREATE TABLE "widget_instances" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "widgetKey" TEXT NOT NULL,
     "order" INTEGER NOT NULL DEFAULT 0,
-    "size" TEXT NOT NULL DEFAULT 'M'
+    "size" TEXT NOT NULL DEFAULT 'M',
+    "x" INTEGER,
+    "y" INTEGER
 );
 
 -- CreateTable

@@ -47,6 +47,10 @@ next-env.d.ts
 # data
 /data
 
+# docs
+docs/superpowers/
+openspec/
+
 # IDE / tooling local data
 .agents/
 .antigravity/

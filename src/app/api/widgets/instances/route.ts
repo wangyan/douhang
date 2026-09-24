@@ -26,6 +26,8 @@ export const GET = withAuth(async () => {
       widgetKey: i.widgetKey as WidgetKey,
       order: i.order,
       size: i.size as 'S' | 'M' | 'L',
+      x: i.x,
+      y: i.y,
     })),
   });
 });
@@ -78,5 +80,7 @@ export const POST = withAuth(async (_session, req) => {
     widgetKey: instance.widgetKey as WidgetKey,
     order: instance.order,
     size: instance.size as 'S' | 'M' | 'L',
+    x: instance.x,
+    y: instance.y,
   });
 });

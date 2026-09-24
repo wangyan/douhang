@@ -36,7 +36,7 @@ export function WidgetBar({ initialInstances }: WidgetBarProps) {
   const {
     instances,
     isLoading,
-    reorderInstances,
+    setInstancePositions,
     setInstanceSize,
     removeInstanceDeferred,
     addInstance,
@@ -159,7 +159,7 @@ export function WidgetBar({ initialInstances }: WidgetBarProps) {
         <WidgetGrid
           instances={effectiveInstances}
           isEditMode={isEditMode}
-          onReorder={reorderInstances}
+          onMove={setInstancePositions}
           onResize={setInstanceSize}
           onRemove={handleRemove}
         />
