@@ -14,8 +14,8 @@ interface FloatingLogoProps {
  * 左上角站点标题锁字
  *
  * - 默认 position: fixed，脱离居中容器；withinFrame 时相对页面框架定位
- * - 字标主导：DouHang 使用 KWGTDot47 点阵标题，BrandMark 作为前置锚点
- * - 标题最后一个 ASCII 字符与 Logo 终点像素同色，形成单点强调
+ * - 字标主导：选用专为中文 Logo/字标设计的现代字体，BrandMark 作为前置锚点
+ * - 标题特征字符与 Logo 终点像素同色，形成单点强调
  * - 不使用胶囊/边框/底色，避免与右上角 FloatingToolbar 控件混淆
  * - drop-shadow 仅用于壁纸上可读性，不形成可见容器
  * - 小屏（<640px）隐藏文字，仅保留 BrandMark

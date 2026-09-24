@@ -12,18 +12,20 @@ import {
   ArrowUpCircle,
   BookOpenText,
   Check,
+  ChevronLeft,
+  ChevronRight,
   CircleUserRound,
   Command,
   Grid2x2,
   Info,
   LayoutTemplate,
   ListChecks,
+  LogIn,
   LogOut,
   Monitor,
   Moon,
   Pencil,
   Settings,
-  Star,
   Sun,
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -62,6 +64,8 @@ interface FloatingToolbarProps {
   repoUrl?: string;
   /** 使用帮助文档地址（支持外部透传，回落至 MANUAL_URL） */
   manualUrl?: string;
+  /** 当前用户是否已登录，默认 true（设置页等私有页默认为 true） */
+  isAuthed?: boolean;
 }
 
 /**
@@ -74,32 +78,43 @@ interface FloatingToolbarProps {
  * 分区逻辑：环境（网络/主题）｜ 视图（⌘/Widget/简洁）｜ 模式（编辑/批量）｜ 账户
  * 高频操作直达，低频配置在设置页，账户菜单只做导航。
  */
-/** ESC 逐层退出画布模式：批量删除 → 编辑模式（由本 hook 统一监听） */
+/** ESC 逐层退出画布模式：批量删除 → 编辑模式 → 折叠工具栏（由本 hook 统一监听） */
 function useEscapeExitModes(
   editMode: boolean,
   batchMode: boolean,
+  expanded: boolean,
   dispatchEditModeChange: (value: boolean) => void,
   dispatchBatchModeChange: (value: boolean) => void,
+  setExpanded: (value: boolean) => void,
 ) {
   useEffect(() => {
-    if (!editMode && !batchMode) return;
+    if (!editMode && !batchMode && !expanded) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         // 打开中的原生 dialog / 命令面板消费 ESC 时不退出画布模式
         if (e.defaultPrevented || document.querySelector('dialog[open]')) {
           return;
         }
-        // 逐层退出：优先退出批量选择模式，其次退出编辑模式
+        // 逐层退出：优先退出批量选择模式，其次退出编辑模式，最后折叠工具栏
         if (batchMode) {
           dispatchBatchModeChange(false);
         } else if (editMode) {
           dispatchEditModeChange(false);
+        } else if (expanded) {
+          setExpanded(false);
         }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [editMode, batchMode, dispatchEditModeChange, dispatchBatchModeChange]);
+  }, [
+    editMode,
+    batchMode,
+    expanded,
+    dispatchEditModeChange,
+    dispatchBatchModeChange,
+    setExpanded,
+  ]);
 }
 /** 环境区按钮：网络模式 + 主题循环（高频，各自循环/切换） */
 function ToolbarEnvCluster({
@@ -147,17 +162,13 @@ function ToolbarEnvCluster({
     </>
   );
 }
-/** 视图区按钮：快捷启动器 + Widget 显隐 + 卡片简洁模式 */
+/** 视图区按钮：快捷启动器 + 卡片简洁模式 */
 function ToolbarViewCluster({
   onOpenCmdK,
-  widgetBarVisible,
-  onToggleWidgetBar,
   simpleMode,
   onToggleSimpleMode,
 }: {
   onOpenCmdK: () => void;
-  widgetBarVisible: boolean;
-  onToggleWidgetBar: () => void;
   simpleMode: boolean;
   onToggleSimpleMode: () => void;
 }) {
@@ -171,14 +182,6 @@ function ToolbarViewCluster({
         onClick={onOpenCmdK}
       />
       <IconButton
-        label={widgetBarVisible ? '隐藏 Widget' : '显示 Widget'}
-        icon={<Grid2x2 size={ICON_SIZE.md} />}
-        variant={widgetBarVisible ? 'secondary' : 'ghost'}
-        tooltip={widgetBarVisible ? '隐藏 Widget 横条' : '显示 Widget 横条'}
-        aria-pressed={widgetBarVisible}
-        onClick={onToggleWidgetBar}
-      />
-      <IconButton
         label={simpleMode ? '退出简洁模式' : '卡片简洁模式'}
         icon={<LayoutTemplate size={ICON_SIZE.md} />}
         variant={simpleMode ? 'secondary' : 'ghost'}
@@ -186,20 +189,21 @@ function ToolbarViewCluster({
         aria-pressed={simpleMode}
         onClick={onToggleSimpleMode}
       />
-
-      {/* hairline 分隔：视图区 | 模式区 */}
-      <span className="mx-2 h-5 w-px bg-border" aria-hidden />
     </>
   );
 }
-/** 模式区按钮：编辑模式 + 批量删除（编辑的二级操作，仅主页显示） */
+/** 模式区按钮：Widget 显隐 + 编辑模式 + 批量删除（编辑的二级操作，仅登录态展示） */
 function ToolbarModeCluster({
+  widgetBarVisible,
+  onToggleWidgetBar,
   editMode,
   batchMode,
   showBatch,
   dispatchEditModeChange,
   dispatchBatchModeChange,
 }: {
+  widgetBarVisible: boolean;
+  onToggleWidgetBar: () => void;
   editMode: boolean;
   batchMode: boolean;
   showBatch: boolean;
@@ -208,6 +212,17 @@ function ToolbarModeCluster({
 }) {
   return (
     <>
+      {/* hairline 分隔：视图区 | 模式区 */}
+      <span className="mx-2 h-5 w-px bg-border" aria-hidden />
+
+      <IconButton
+        label={widgetBarVisible ? '隐藏 Widget' : '显示 Widget'}
+        icon={<Grid2x2 size={ICON_SIZE.md} />}
+        variant={widgetBarVisible ? 'secondary' : 'ghost'}
+        tooltip={widgetBarVisible ? '隐藏 Widget 横条' : '显示 Widget 横条'}
+        aria-pressed={widgetBarVisible}
+        onClick={onToggleWidgetBar}
+      />
       <IconButton
         label={editMode ? '完成' : '编辑'}
         icon={
@@ -245,11 +260,15 @@ export function FloatingToolbar({
   withinFrame = false,
   repoUrl = REPO_URL,
   manualUrl = MANUAL_URL,
+  isAuthed = true,
 }: FloatingToolbarProps) {
   const [cmdKOpen, setCmdKOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  // 编辑态或批量删除态下强制保持展开，避免用户无法退出编辑
+  const isExpanded = expanded || editMode || batchMode;
   const [simpleMode, setSimpleMode] = useState(cardSimpleMode);
   const [netMode, setNetMode] = useState<NetworkMode>(networkMode);
   const { mode, resolved, setMode } = useTheme();
@@ -264,8 +283,9 @@ export function FloatingToolbar({
   // 批量删除仅作用于主页卡片，设置页不显示入口
   const pathname = usePathname();
 
-  // 挂载时检查更新：服务端 24h 节流，命中缓存无额外开销；失败静默
+  // 挂载时检查更新（仅登录态）：服务端 24h 节流，命中缓存无额外开销；失败静默
   useEffect(() => {
+    if (!isAuthed) return;
     let cancelled = false;
     versionApi
       .check()
@@ -281,7 +301,7 @@ export function FloatingToolbar({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isAuthed]);
 
   // 提示状态机：浮层（强提醒）与工具栏图标（常驻入口）互斥
   const activeUpdate =
@@ -313,6 +333,23 @@ export function FloatingToolbar({
     );
   }, []);
 
+  // 折叠 / 展开工具栏切换：退出时同步退出编辑与批量删除状态
+  const handleToggleExpand = useCallback(() => {
+    if (isExpanded) {
+      if (batchMode) dispatchBatchModeChange(false);
+      if (editMode) dispatchEditModeChange(false);
+      setExpanded(false);
+    } else {
+      setExpanded(true);
+    }
+  }, [
+    isExpanded,
+    batchMode,
+    editMode,
+    dispatchBatchModeChange,
+    dispatchEditModeChange,
+  ]);
+
   // 监听外部触发的编辑模式变更（如 WidgetBar 添加 widget 后自动进入编辑态）
   useEffect(() => {
     const handler = (e: Event) => {
@@ -333,12 +370,14 @@ export function FloatingToolbar({
     return () => window.removeEventListener(BATCH_DELETE_MODE_EVENT, handler);
   }, []);
 
-  // ESC 逐层退出画布模式：批量删除 → 编辑模式（由 useEscapeExitModes 统一监听）
+  // ESC 逐层退出画布模式：批量删除 → 编辑模式 → 折叠工具栏（由 useEscapeExitModes 统一监听）
   useEscapeExitModes(
     editMode,
     batchMode,
+    expanded,
     dispatchEditModeChange,
     dispatchBatchModeChange,
+    setExpanded,
   );
 
   // 监听设置页触发的网络模式变更，保持工具栏同步
@@ -406,52 +445,76 @@ export function FloatingToolbar({
       <HStack
         gap={1}
         align="center"
-        className={`${withinFrame ? 'absolute' : 'fixed'} top-6 right-4 md:right-6 z-chrome rounded-full bg-surface/80 backdrop-blur-md border border-border shadow-float px-1.5 py-1 sm:px-2 md:px-3`}
+        className={`${withinFrame ? 'absolute' : 'fixed'} top-6 right-4 md:right-6 z-chrome rounded-full bg-surface/80 backdrop-blur-md border border-border shadow-float ${isExpanded ? 'px-1.5 py-1 sm:px-2 md:px-3' : 'px-1.5 py-1 sm:px-2'} transition-all duration-300 ease-out`}
       >
-        {/* 环境区：网络模式 + 主题（高频，各自循环/切换） */}
-        <ToolbarEnvCluster
-          netMode={netMode}
-          onCycleNetwork={handleCycleNetworkMode}
-          mode={mode}
-          resolved={resolved}
-          onCycleTheme={handleCycleTheme}
+        <IconButton
+          label={isExpanded ? '折叠工具栏' : '展开工具栏'}
+          icon={
+            isExpanded ? (
+              <ChevronRight size={ICON_SIZE.md} />
+            ) : (
+              <ChevronLeft size={ICON_SIZE.md} />
+            )
+          }
+          variant="ghost"
+          tooltip={isExpanded ? '折叠工具栏' : '展开工具栏'}
+          onClick={handleToggleExpand}
         />
 
-        {/* 视图区：显示开关 */}
-        <ToolbarViewCluster
-          onOpenCmdK={() => setCmdKOpen(true)}
-          widgetBarVisible={widgetBarVisible}
-          onToggleWidgetBar={() => setWidgetBarVisible(!widgetBarVisible)}
-          simpleMode={simpleMode}
-          onToggleSimpleMode={handleToggleSimpleMode}
-        />
-
-        <ToolbarModeCluster
-          editMode={editMode}
-          batchMode={batchMode}
-          showBatch={pathname === '/'}
-          dispatchEditModeChange={dispatchEditModeChange}
-          dispatchBatchModeChange={dispatchBatchModeChange}
-        />
-
-        {/* 更新提醒：浮层关闭后才出现的常驻入口，直达关于弹窗 */}
-        {dismissedUpdate && (
+        {isExpanded && (
           <>
-            <span className="mx-2 h-5 w-px bg-border" aria-hidden />
-            <IconButton
-              label={`新版本 ${dismissedUpdate.tag} 可用`}
-              icon={<ArrowUpCircle size={ICON_SIZE.md} />}
-              variant="secondary"
-              tooltip={`新版本 ${dismissedUpdate.tag} 可用，点击查看更新日志`}
-              onClick={() => setAboutOpen(true)}
+            {/* hairline 分隔：折叠箭头 | 环境区 */}
+            <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+
+            {/* 环境区：网络模式 + 主题（高频，各自循环/切换） */}
+            <ToolbarEnvCluster
+              netMode={netMode}
+              onCycleNetwork={handleCycleNetworkMode}
+              mode={mode}
+              resolved={resolved}
+              onCycleTheme={handleCycleTheme}
             />
+
+            {/* 视图区：显示开关 */}
+            <ToolbarViewCluster
+              onOpenCmdK={() => setCmdKOpen(true)}
+              simpleMode={simpleMode}
+              onToggleSimpleMode={handleToggleSimpleMode}
+            />
+
+            {/* 模式区：仅登录用户可见（Widget 显隐、编辑模式、批量删除） */}
+            {isAuthed && (
+              <ToolbarModeCluster
+                widgetBarVisible={widgetBarVisible}
+                onToggleWidgetBar={() => setWidgetBarVisible(!widgetBarVisible)}
+                editMode={editMode}
+                batchMode={batchMode}
+                showBatch={pathname === '/'}
+                dispatchEditModeChange={dispatchEditModeChange}
+                dispatchBatchModeChange={dispatchBatchModeChange}
+              />
+            )}
+
+            {/* 更新提醒：仅登录态检查与展示，浮层关闭后才出现的常驻入口，直达关于弹窗 */}
+            {isAuthed && dismissedUpdate && (
+              <>
+                <span className="mx-2 h-5 w-px bg-border" aria-hidden />
+                <IconButton
+                  label={`新版本 ${dismissedUpdate.tag} 可用`}
+                  icon={<ArrowUpCircle size={ICON_SIZE.md} />}
+                  variant="secondary"
+                  tooltip={`新版本 ${dismissedUpdate.tag} 可用，点击查看更新日志`}
+                  onClick={() => setAboutOpen(true)}
+                />
+              </>
+            )}
           </>
         )}
 
-        {/* 用户菜单：纯导航（设置 / 退出登录 / 关于）；主题与可达状态配置在设置页 */}
+        {/* 用户菜单：纯导航（设置 / 退出登录 / 登录后台 / 关于），常驻末尾 */}
         <ToolbarUserMenu
+          isAuthed={isAuthed}
           onOpenAbout={() => setAboutOpen(true)}
-          repoUrl={repoUrl}
           manualUrl={manualUrl}
         />
       </HStack>
@@ -466,7 +529,7 @@ export function FloatingToolbar({
         onOpenChange={setAboutOpen}
         update={updateState?.update ?? null}
       />
-      {activeUpdate && (
+      {isAuthed && activeUpdate && (
         <UpdateNotification
           update={activeUpdate}
           repoUrl={repoUrl}
@@ -478,17 +541,17 @@ export function FloatingToolbar({
 }
 
 /**
- * 用户下拉菜单（纯导航：设置 / 退出登录）
- *
- * 主题切换在工具栏（高频），可达状态在设置页外观分区（低频配置）。
+ * 用户下拉菜单
+ * - 登录用户：设置 / 使用帮助 / 退出登录 / 关于
+ * - 未登录用户：登录后台 / 使用帮助 / 关于
  */
 function ToolbarUserMenu({
+  isAuthed,
   onOpenAbout,
-  repoUrl,
   manualUrl,
 }: {
+  isAuthed: boolean;
   onOpenAbout: () => void;
-  repoUrl: string;
   manualUrl: string;
 }) {
   const router = useRouter();
@@ -505,35 +568,48 @@ function ToolbarUserMenu({
         icon: <CircleUserRound size={ICON_SIZE.md} />,
       }}
     >
-      <DropdownMenuItem
-        icon={<Settings size={ICON_SIZE.md} />}
-        label="设置"
-        style={{ paddingInline: 12 }}
-        onClick={() => router.push('/settings')}
-      />
-      <DropdownMenuItem
-        icon={<BookOpenText size={ICON_SIZE.md} />}
-        label="使用帮助"
-        style={{ paddingInline: 12 }}
-        onClick={() => window.open(manualUrl, '_blank', 'noopener')}
-      />
-      <DropdownMenuItem
-        icon={<Star size={ICON_SIZE.md} />}
-        label="点亮 Star"
-        style={{ paddingInline: 12 }}
-        onClick={() => window.open(repoUrl, '_blank', 'noopener')}
-      />
-      <DropdownMenuItem
-        icon={<LogOut size={ICON_SIZE.md} />}
-        label="退出登录"
-        style={{ paddingInline: 12 }}
-        onClick={() => {
-          // NextAuth 返回的 url 依赖反代 Host；退出后用浏览器当前 origin 跳相对路径
-          void signOut({ redirect: false, redirectTo: '/login' }).then(() => {
-            router.replace('/login');
-          });
-        }}
-      />
+      {isAuthed ? (
+        <>
+          <DropdownMenuItem
+            icon={<Settings size={ICON_SIZE.md} />}
+            label="设置"
+            style={{ paddingInline: 12 }}
+            onClick={() => router.push('/settings')}
+          />
+          <DropdownMenuItem
+            icon={<BookOpenText size={ICON_SIZE.md} />}
+            label="使用帮助"
+            style={{ paddingInline: 12 }}
+            onClick={() => window.open(manualUrl, '_blank', 'noopener')}
+          />
+          <DropdownMenuItem
+            icon={<LogOut size={ICON_SIZE.md} />}
+            label="退出登录"
+            style={{ paddingInline: 12 }}
+            onClick={() => {
+              void signOut({ redirect: false }).then(() => {
+                router.replace('/');
+                router.refresh();
+              });
+            }}
+          />
+        </>
+      ) : (
+        <>
+          <DropdownMenuItem
+            icon={<LogIn size={ICON_SIZE.md} />}
+            label="登录后台"
+            style={{ paddingInline: 12 }}
+            onClick={() => router.push('/login?callbackUrl=/settings')}
+          />
+          <DropdownMenuItem
+            icon={<BookOpenText size={ICON_SIZE.md} />}
+            label="使用帮助"
+            style={{ paddingInline: 12 }}
+            onClick={() => window.open(manualUrl, '_blank', 'noopener')}
+          />
+        </>
+      )}
       <DropdownMenuDivider />
       <DropdownMenuItem
         icon={<Info size={ICON_SIZE.md} />}

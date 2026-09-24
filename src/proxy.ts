@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 
 /**
  * Next.js 16 Proxy（原 middleware）
- * 保护所有路由，未登录用户重定向到 /login
+ * 首页无需登录即可访问；保护管理后台路由（如 /settings），未登录用户重定向到 /login
  * 排除：API、静态资源、登录页
  */
 export const config = {
@@ -15,7 +15,14 @@ export const config = {
 
 export default auth((req) => {
   const isAuthed = !!req.auth;
-  if (!isAuthed) {
-    return NextResponse.redirect(new URL('/login', req.url));
+  const { pathname } = req.nextUrl;
+
+  // 仅保护管理后台路由（/settings 及其子路由）
+  if (pathname.startsWith('/settings')) {
+    if (!isAuthed) {
+      const loginUrl = new URL('/login', req.url);
+      loginUrl.searchParams.set('callbackUrl', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
   }
 });

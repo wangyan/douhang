@@ -9,6 +9,7 @@ import { HomeClock } from '@/components/layout/HomeClock';
 import { HomeContent } from '@/components/layout/HomeContent';
 import { WidgetBar } from '@/components/layout/WidgetBar';
 import { SearchBox } from '@/components/search/SearchBox';
+import { auth } from '@/lib/auth';
 import { getBrandConfig } from '@/lib/brand';
 import { prisma } from '@/lib/db';
 import { getUserPreference } from '@/lib/preferences';
@@ -55,6 +56,7 @@ export default async function HomePage() {
     cardStatusBadge,
     usingDefaultPassword,
     wallpaperScrim,
+    session,
   ] = await Promise.all([
     // 取所有分类（含卡片），按 order 排序
     prisma.category.findMany({
@@ -86,7 +88,11 @@ export default async function HomePage() {
     isUsingDefaultPassword(),
     // 壁纸遮罩强度（外观设置可调）
     getUserPreference<unknown>('wallpaperScrim', WALLPAPER_SCRIM_DEFAULT),
+    // 会话状态
+    auth(),
   ]);
+
+  const isAuthed = !!session?.user;
 
   const initialInstances = widgetInstances.map((i) => ({
     id: i.id,
@@ -143,18 +149,19 @@ export default async function HomePage() {
           cardSimpleMode={cardSimpleMode}
           repoUrl={getRepoUrl()}
           manualUrl={getManualUrl()}
+          isAuthed={isAuthed}
         />
         <EditModeBanner />
 
         {/* 首屏分三段：时钟/搜索聚焦入口、widget 状态横条、图标内容区。 */}
         <VStack gap={10} className="mx-auto w-full max-w-[1360px] pt-28">
-          {usingDefaultPassword && <DefaultPasswordBanner />}
+          {isAuthed && usingDefaultPassword && <DefaultPasswordBanner />}
           <VStack gap={4} className="mx-auto w-full max-w-[720px]">
             <HomeClock />
             <SearchBox initialEngine={searchEngine} engines={engines} />
           </VStack>
 
-          <WidgetBar initialInstances={initialInstances} />
+          <WidgetBar initialInstances={initialInstances} isAuthed={isAuthed} />
 
           <HomeContent
             categories={serializedCategories}
@@ -162,6 +169,7 @@ export default async function HomePage() {
             networkMode={networkMode}
             cardSimpleMode={cardSimpleMode}
             cardStatusBadge={cardStatusBadge}
+            isAuthed={isAuthed}
           />
         </VStack>
       </AppShell>

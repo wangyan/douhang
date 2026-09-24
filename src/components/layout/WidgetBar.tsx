@@ -22,6 +22,7 @@ import type { WidgetInstance } from '@/types';
 
 interface WidgetBarProps {
   initialInstances?: WidgetInstance[];
+  isAuthed?: boolean;
 }
 
 /**
@@ -32,7 +33,10 @@ interface WidgetBarProps {
  * 编辑模式由 FloatingToolbar 统一管控（edit-mode-change 事件），
  * WidgetBar 仅监听事件同步本地 isEditMode state。
  */
-export function WidgetBar({ initialInstances }: WidgetBarProps) {
+export function WidgetBar({
+  initialInstances,
+  isAuthed = true,
+}: WidgetBarProps) {
   const {
     instances,
     isLoading,
@@ -123,6 +127,11 @@ export function WidgetBar({ initialInstances }: WidgetBarProps) {
     return null;
   }
 
+  // 未登录且没有 widget 实例时，不渲染占位横条
+  if (!isAuthed && effectiveInstances.length === 0) {
+    return null;
+  }
+
   return (
     <VStack gap={3} className="group/widget-bar">
       <SectionHeader
@@ -137,21 +146,23 @@ export function WidgetBar({ initialInstances }: WidgetBarProps) {
         title={<span className="widget-bar-title">WIDGETS</span>}
         actionsAlign="end"
         actions={
-          <div
-            className={`flex items-center gap-1 transition-opacity duration-200 ${
-              isEditMode
-                ? 'invisible opacity-0'
-                : 'opacity-0 group-hover/widget-bar:opacity-100 max-md:pointer-coarse:opacity-100'
-            }`}
-          >
-            <IconButton
-              label="添加 widget"
-              icon={<Plus size={ICON_SIZE.lg} />}
-              variant="ghost"
-              tooltip="添加 widget"
-              onClick={() => setLibraryOpen(true)}
-            />
-          </div>
+          isAuthed ? (
+            <div
+              className={`flex items-center gap-1 transition-opacity duration-200 ${
+                isEditMode
+                  ? 'invisible opacity-0'
+                  : 'opacity-0 group-hover/widget-bar:opacity-100 max-md:pointer-coarse:opacity-100'
+              }`}
+            >
+              <IconButton
+                label="添加 widget"
+                icon={<Plus size={ICON_SIZE.lg} />}
+                variant="ghost"
+                tooltip="添加 widget"
+                onClick={() => setLibraryOpen(true)}
+              />
+            </div>
+          ) : undefined
         }
       />
 
@@ -179,20 +190,22 @@ export function WidgetBar({ initialInstances }: WidgetBarProps) {
         </button>
       )}
 
-      <AddWidgetDialog
-        isOpen={libraryOpen}
-        onOpenChange={setLibraryOpen}
-        onAddInstance={async (key) => {
-          const created = await addInstance(key);
-          if (created) {
-            showToast({
-              body: `已添加「${WIDGET_REGISTRY[key].label}」`,
-              type: 'info',
-            });
-          }
-        }}
-        onCreateDate={handleCreateSubmit}
-      />
+      {isAuthed && (
+        <AddWidgetDialog
+          isOpen={libraryOpen}
+          onOpenChange={setLibraryOpen}
+          onAddInstance={async (key) => {
+            const created = await addInstance(key);
+            if (created) {
+              showToast({
+                body: `已添加「${WIDGET_REGISTRY[key].label}」`,
+                type: 'info',
+              });
+            }
+          }}
+          onCreateDate={handleCreateSubmit}
+        />
+      )}
     </VStack>
   );
 }

@@ -12,7 +12,10 @@ export const dynamic = 'force-dynamic';
  * - GET: 列出实例的所有日期项
  * - POST: 为实例新增日期项（widgetKey 从实例读取，body 不传）
  */
-export const GET = withAuth(async (_session, _req, ctx) => {
+export const GET = async (
+  _req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) => {
   const { id } = await ctx.params;
 
   const items = await prisma.dateItem.findMany({
@@ -31,7 +34,7 @@ export const GET = withAuth(async (_session, _req, ctx) => {
       createdAt: item.createdAt.toISOString(),
     })),
   });
-});
+};
 
 export const POST = withAuth(async (_session, req, ctx) => {
   const { id } = await ctx.params;

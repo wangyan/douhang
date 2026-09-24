@@ -229,6 +229,14 @@ html[data-theme="dark"] .widget-surface {
 }
 
 @font-face {
+  font-family: "SmileySans";
+  src: url("/fonts/brand/SmileySans-Oblique.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: "KWGTDot47";
   src: url("/fonts/date-widgets/ndot-47.ttf") format("truetype");
   font-display: swap;
@@ -250,12 +258,15 @@ html[data-theme="dark"] .widget-surface {
 .brand-pixel-accent {
   color: var(--color-brand-pixel-accent);
 }
-/* 品牌标题：与像素标识 / 首屏时钟共用 KWGTDot47 点阵语言 */
+/* 品牌标题：采用适用中文字标的现代设计字体（首选得意黑，回退至系统高阶标题黑体栈） */
 .brand-title {
-  font-family: "KWGTDot47", var(--font-geist-sans), system-ui, sans-serif;
+  font-family:
+    "SmileySans", "PingFang SC", "Hiragino Sans GB", "HarmonyOS Sans SC",
+    "Microsoft YaHei", "Source Han Sans CN", sans-serif;
   font-size: 1.25rem;
+  font-weight: 600;
   line-height: 1;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   text-rendering: geometricPrecision;
 }
 

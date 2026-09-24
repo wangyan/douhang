@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { withAuth } from '@/lib/api';
 import { getUserPreference } from '@/lib/preferences';
 import {
   DEFAULT_QBITTORRENT_CONFIG,
@@ -38,7 +37,7 @@ function unavailable(error: string) {
  * qBittorrent widget 数据 API
  * - GET: 读取集成配置并聚合 qB 下载状态；未配置 / 连接失败降级返回
  */
-export const GET = withAuth(async (_session, req) => {
+export const GET = async (req: Request) => {
   const force = new URL(req.url).searchParams.get('force') === '1';
   const config = await getUserPreference<QbittorrentConfig>(
     'qbittorrent',
@@ -55,4 +54,4 @@ export const GET = withAuth(async (_session, req) => {
     console.error(e);
     return unavailable('连接 qBittorrent 失败，请检查连接配置');
   }
-});
+};

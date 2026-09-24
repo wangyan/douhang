@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { withAuth } from '@/lib/api';
 import {
   getDockerEngineInfo,
   getDockerResourceStats,
@@ -16,7 +15,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  * Docker widget 数据 API
  * - GET: 返回容器状态 + 资源水位聚合
  */
-export const GET = withAuth(async () => {
+export const GET = async () => {
   const available = await isDockerAvailable();
   if (!available) {
     return NextResponse.json(
@@ -45,4 +44,4 @@ export const GET = withAuth(async () => {
     { available: true, status, resource, engine },
     { headers: NO_STORE_HEADERS },
   );
-});
+};

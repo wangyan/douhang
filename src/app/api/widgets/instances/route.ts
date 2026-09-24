@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
  *   日期类 widget（countdown/countup）必须带 initialItem（schema 强制），
  *   实例与首个日期项在同一次 create 中原子落库，不会产生空实例
  */
-export const GET = withAuth(async () => {
+export const GET = async () => {
   const instances = await prisma.widgetInstance.findMany({
     orderBy: { order: 'asc' },
   });
@@ -30,7 +30,7 @@ export const GET = withAuth(async () => {
       y: i.y,
     })),
   });
-});
+};
 
 export const POST = withAuth(async (_session, req) => {
   const body = await req.json();

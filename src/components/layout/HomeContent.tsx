@@ -63,6 +63,8 @@ interface HomeContentProps {
   cardSimpleMode: boolean;
   /** 卡片状态徽章显隐（SSR 初始值） */
   cardStatusBadge: boolean;
+  /** 当前用户是否已登录，默认 true */
+  isAuthed?: boolean;
 }
 
 /**
@@ -78,6 +80,7 @@ export function HomeContent({
   networkMode,
   cardSimpleMode,
   cardStatusBadge,
+  isAuthed = true,
 }: HomeContentProps) {
   const [modal, dispatchModal] = useReducer(editModalReducer, {
     mode: 'closed',
@@ -157,8 +160,10 @@ export function HomeContent({
     dispatchModal({ type: 'open-drop', url });
     setDropKey((k) => k + 1);
   };
-  const { isDragOver } = useExternalDrop({ onDropUrl: handleDropUrl });
-  useExternalPaste({ onPasteUrl: handleDropUrl });
+  const { isDragOver } = useExternalDrop({
+    onDropUrl: isAuthed ? handleDropUrl : () => {},
+  });
+  useExternalPaste({ onPasteUrl: isAuthed ? handleDropUrl : () => {} });
 
   /**
    * 新建卡片入口
@@ -225,16 +230,18 @@ export function HomeContent({
               statuses={statuses}
               networkMode={networkMode}
               onCardClick={refreshOne}
-              onEditCard={handleEditCard}
-              onDeleteCard={handleDeleteCard}
-              onAddCard={() => handleNewCard(category.id)}
+              onEditCard={isAuthed ? handleEditCard : undefined}
+              onDeleteCard={isAuthed ? handleDeleteCard : undefined}
+              onAddCard={
+                isAuthed ? () => handleNewCard(category.id) : undefined
+              }
               simple={simpleMode}
               showStatus={showStatusBadge}
               selectionMode={batch.active}
               selectedIds={batch.selectedIds}
               onToggleSelect={batch.toggle}
-              sortable
-              reorderMode={reorderMode}
+              sortable={isAuthed}
+              reorderMode={isAuthed && reorderMode}
               activeCard={activeCard}
             />
           ))}
@@ -248,16 +255,16 @@ export function HomeContent({
               statuses={statuses}
               networkMode={networkMode}
               onCardClick={refreshOne}
-              onEditCard={handleEditCard}
-              onDeleteCard={handleDeleteCard}
-              onAddCard={() => handleNewCard(null)}
+              onEditCard={isAuthed ? handleEditCard : undefined}
+              onDeleteCard={isAuthed ? handleDeleteCard : undefined}
+              onAddCard={isAuthed ? () => handleNewCard(null) : undefined}
               simple={simpleMode}
               showStatus={showStatusBadge}
               selectionMode={batch.active}
               selectedIds={batch.selectedIds}
               onToggleSelect={batch.toggle}
-              sortable
-              reorderMode={reorderMode}
+              sortable={isAuthed}
+              reorderMode={isAuthed && reorderMode}
               activeCard={activeCard}
             />
           )}
@@ -268,12 +275,14 @@ export function HomeContent({
           description="手动添加服务卡片，也可以把浏览器里的链接直接拖进页面"
           icon={<EmptyCardsIllustration />}
           actions={
-            <Button
-              label="创建卡片"
-              variant="primary"
-              icon={<Plus size={ICON_SIZE.md} />}
-              onClick={() => handleNewCard(null)}
-            />
+            isAuthed ? (
+              <Button
+                label="创建卡片"
+                variant="primary"
+                icon={<Plus size={ICON_SIZE.md} />}
+                onClick={() => handleNewCard(null)}
+              />
+            ) : undefined
           }
         />
       )}
@@ -330,7 +339,7 @@ export function HomeContent({
       )}
 
       {/* 拖入链接时的全屏放置提示层 */}
-      {isDragOver && (
+      {isAuthed && isDragOver && (
         <div
           className="fixed inset-0 z-chrome flex items-center justify-center bg-accent/10 backdrop-blur-sm"
           style={{ pointerEvents: 'none' }}

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { withAuth } from '@/lib/api';
 import { prisma } from '@/lib/db';
 import { probeUrls, resolveAutoUrl } from '@/lib/network';
 import { getUserPreference } from '@/lib/preferences';
@@ -17,7 +16,7 @@ export const maxDuration = 30;
  *   - external: 只探测 externalUrl
  *   - auto: 同时探测两个，外网优先
  */
-export const GET = withAuth(async () => {
+export const GET = async () => {
   const cards = await prisma.card.findMany({
     select: { id: true, internalUrl: true, externalUrl: true },
   });
@@ -91,4 +90,4 @@ export const GET = withAuth(async () => {
   });
 
   return NextResponse.json({ items });
-});
+};

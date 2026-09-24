@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
  * - GET: 读取全部首选项（networkMode / theme / fontSize / searchEngine / brand / cardSimpleMode / cardStatusBadge / wallpaperScrim）
  * - PATCH: 更新单个首选项（body: { key, value })
  */
-export const GET = withAuth(async () => {
+export const GET = async () => {
   const [
     networkMode,
     theme,
@@ -53,7 +53,7 @@ export const GET = withAuth(async () => {
         ? wallpaperScrim
         : WALLPAPER_SCRIM_DEFAULT,
   });
-});
+};
 
 export const PATCH = withAuth(async (_session, req) => {
   const body = await req.json();

@@ -51,6 +51,7 @@ export default async function SettingsRootLayout({
           cardSimpleMode={cardSimpleMode}
           repoUrl={getRepoUrl()}
           manualUrl={getManualUrl()}
+          isAuthed={true}
         />
         <SettingsLayout>{children}</SettingsLayout>
       </AppShell>

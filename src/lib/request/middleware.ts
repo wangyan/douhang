@@ -30,6 +30,9 @@ export const errorMiddleware: Middleware =
       if (err.isAborted) return;
 
       if (err.isUnauthorized && !isRedirecting) {
+        // 首页默认无需登录，公开访问时不触发 401 整页跳转
+        if (window.location.pathname === '/') return;
+
         isRedirecting = true;
         window.location.href = '/login';
         // 3 秒后自动复位（防止跳转失败时永久卡住后续 401 处理）

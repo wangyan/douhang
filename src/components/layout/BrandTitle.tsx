@@ -33,10 +33,9 @@ function findAccentIndex(chars: string[]): number {
 }
 
 /**
- * 点阵品牌标题（KWGTDot47 字体）
+ * 品牌标题（适用中文与西文字标的 Logo 字体）
  *
  * 第二个词的首字符用强调色，呼应 Logo 终点像素；
- * 中文等 CJK 字符自动回退系统字体
  */
 export function BrandTitle({
   title,
