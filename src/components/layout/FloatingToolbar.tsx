@@ -7,7 +7,6 @@ import {
 } from '@astryxdesign/core/DropdownMenu';
 import { HStack } from '@astryxdesign/core/HStack';
 import { IconButton } from '@astryxdesign/core/IconButton';
-import { useToast } from '@astryxdesign/core/Toast';
 import {
   ArrowUpCircle,
   BookOpenText,
@@ -274,7 +273,6 @@ export function FloatingToolbar({
   const { mode, resolved, setMode } = useTheme();
   const { visible: widgetBarVisible, setVisible: setWidgetBarVisible } =
     useWidgetBarVisibility();
-  const showToast = useToast();
   /** 有新版本时的展示状态：update + 是否已被用户关闭（一次 setState 原子落定，无闪烁） */
   const [updateState, setUpdateState] = useState<{
     update: VersionUpdateInfo;
@@ -390,13 +388,32 @@ export function FloatingToolbar({
     return () => window.removeEventListener(NETWORK_MODE_CHANGE_EVENT, handler);
   }, []);
 
-  // 切换卡片简洁模式：持久化 + 通知 HomeContent 即时生效
+  // 挂载后同步浏览器本地持久化的简洁模式偏好
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('douhang-card-simple-mode');
+      if (stored !== null) {
+        const val = stored === 'true';
+        setSimpleMode(val);
+        window.dispatchEvent(
+          new CustomEvent(CARD_SIMPLE_MODE_EVENT, { detail: val }),
+        );
+      }
+    } catch {}
+  }, []);
+
+  // 切换卡片简洁模式：本地缓存 + 服务端持久化（已登录态）+ 通知 HomeContent 即时生效
   const handleToggleSimpleMode = () => {
     const next = !simpleMode;
     setSimpleMode(next);
-    void preferencesApi.update('cardSimpleMode', next).catch(() => {
-      showToast({ body: '简洁模式未保存到服务端', type: 'error' });
-    });
+    try {
+      localStorage.setItem('douhang-card-simple-mode', String(next));
+    } catch {}
+    if (isAuthed) {
+      void preferencesApi.update('cardSimpleMode', next).catch((e) => {
+        console.error('保存简洁模式失败', e);
+      });
+    }
     window.dispatchEvent(
       new CustomEvent(CARD_SIMPLE_MODE_EVENT, { detail: next }),
     );
@@ -420,9 +437,14 @@ export function FloatingToolbar({
     const next = NETWORK_MODE_ORDER[(idx + 1) % NETWORK_MODE_ORDER.length];
     setNetMode(next);
     try {
-      await preferencesApi.update('networkMode', next);
-    } catch (e) {
-      console.error('保存网络模式失败', e);
+      localStorage.setItem('douhang-network-mode', next);
+    } catch {}
+    if (isAuthed) {
+      try {
+        await preferencesApi.update('networkMode', next);
+      } catch (e) {
+        console.error('保存网络模式失败', e);
+      }
     }
     // 通知主页重新探测状态灯
     window.dispatchEvent(
@@ -430,14 +452,16 @@ export function FloatingToolbar({
     );
   };
 
-  // 主题三态循环：明亮 → 暗黑 → 跟随系统（与设置页 ThemeForm 选项一致）
+  // 主题三态循环：明亮 → 暗黑 → 跟随系统（已登录同步服务端，未登录仅本地存储）
   const handleCycleTheme = () => {
     const next: ThemeMode =
       mode === 'light' ? 'dark' : mode === 'dark' ? 'system' : 'light';
     setMode(next);
-    void preferencesApi.update('theme', next).catch(() => {
-      showToast({ body: '主题未保存到服务端', type: 'error' });
-    });
+    if (isAuthed) {
+      void preferencesApi.update('theme', next).catch((e) => {
+        console.error('保存主题失败', e);
+      });
+    }
   };
 
   return (

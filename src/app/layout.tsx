@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { THEME_SCRIPT_CODE } from '@/hooks/useTheme';
 import { getBrandConfig } from '@/lib/brand';
@@ -7,16 +6,6 @@ import { normalizeFontSize } from '@/lib/font-size';
 import { getUserPreference } from '@/lib/preferences';
 import type { ThemeMode } from '@/types';
 import { Providers } from './providers';
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
 
 export async function generateMetadata(): Promise<Metadata> {
   const brand = await getBrandConfig();
@@ -80,7 +69,7 @@ export default async function RootLayout({
         fontSize: `${fontSize}%`,
       }}
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <head>
         {/* 主题初始化必须是普通同步脚本；next/script 会推入 __next_s 队列。 */}

@@ -127,6 +127,14 @@ html[data-theme="dark"] [data-astryx-theme] {
   /* 品牌/装饰强调色（非危险语义，区别于 --color-error） */
   --color-brand-pixel-accent: #e5484d;
   --color-date-widget-accent: #d71921;
+  /* 品牌标识深浅色模式自适应变量 */
+  --brand-mark-bg: #d45134;
+  --brand-mark-fg: #ffffff;
+}
+
+html[data-theme="dark"] {
+  --brand-mark-bg: #24272b;
+  --brand-mark-fg: #e5484d;
 }
 
 /* z 层级语义（约定见 docs/ARCHITECTURE.md）：

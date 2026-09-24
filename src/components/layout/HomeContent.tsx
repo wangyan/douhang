@@ -124,6 +124,16 @@ export function HomeContent({
     return () => window.removeEventListener(EDIT_MODE_CHANGE_EVENT, handler);
   }, []);
 
+  // 挂载后同步浏览器本地持久化的简洁模式偏好
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('douhang-card-simple-mode');
+      if (stored !== null) {
+        setSimpleMode(stored === 'true');
+      }
+    } catch {}
+  }, []);
+
   // 卡片简洁模式开关（FloatingToolbar 切换后即时生效）
   useEffect(() => {
     const handler = (e: Event) => {
