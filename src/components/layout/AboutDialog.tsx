@@ -17,6 +17,10 @@ interface AboutDialogProps {
   onOpenChange: (open: boolean) => void;
   /** 远端最新 Release（有新版本时由工具栏传入） */
   update?: VersionUpdateInfo | null;
+  /** 远端仓库主页地址（由服务端经工具栏透传，保证客户端水合一致） */
+  repoUrl?: string;
+  /** Releases 列表页完整地址（可选，优先级高于 repoUrl） */
+  releasesUrl?: string;
 }
 
 /**
@@ -31,7 +35,10 @@ export function AboutDialog({
   isOpen,
   onOpenChange,
   update = null,
+  repoUrl,
+  releasesUrl,
 }: AboutDialogProps) {
+  const resolvedReleasesUrl = releasesUrl ?? getReleasesPageUrl(repoUrl);
   const updateReleases = update
     ? parseChangelog(`## ${update.tag}\n\n${update.notes}`)
     : [];
@@ -99,7 +106,7 @@ export function AboutDialog({
           className="border-t border-border/60 pt-3"
         >
           <a
-            href={getReleasesPageUrl()}
+            href={resolvedReleasesUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-accent hover:underline"

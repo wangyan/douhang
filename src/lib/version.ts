@@ -3,21 +3,21 @@ import pkg from '../../package.json';
 /** 应用版本号（package.json 单一来源，不含 v 前缀），用于设置页展示 */
 export const APP_VERSION = pkg.version;
 
-/** 获取配置的代码托管平台域名（默认：code.idiswy.cn） */
+/** 获取配置的代码托管平台域名（默认：code.bg7pbp.com） */
 export function getCodeHost(): string {
   return (
     process.env.NEXT_PUBLIC_CODE_HOST ||
     process.env.CODE_HOST ||
-    'code.idiswy.cn'
+    'code.bg7pbp.com'
   ).trim();
 }
 
-/** 获取配置的仓库路径（默认：zhdmcourt/douhang） */
+/** 获取配置的仓库路径（默认：wangyan/douhang） */
 export function getRepoName(): string {
   return (
     process.env.NEXT_PUBLIC_REPO_NAME ||
     process.env.REPO_NAME ||
-    'zhdmcourt/douhang'
+    'wangyan/douhang'
   ).trim();
 }
 
@@ -42,8 +42,8 @@ export function getManualUrl(): string {
 }
 
 /** Releases 列表页地址（GitHub 与 Forgejo / Gitea 路径一致） */
-export function getReleasesPageUrl(): string {
-  return `${getRepoUrl()}/releases`;
+export function getReleasesPageUrl(repoUrl?: string): string {
+  return `${repoUrl ?? getRepoUrl()}/releases`;
 }
 
 /** Releases 检测源（适配 GitHub api.github.com 或 Forgejo/Gitea api/v1） */
