@@ -1,6 +1,6 @@
 # 更新日志
 
-本文件是斗法领航所有对外发布说明的唯一事实源：
+本文件是斗航所有对外发布说明的唯一事实源：
 
 - **Release**：`scripts/release.sh` 自动提取对应版本段落作为 Release 说明
 - **应用内展示**：构建时解析为 JSON，在「关于」弹窗与更新提醒中展示
@@ -54,7 +54,7 @@
 
 ### 部署与运维
 
-- 官方镜像 `code.idiswy.cn/zhdmcourt/douhang`（切换至 GitHub 平台时为 `ghcr.io/zhdmcourt/douhang`），多架构支持（amd64 / arm64）
+- 官方镜像 `code.bg7pbp.com/wangyan/douhang`（切换至 GitHub 平台时为 `ghcr.io/wangyan/douhang`），多架构支持（amd64 / arm64）
 - 容器启动自动完成数据库迁移与种子写入，数据持久化在宿主机 `./data`
 - 自动探测 Docker socket 属组；`DOCKER_GID` / `PUID` / `PGID` 在 `.env` 设置即可生效
 - 无鉴权健康检查端点 `/api/health`，已接入容器 HEALTHCHECK

@@ -3,7 +3,7 @@
 # 数据目录 ./data 自动创建，Docker 监控自动获取 socket 权限
 services:
   douhang:
-    image: ${CONTAINER_REGISTRY:-code.idiswy.cn}/${REPO_NAME:-zhdmcourt/douhang}:latest   # 锁定版本可改为具体 tag（如 :1.0.0）
+    image: ${CONTAINER_REGISTRY:-code.bg7pbp.com}/${REPO_NAME:-wangyan/douhang}:latest   # 锁定版本可改为具体 tag（如 :1.0.0）
     container_name: douhang
     ports:
       - "3000:3000"
@@ -15,8 +15,8 @@ services:
       - AUTH_USERNAME=${AUTH_USERNAME:-admin}
       - AUTH_PASSWORD=${AUTH_PASSWORD:?请在 .env 中设置 AUTH_PASSWORD}
       - AUTH_URL=${AUTH_URL:-}
-      - CODE_HOST=${CODE_HOST:-code.idiswy.cn}
-      - REPO_NAME=${REPO_NAME:-zhdmcourt/douhang}
+      - CODE_HOST=${CODE_HOST:-code.bg7pbp.com}
+      - REPO_NAME=${REPO_NAME:-wangyan/douhang}
       - REPO_TOKEN=${REPO_TOKEN:-}
       - UPDATE_CHECK_TOKEN=${UPDATE_CHECK_TOKEN:-}
       # 可选：DOCKER_GID（手动指定 socket 组，默认自动探测）；PUID/PGID（匹配宿主机用户）

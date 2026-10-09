@@ -10,7 +10,7 @@ interface BrandMarkProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   /** 自定义容器 className（覆盖默认样式时使用） */
   className?: string;
-  /** 可访问性标签，默认 "斗法领航" */
+  /** 可访问性标签，默认 "斗航" */
   'aria-label'?: string;
   /** 自定义 Logo；空值使用内置标识 */
   logo?: string;
@@ -103,7 +103,7 @@ function DouHangGlyph() {
 export function BrandMark({
   size = 'md',
   className = '',
-  'aria-label': ariaLabel = '斗法领航',
+  'aria-label': ariaLabel = '斗航',
   logo = '',
 }: BrandMarkProps) {
   return (

@@ -37,8 +37,8 @@ if [ -f .env ]; then
   [ -z "${PACKAGE_TOKEN:-}" ] && PACKAGE_TOKEN=$(grep -E '^[[:space:]]*PACKAGE_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
 fi
 
-CODE_HOST="${CODE_HOST:-code.idiswy.cn}"
-REPO_NAME="${REPO_NAME:-zhdmcourt/douhang}"
+CODE_HOST="${CODE_HOST:-code.bg7pbp.com}"
+REPO_NAME="${REPO_NAME:-wangyan/douhang}"
 
 is_github=0
 if [[ "$CODE_HOST" == "github.com" || "$CODE_HOST" == *.github.com ]]; then

@@ -3,6 +3,8 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
 # 安装全部依赖（含 devDependencies），供 builder 阶段类型检查与构建使用
+# .git 不在构建上下文中，需跳过 husky 的 prepare 钩子（同 prod-deps 阶段）
+ENV HUSKY=0
 RUN npm ci
 
 FROM node:22-alpine AS prod-deps
@@ -34,7 +36,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # runner 阶段显式声明（ENV 不跨 FROM 继承）；compose/运行时可覆盖
 ENV DATABASE_URL="file:./data/sqlite.db"
 
-ARG REPO_URL="https://code.idiswy.cn/zhdmcourt/douhang"
+ARG REPO_URL="https://code.bg7pbp.com/wangyan/douhang"
 LABEL org.opencontainers.image.source="${REPO_URL}"
 
 RUN addgroup --system --gid 1001 nodejs

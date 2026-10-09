@@ -12,7 +12,7 @@ const CJK_PATTERN = /[\u3400-\u4dbf\u4e00-\u9fff]/;
  *
  * 1. 空格分词：第一个空白之后的非空白字符（"MyNAS 导航" → 导）
  * 2. 驼峰分词：小写→大写边界（"DouHang" → N、"MyNAS" → N）
- * 3. CJK 分词：前两类均未命中且含 CJK 时取中点（"斗法领航" → 领）
+ * 3. CJK 分词：前两类均未命中且含 CJK 时取中点（"斗航" → 领）
  * 4. 均未命中（纯小写单词、单字符等）→ -1 不着色
  */
 function findAccentIndex(chars: string[]): number {

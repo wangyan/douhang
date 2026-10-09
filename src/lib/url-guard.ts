@@ -3,7 +3,7 @@
  *
  * 防护范围：云元数据端点 + 回环地址。
  * 私网地址（10.x / 172.16-31.x / 192.168.x 等）刻意放行：
- * 斗法领航是 NAS 导航站，qB / Jellyfin 等内网服务是合法抓取目标。
+ * 斗航是 NAS 导航站，qB / Jellyfin 等内网服务是合法抓取目标。
  *
  * 已知接受风险：域名解析到内网 IP（DNS rebinding）无法靠字符串黑名单
  * 拦截，需要 resolve-then-validate-then-connect；单用户自托管场景

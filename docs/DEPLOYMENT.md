@@ -1,20 +1,18 @@
-# 斗法领航部署文档
+# 部署文档
 
 本文档面向部署者，覆盖镜像与源码部署、环境变量、数据持久化、启动流程、反向代理、升级、备份与故障排查。使用说明见[使用手册](./MANUAL.md)，系统结构见[架构文档](./ARCHITECTURE.md)。
 
 ## 1. 镜像方式部署（推荐）
 
-容器镜像地址由平台环境配置决定（默认自建平台为 `code.idiswy.cn/zhdmcourt/douhang`；切换 GitHub 时为 `ghcr.io/zhdmcourt/douhang`，建议锁定具体版本号而非 `latest`）。
+容器镜像地址由平台环境配置决定（默认自建平台为 `code.bg7pbp.com/wangyan/douhang`；切换 GitHub 时为 `ghcr.io/wangyan/douhang`，建议锁定具体版本号而非 `latest`）。
 
 **前置条件**：已安装 Docker 与 Docker Compose v2，且主机可访问互联网以下载镜像。
 
 ```bash
 mkdir douhang && cd douhang
 
-# 1. 获取生产编排文件（私有仓库需携带访问令牌；默认自建平台，亦可替换为私有 GitHub 仓库地址）
-curl -H "Authorization: token <REPO_TOKEN>" -O https://${CODE_HOST:-code.idiswy.cn}/${REPO_NAME:-zhdmcourt/douhang}/raw/branch/main/docker-compose.prod.yml
-# 若为 GitHub 私有仓库，执行：
-# curl -H "Authorization: token <REPO_TOKEN>" -O https://raw.githubusercontent.com/<owner>/<repo>/main/docker-compose.prod.yml
+# 1. 获取生产编排文件
+curl -O https://raw.githubusercontent.com/wangyan/douhang/main/docker-compose.prod.yml
 
 # 2. 生成 .env（仅在文件不存在时创建）：
 #    AUTH_SECRET 至少 32 字符；AUTH_PASSWORD 必填且不少于 8 位，
@@ -27,7 +25,6 @@ if [ ! -f .env ]; then
     echo "AUTH_SECRET=$(openssl rand -base64 32)"
     echo "AUTH_USERNAME=admin"
     echo "AUTH_PASSWORD=$(openssl rand -base64 18)"
-    echo "REPO_TOKEN=your-repo-token"
   } > .env
   echo "已生成随机登录口令，见 .env 中的 AUTH_PASSWORD，请妥善保存"
 fi
@@ -42,14 +39,14 @@ docker compose -f docker-compose.prod.yml up -d
 
 镜像已内置默认值 `DATABASE_URL=file:./data/sqlite.db`，生产编排挂载 docker.sock，常规场景无需额外配置。
 
-持续运行期间的唯一自动出站请求是版本更新检测（每 24 小时查询一次 Releases）。私有仓库需在 `.env` 中提供 `REPO_TOKEN`（或在「设置 → 通用 → 版本更新」中输入令牌）。纯内网或离线环境可在设置页关闭检测，关闭后不再发起该请求。
+持续运行期间的唯一自动出站请求是版本更新检测（每 24 小时查询一次 Releases）。作为公开项目，默认无需配置令牌即可自动检查更新（若为私有镜像库或受 GitHub API 速率限制，可在 `.env` 中提供 `REPO_TOKEN` 或在「设置 → 通用 → 版本更新」中输入令牌）。纯内网或离线环境可在设置页关闭检测，关闭后不再发起该请求。
 
 ## 2. 源码构建部署
 
 适合需要自行构建镜像或进行二次开发的场景。前置条件同上，并需克隆仓库源码。
 
 ```bash
-git clone <repo-url> douhang
+git clone https://github.com/wangyan/douhang.git douhang
 cd douhang
 cp .env.example .env          # 设置 AUTH_SECRET 与不少于 8 位的真实口令 AUTH_PASSWORD
 docker compose up -d --build  # 基于仓库根目录 Dockerfile 多阶段构建
@@ -70,8 +67,8 @@ docker compose up -d --build  # 基于仓库根目录 Dockerfile 多阶段构建
 | `DOCKER_GID` | 否 | 自动探测 | 宿主机 docker.sock 属组 GID；探测失败时 `0`。Linux NAS 上常需覆盖，在 `.env` 设置即可生效（见排错） |
 | `PUID` | 否 | `1001` | 容器内运行用户 uid，用于对齐宿主机文件属主，在 `.env` 设置即可生效 |
 | `PGID` | 否 | `1001` | 容器内运行用户 gid，同上，在 `.env` 设置即可生效 |
-| `CODE_HOST` | 否 | `code.idiswy.cn` | 远端托管平台域名（如 `code.idiswy.cn` 或 `github.com`） |
-| `REPO_NAME` | 否 | `zhdmcourt/douhang` | 远端仓库全名（如 `owner/repo`） |
+| `CODE_HOST` | 否 | `code.bg7pbp.com` | 远端托管平台域名（如 `code.bg7pbp.com` 或 `github.com`） |
+| `REPO_NAME` | 否 | `wangyan/douhang` | 远端仓库全名（如 `owner/repo`） |
 | `CONTAINER_REGISTRY` | 否 | 同 Host / `ghcr.io` | 容器镜像库域名（若 Host 为 `github.com` 默认 `ghcr.io`，其他默认同 `CODE_HOST`） |
 | `REPO_TOKEN` | 否 | - | 仓库访问令牌，用于私有仓库版本检测与发版 |
 | `PACKAGE_TOKEN` | 否 | - | 容器镜像库读写令牌，用于发版推送 Docker 镜像 |
@@ -138,7 +135,7 @@ docker compose up -d --build  # 基于仓库根目录 Dockerfile 多阶段构建
 
 ```bash
 # 环境要求：Node.js 22+（见 .nvmrc）、npm 10+
-git clone <repo-url> douhang
+git clone https://github.com/wangyan/douhang.git douhang
 cd douhang
 npm ci
 cp .env.example .env        # 设置 AUTH_SECRET 与不少于 8 位的真实口令 AUTH_PASSWORD
@@ -155,24 +152,25 @@ npm run dev                 # 启动 dev server（Turbopack）
 
 发布流程见[贡献指南](./CONTRIBUTING.md)。
 
-## 12. 代码平台切换（自建平台 ↔ 私有 GitHub）
+## 12. 代码平台切换（自建平台 ↔ GitHub）
 
 系统所有平台相关的路由与地址均支持由 `.env` 环境变量自适应推导，只需修改 `.env` 即可完成切换：
 
-### 切换至私有 GitHub
+### 切换至 GitHub（公开仓库：https://github.com/wangyan/douhang.git）
 ```dotenv
 CODE_HOST="github.com"
-REPO_NAME="zhdmcourt/douhang"
+REPO_NAME="wangyan/douhang"
 CONTAINER_REGISTRY="ghcr.io"
-REPO_TOKEN="<具备 repo 权限的 GitHub PAT>"
-PACKAGE_TOKEN="<具备 write:packages 权限的 GitHub PAT>"
+# 公开仓库检测更新无需 REPO_TOKEN；若需发版或解除 API 频限可填入 PAT：
+# REPO_TOKEN="<具备 repo 权限的 GitHub PAT>"
+# PACKAGE_TOKEN="<具备 write:packages 权限的 GitHub PAT>"
 ```
 
 ### 切换至自建平台（默认）
 ```dotenv
-CODE_HOST="code.idiswy.cn"
-REPO_NAME="zhdmcourt/douhang"
-CONTAINER_REGISTRY="code.idiswy.cn"
+CODE_HOST="code.bg7pbp.com"
+REPO_NAME="wangyan/douhang"
+CONTAINER_REGISTRY="code.bg7pbp.com"
 REPO_TOKEN="<自建平台 Repository Token>"
 PACKAGE_TOKEN="<自建平台 Package Token>"
 ```

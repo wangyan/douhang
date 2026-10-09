@@ -1,4 +1,4 @@
-# 斗法领航贡献指南
+# 贡献指南
 
 本文档面向本仓库的代码贡献者，规定提交信息与变更日志的写法以及发布流程。系统结构见[架构文档](./ARCHITECTURE.md)；部署与运维见[部署文档](./DEPLOYMENT.md)。
 
@@ -97,7 +97,7 @@ fix(搜索): 修复拼音首字母匹配在含数字卡片上失效
 2. **环境凭据**：本地 `.env` 或系统环境变量已就绪：
    - `REPO_TOKEN`：具备目标仓库写权限（用于创建 Release、Git 推送）；
    - `PACKAGE_TOKEN`：具备目标容器镜像库写权限（用于 `docker login` 与推送镜像）；
-   - （可选）`CODE_HOST` / `REPO_NAME` / `CONTAINER_REGISTRY`：平台自适应配置（默认连接 `code.idiswy.cn`，亦支持切换至私有 GitHub，详见[部署文档](./DEPLOYMENT.md)第 12 节）。
+   - （可选）`CODE_HOST` / `REPO_NAME` / `CONTAINER_REGISTRY`：平台自适应配置（默认连接 `code.bg7pbp.com`，亦支持切换至 GitHub，详见[部署文档](./DEPLOYMENT.md)第 12 节）。
 3. **Docker 引擎状态**：Docker 正在运行（`docker info` 正常返回），且支持 `docker buildx` 多架构构建。
 4. **更新日志确认**：可在 `CHANGELOG.md` 顶部预先写好人工润色条目；若未提供，脚本会自动从 Git 提交生成初始段落。
 
@@ -149,6 +149,13 @@ bash scripts/release.sh 1.0.0
 
 ## 5. 推送
 
-- 本项目主远端为 `origin`（`ssh://git@idiswy.cn/zhdmcourt/douhang.git`）。
-- 默认不推送。需要推送时：`git push origin main --tags`。
+- 本项目配置双远端：默认主远端为 `origin`（`ssh://git@bg7pbp.com/wangyan/douhang.git`），公开同步远端为 `github`（`git@github.com:wangyan/douhang.git`，公开项目地址：`https://github.com/wangyan/douhang.git`）。
+- 默认不推送。需要推送时：
+  ```bash
+  # 推送到主远端
+  git push origin main --tags
+
+  # 同步到 GitHub 公开仓库
+  git push github main --tags
+  ```
 - **禁止对 `main` 强推。** 确需改写历史（如统一提交信息）时必须经维护者明确同意，并按规范流程同步分支与标签。
