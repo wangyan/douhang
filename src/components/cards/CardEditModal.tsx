@@ -279,7 +279,7 @@ function CardEditModalInner({
                     render={({ field }) => (
                       <TextInput
                         label="名称"
-                        placeholder="如：Jellyfin"
+                        placeholder="如：GitLab"
                         value={field.value}
                         onChange={field.onChange}
                         onBlur={field.onBlur}

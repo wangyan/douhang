@@ -64,7 +64,7 @@ docker compose up -d --build  # 基于仓库根目录 Dockerfile 多阶段构建
 | `AUTH_PASSWORD` | 是 | - | 管理员初始密码，不少于 8 位，禁止空值 / `changeme` / `请修改默认密码`，启动时校验不通过即失败。仅在数据库为空时写入；修改密码在「设置 → 通用」操作 |
 | `AUTH_URL` | 否 | - | 反代 / 域名部署的公开地址（如 `https://douhang.example.com`），用于 NextAuth 回调与登出跳转 |
 | `DOCKER_HOST` | 否 | unix socket | Docker 监控数据源：`unix:///var/run/docker.sock` 或 `tcp://host:2375` |
-| `DOCKER_GID` | 否 | 自动探测 | 宿主机 docker.sock 属组 GID；探测失败时 `0`。Linux NAS 上常需覆盖，在 `.env` 设置即可生效（见排错） |
+| `DOCKER_GID` | 否 | 自动探测 | 宿主机 docker.sock 属组 GID；探测失败时 `0`。部分 Linux 主机或存储系统上常需覆盖，在 `.env` 设置即可生效（见排错） |
 | `PUID` | 否 | `1001` | 容器内运行用户 uid，用于对齐宿主机文件属主，在 `.env` 设置即可生效 |
 | `PGID` | 否 | `1001` | 容器内运行用户 gid，同上，在 `.env` 设置即可生效 |
 | `CODE_HOST` | 否 | `code.bg7pbp.com` | 远端托管平台域名（如 `code.bg7pbp.com` 或 `github.com`） |
@@ -121,11 +121,11 @@ docker compose up -d --build  # 基于仓库根目录 Dockerfile 多阶段构建
 
 - **应用内备份（推荐）**：「设置 → 通用 → 备份」一键导出 zip，含全部配置数据（`backup.json`）+ `./data/uploads` 上传文件；导入支持 zip 或裸 JSON，可恢复到任意实例。
 - **文件系统级备份**：直接归档宿主机 `./data` 目录即可（数据库 + 上传文件）。恢复时停止容器，覆盖 `./data` 目录后重新启动。
-- 建议在修改配置或迁移 NAS 前导出备份。
+- 建议在修改配置或迁移服务器前导出备份。
 
 ## 9. 常见问题排查
 
-- **Docker 监控 Widget 显示无数据或降级**：通常由 docker.sock 权限不足导致。Linux NAS 上 socket 常属 `docker` 组，需在 `.env` 设 `DOCKER_GID=<gid>`（取 `stat -c %g /var/run/docker.sock`），设置后 entrypoint 会把运行用户加入该组。若编排文件未在 `environment` 透传该变量，可在 `environment` 补传，或为服务添加 `group_add: ${DOCKER_GID:-0}`（开发编排默认带此配置）；Docker Desktop 一般为 root(0) 组，默认即可。Widget 不可用时仅降级显示，不影响其他功能。
+- **Docker 监控 Widget 显示无数据或降级**：通常由 docker.sock 权限不足导致。Linux 系统上 socket 常属 `docker` 组，需在 `.env` 设 `DOCKER_GID=<gid>`（取 `stat -c %g /var/run/docker.sock`），设置后 entrypoint 会把运行用户加入该组。若编排文件未在 `environment` 透传该变量，可在 `environment` 补传，或为服务添加 `group_add: ${DOCKER_GID:-0}`（开发编排默认带此配置）；Docker Desktop 一般为 root(0) 组，默认即可。Widget 不可用时仅降级显示，不影响其他功能。
 - **数据库写入失败 / 权限拒绝**：宿主机 `./data` 目录若由 Docker 以 root 创建，非 root 运行用户（`PUID`/`PGID`）无法写入。可通过 `PUID`/`PGID` 对齐宿主机实际用户，entrypoint 会自动 `chown` 挂载目录与 `node_modules`。
 - **忘记密码**：无命令行重置入口；最快方式是停止容器、删除 `./data/sqlite.db`、重新 `up -d`，seed 会按 `.env` 中的 `AUTH_USERNAME` / `AUTH_PASSWORD` 重建账号（口令未设置时生成随机口令并打印一次）。此操作**将清除全部配置与卡片数据，操作前务必备份**。
 - **登录后报 `[auth][error] JWTSessionError … no matching decryption secret`**：会话 Cookie 是用**旧的** `AUTH_SECRET` 加密的，容器换了密钥后无法解密。处理：清除浏览器中本站的 Cookie（或换隐身窗口）后重新登录；并检查 `AUTH_SECRET` 是否在多次部署间保持一致——重新生成密钥必然使已登录会话失效。
