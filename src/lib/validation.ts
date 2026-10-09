@@ -35,6 +35,13 @@ const urlSchema = z
     { message: '请输入合法的 http/https 地址' },
   );
 
+/** qBittorrent 连接配置保存（PUT /api/widgets/qbittorrent/config，服务端会真实请求该地址） */
+export const qbittorrentConfigSchema = z.object({
+  url: urlSchema,
+  username: z.string(),
+  password: z.string().optional(),
+});
+
 // ============ 卡片 ============
 
 /**
@@ -211,6 +218,9 @@ export const backupImportSchema = z.object({
       widgetKey: z.string(),
       order: z.number().int(),
       size: z.string(),
+      // 自由布局坐标（旧备份无此字段，null = 未定制）
+      x: z.number().int().nullish(),
+      y: z.number().int().nullish(),
     }),
   ),
   dateItems: z.array(

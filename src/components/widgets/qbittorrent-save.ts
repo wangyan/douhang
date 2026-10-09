@@ -3,29 +3,19 @@ import { widgetsApi } from '@/services/widgets';
 import type { QbittorrentConfig } from '@/types';
 
 /**
- * qBittorrent 配置保存（补偿事务）
+ * qBittorrent 配置保存
  *
- * 连接验证读取服务端已存配置，因此先写入新配置再验证；
- * 验证失败时回滚为原配置并抛出错误，不残留无效配置。
+ * 写入新配置并进行真实连接验证；验证失败时抛出错误供表单提示。
  */
 export async function saveQbittorrentConfig(
   config: QbittorrentConfig,
 ): Promise<void> {
-  const previous = await widgetsApi.getQbittorrentConfig();
-  await request('/api/preferences', {
-    method: 'PATCH',
-    body: { key: 'qbittorrent', value: config },
+  await request('/api/widgets/qbittorrent/config', {
+    method: 'PUT',
+    body: config,
   });
-  try {
-    const stats = await widgetsApi.validateQbittorrentConnection();
-    if (!stats.available) {
-      throw new Error(stats.error ?? '连接失败，请检查配置');
-    }
-  } catch (e) {
-    await request('/api/preferences', {
-      method: 'PATCH',
-      body: { key: 'qbittorrent', value: previous },
-    }).catch(() => {});
-    throw e instanceof Error ? e : new Error('连接失败，请检查配置');
+  const stats = await widgetsApi.validateQbittorrentConnection();
+  if (!stats.available) {
+    throw new Error(stats.error ?? '连接失败，请检查配置');
   }
 }

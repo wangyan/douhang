@@ -1,5 +1,6 @@
 import { URL } from 'node:url';
 import { parse } from 'parse5';
+import { safeFetch } from '@/lib/url-guard';
 import { getRepoUrl } from '@/lib/version';
 
 /**
@@ -16,15 +17,6 @@ import { getRepoUrl } from '@/lib/version';
 
 const FETCH_TIMEOUT_MS = 2500;
 const USER_AGENT = `DouHang/1.0 (+${getRepoUrl()})`;
-
-/** 云元数据端点等敏感地址（SSRF 防护：阻止探测云实例凭据） */
-function isBlockedHost(hostname: string): boolean {
-  const h = hostname.toLowerCase();
-  return (
-    h === '169.254.169.254' || // AWS / Azure 元数据
-    h === 'metadata.google.internal' // GCP 元数据
-  );
-}
 
 /** 识别历史上游生成的 Google S2 存量图标 */
 export function isGoogleFaviconUrl(value: string): boolean {
@@ -78,19 +70,15 @@ export async function fetchFavicon(
   const hostname = extractHostname(targetUrl);
   if (!hostname) return null;
 
-  // SSRF 防护：阻止云元数据端点
-  if (isBlockedHost(hostname)) return null;
-
   // 1. 尝试解析 HTML 中的 <link rel="icon">，顺带记录页面标题
   let pageTitle: string | undefined;
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-    const res = await fetch(targetUrl, {
+    const res = await safeFetch(targetUrl, {
       headers: { 'User-Agent': USER_AGENT },
       signal: controller.signal,
-      redirect: 'follow',
     });
     clearTimeout(timer);
 

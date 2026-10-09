@@ -7,6 +7,16 @@ import { getUserPreference } from '@/lib/preferences';
 import type { ThemeMode } from '@/types';
 import { Providers } from './providers';
 
+// DB 不可用时降级为默认值，保证登录页 / 静态外壳仍可渲染（错误边界无法捕获根布局自身的抛错）
+async function safePreference<T>(key: string, fallback: T): Promise<T> {
+  try {
+    return await getUserPreference<T>(key, fallback);
+  } catch (error) {
+    console.error('读取用户偏好失败，使用默认值', error);
+    return fallback;
+  }
+}
+
 export async function generateMetadata(): Promise<Metadata> {
   const brand = await getBrandConfig();
   // AUTH_URL 用于生成分享图片绝对地址；未设置时回退至
@@ -36,12 +46,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const rawTheme = await getUserPreference<unknown>('theme', 'system');
+  const rawTheme = await safePreference<unknown>('theme', 'system');
   const theme: ThemeMode =
     rawTheme === 'light' || rawTheme === 'dark' || rawTheme === 'system'
       ? rawTheme
       : 'system';
-  const rawFontSize = await getUserPreference<unknown>('fontSize', 100);
+  const rawFontSize = await safePreference<unknown>('fontSize', 100);
   const fontSize = normalizeFontSize(rawFontSize);
   const isDark = theme === 'dark';
   // 仅显式 light/dark 由 SSR 输出主题属性；system 不输出任何明暗信息，

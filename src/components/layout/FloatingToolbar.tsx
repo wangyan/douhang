@@ -23,6 +23,7 @@ import {
   LogOut,
   Monitor,
   Moon,
+  Palette,
   Pencil,
   Settings,
   Sun,
@@ -31,6 +32,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import { useCallback, useEffect, useState } from 'react';
 import { AboutDialog } from '@/components/layout/AboutDialog';
+import {
+  type AppearancePanelData,
+  AppearanceQuickPanel,
+} from '@/components/layout/AppearanceQuickPanel';
 import {
   BATCH_DELETE_MODE_EVENT,
   CARD_SIMPLE_MODE_EVENT,
@@ -65,6 +70,8 @@ interface FloatingToolbarProps {
   manualUrl?: string;
   /** 当前用户是否已登录，默认 true（设置页等私有页默认为 true） */
   isAuthed?: boolean;
+  /** 外观快捷面板数据包（首页 SSR 取好传入；缺省时菜单不显示外观入口） */
+  appearance?: AppearancePanelData;
 }
 
 /**
@@ -260,9 +267,11 @@ export function FloatingToolbar({
   repoUrl = REPO_URL,
   manualUrl = MANUAL_URL,
   isAuthed = true,
+  appearance,
 }: FloatingToolbarProps) {
   const [cmdKOpen, setCmdKOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -366,6 +375,16 @@ export function FloatingToolbar({
     };
     window.addEventListener(BATCH_DELETE_MODE_EVENT, handler);
     return () => window.removeEventListener(BATCH_DELETE_MODE_EVENT, handler);
+  }, []);
+
+  // 监听外部触发的简洁模式变更（如外观快捷面板切换），保持工具栏按钮同步
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<boolean>).detail;
+      if (typeof detail === 'boolean') setSimpleMode(detail);
+    };
+    window.addEventListener(CARD_SIMPLE_MODE_EVENT, handler);
+    return () => window.removeEventListener(CARD_SIMPLE_MODE_EVENT, handler);
   }, []);
 
   // ESC 逐层退出画布模式：批量删除 → 编辑模式 → 折叠工具栏（由 useEscapeExitModes 统一监听）
@@ -539,6 +558,9 @@ export function FloatingToolbar({
         <ToolbarUserMenu
           isAuthed={isAuthed}
           onOpenAbout={() => setAboutOpen(true)}
+          onOpenAppearance={
+            isAuthed && appearance ? () => setAppearanceOpen(true) : undefined
+          }
           manualUrl={manualUrl}
         />
       </HStack>
@@ -552,7 +574,16 @@ export function FloatingToolbar({
         isOpen={aboutOpen}
         onOpenChange={setAboutOpen}
         update={updateState?.update ?? null}
+        repoUrl={repoUrl}
       />
+      {appearance && (
+        <AppearanceQuickPanel
+          isOpen={appearanceOpen}
+          onOpenChange={setAppearanceOpen}
+          data={appearance}
+          cardSimpleMode={simpleMode}
+        />
+      )}
       {isAuthed && activeUpdate && (
         <UpdateNotification
           update={activeUpdate}
@@ -572,10 +603,12 @@ export function FloatingToolbar({
 function ToolbarUserMenu({
   isAuthed,
   onOpenAbout,
+  onOpenAppearance,
   manualUrl,
 }: {
   isAuthed: boolean;
   onOpenAbout: () => void;
+  onOpenAppearance?: () => void;
   manualUrl: string;
 }) {
   const router = useRouter();
@@ -594,6 +627,14 @@ function ToolbarUserMenu({
     >
       {isAuthed ? (
         <>
+          {onOpenAppearance && (
+            <DropdownMenuItem
+              icon={<Palette size={ICON_SIZE.md} />}
+              label="外观"
+              style={{ paddingInline: 12 }}
+              onClick={onOpenAppearance}
+            />
+          )}
           <DropdownMenuItem
             icon={<Settings size={ICON_SIZE.md} />}
             label="设置"

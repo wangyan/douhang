@@ -27,6 +27,17 @@ export function useFaviconFetcher({
   const latestIntentRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
+  // 回调经 ref 中转，避免父组件每次渲染新建函数导致 effect 重跑重复抓取；
+  // 赋值放 commit 后的 effect，不在 render 期间产生副作用
+  const onFetchedRef = useRef(onFetched);
+  const onAutoFetchedRef = useRef(onAutoFetched);
+  const onFetchErrorRef = useRef(onFetchError);
+  useEffect(() => {
+    onFetchedRef.current = onFetched;
+    onAutoFetchedRef.current = onAutoFetched;
+    onFetchErrorRef.current = onFetchError;
+  });
+
   const request = useCallback(
     async (signal: AbortSignal) => {
       if (!sourceUrl) return null;
@@ -53,16 +64,16 @@ export function useFaviconFetcher({
     try {
       const data = await request(abortController.signal);
       if (intentToken !== latestIntentRef.current || !data) return;
-      onFetched(data);
+      onFetchedRef.current(data);
     } catch {
       if (intentToken !== latestIntentRef.current) return;
-      onFetchError(abortController.signal.aborted);
+      onFetchErrorRef.current(abortController.signal.aborted);
     } finally {
       clearTimeout(timeoutTimer);
       if (abortRef.current === abortController) abortRef.current = null;
       if (intentToken === latestIntentRef.current) setPending(false);
     }
-  }, [onFetchError, onFetched, request, sourceUrl]);
+  }, [request, sourceUrl]);
 
   useEffect(() => {
     if (!autoFetch || !sourceUrl || !/^https?:\/\//i.test(sourceUrl)) {
@@ -78,7 +89,7 @@ export function useFaviconFetcher({
       try {
         const data = await request(abortController.signal);
         if (intentToken !== latestIntentRef.current || !data) return;
-        onAutoFetched(data);
+        onAutoFetchedRef.current(data);
       } catch {
         // 抓取失败时保留首字母占位，不影响表单编辑
       } finally {
@@ -88,7 +99,7 @@ export function useFaviconFetcher({
     void fetchDefaultIcon();
 
     return () => abortController.abort();
-  }, [autoFetch, onAutoFetched, request, sourceUrl]);
+  }, [autoFetch, request, sourceUrl]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 

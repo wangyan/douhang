@@ -125,8 +125,10 @@ html[data-theme="dark"] [data-astryx-theme] {
   --z-selected: 20;
   --z-chrome: 50;
   /* 品牌/装饰强调色（非危险语义，区别于 --color-error） */
-  --color-brand-pixel-accent: #e5484d;
-  --color-date-widget-accent: #d71921;
+  --color-brand-red: #d71921;
+  --color-brand-pixel: #e5484d;
+  --color-brand-pixel-accent: var(--color-brand-pixel);
+  --color-date-widget-accent: var(--color-brand-red);
   /* 品牌标识深浅色模式自适应变量 */
   --brand-mark-bg: #d45134;
   --brand-mark-fg: #ffffff;
@@ -1092,8 +1094,8 @@ html[data-entered="1"] .stagger-cards > * {
   padding-left: 0.15rem;
 }
 
-/* S 档日期卡辅助行：单行跟随大数字基线；名称不收缩，
-   空间不足时日期从最右侧收缩并以省略号收尾 */
+/* S 档日期卡辅助行：单行跟随大数字基线；空间不足时先收缩日期、
+   极端字号下名称与日期均以省略号截断 */
 .date-widget-compact-inline {
   display: flex;
   flex: 1 1 0;
@@ -1108,7 +1110,12 @@ html[data-entered="1"] .stagger-cards > * {
 }
 
 .date-widget-compact-name {
-  flex: none;
+  /* 极端字号（如 S×150%）下名称也需可收缩，否则会撑破父容器
+     把日期顶出内容边界；常规缩放下空间充足不触发 */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

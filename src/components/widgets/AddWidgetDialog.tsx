@@ -18,9 +18,9 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { DateItemForm } from '@/components/widgets/DateItemForm';
 import { QbittorrentConnectionForm } from '@/components/widgets/QbittorrentConnectionForm';
-import { saveQbittorrentConfig } from '@/components/widgets/qbittorrent-save';
 import type { RecurUnit } from '@/lib/datetime';
 import { DIALOG_WIDTH, ICON_SIZE } from '@/lib/design-tokens';
+import { request } from '@/lib/request/request';
 // 日期类 widget key 从注册表派生（单一来源）
 import { DATE_ITEM_WIDGET_KEYS } from '@/lib/widgets/registry';
 import { widgetsApi } from '@/services/widgets';
@@ -314,8 +314,15 @@ function QbConfigStep({
   onDone: () => void;
 }) {
   const handleSubmit = async (config: QbittorrentConfig) => {
-    // 写入并验证连接；验证失败回滚为原配置，不创建实例，就地提示修正
-    await saveQbittorrentConfig(config);
+    await request('/api/widgets/qbittorrent/config', {
+      method: 'PUT',
+      body: config,
+    });
+    // 真实登录验证：凭据错误 / 连接失败时不创建实例，就地提示修正
+    const stats = await widgetsApi.validateQbittorrentConnection();
+    if (!stats.available) {
+      throw new Error(stats.error ?? '连接失败，请检查配置');
+    }
     await onAddInstance();
     onDone();
   };
@@ -340,7 +347,7 @@ function QbConfigStep({
       </HStack>
 
       <QbittorrentConnectionForm
-        initial={{ url: '', username: '', password: '' }}
+        initial={{ url: '', username: '', password: '', hasPassword: false }}
         submitLabel="保存并添加"
         onSubmit={handleSubmit}
       />

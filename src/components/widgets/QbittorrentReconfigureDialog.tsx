@@ -5,10 +5,10 @@ import { Text } from '@astryxdesign/core/Text';
 import { VStack } from '@astryxdesign/core/VStack';
 import { useEffect, useState } from 'react';
 import { QbittorrentConnectionForm } from '@/components/widgets/QbittorrentConnectionForm';
-import { saveQbittorrentConfig } from '@/components/widgets/qbittorrent-save';
 import { DIALOG_WIDTH } from '@/lib/design-tokens';
+import { request } from '@/lib/request/request';
 import { widgetsApi } from '@/services/widgets';
-import type { QbittorrentConfig } from '@/types';
+import type { QbittorrentConfig, QbittorrentConfigView } from '@/types';
 
 interface QbittorrentReconfigureDialogProps {
   isOpen: boolean;
@@ -26,7 +26,7 @@ export function QbittorrentReconfigureDialog({
   isOpen,
   onOpenChange,
 }: QbittorrentReconfigureDialogProps) {
-  const [initial, setInitial] = useState<QbittorrentConfig | null>(null);
+  const [initial, setInitial] = useState<QbittorrentConfigView | null>(null);
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
@@ -50,7 +50,14 @@ export function QbittorrentReconfigureDialog({
   }, [isOpen]);
 
   const handleSave = async (config: QbittorrentConfig) => {
-    await saveQbittorrentConfig(config);
+    await request('/api/widgets/qbittorrent/config', {
+      method: 'PUT',
+      body: config,
+    });
+    const stats = await widgetsApi.validateQbittorrentConnection();
+    if (!stats.available) {
+      throw new Error(stats.error ?? '连接失败，请检查配置');
+    }
     onOpenChange(false);
   };
 
@@ -80,6 +87,7 @@ export function QbittorrentReconfigureDialog({
           {initial ? (
             <QbittorrentConnectionForm
               initial={initial}
+              hasPassword={initial.hasPassword}
               submitLabel="保存"
               onSubmit={handleSave}
             />

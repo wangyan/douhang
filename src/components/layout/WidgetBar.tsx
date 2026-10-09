@@ -41,6 +41,7 @@ export function WidgetBar({
     instances,
     isLoading,
     setInstancePositions,
+    setInstanceOrder,
     setInstanceSize,
     removeInstanceDeferred,
     addInstance,
@@ -171,6 +172,7 @@ export function WidgetBar({
           instances={effectiveInstances}
           isEditMode={isEditMode}
           onMove={setInstancePositions}
+          onReorder={setInstanceOrder}
           onResize={setInstanceSize}
           onRemove={handleRemove}
         />

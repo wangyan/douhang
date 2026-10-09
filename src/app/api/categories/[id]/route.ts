@@ -39,13 +39,14 @@ export const DELETE = withAuth(async (_session, _req, ctx) => {
     return NextResponse.json({ error: '分类不存在' }, { status: 404 });
   }
 
-  await prisma.card.updateMany({
-    where: { categoryId: id },
-    data: { categoryId: null },
-  });
-
-  await prisma.category.delete({
-    where: { id },
+  // 单事务保证原子性：删除分类；
+  // 卡片解除关联由 Card.category 的 onDelete: SetNull 数据库级联完成
+  await prisma.$transaction(async (tx) => {
+    await tx.card.updateMany({
+      where: { categoryId: id },
+      data: { categoryId: null },
+    });
+    await tx.category.delete({ where: { id } });
   });
 
   return NextResponse.json({ success: true });
