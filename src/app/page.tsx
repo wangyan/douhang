@@ -176,7 +176,12 @@ export default async function HomePage() {
             <SearchBox initialEngine={searchEngine} engines={engines} />
           </VStack>
 
-          <WidgetBar initialInstances={initialInstances} isAuthed={isAuthed} />
+          {isAuthed && (
+            <WidgetBar
+              initialInstances={initialInstances}
+              isAuthed={isAuthed}
+            />
+          )}
 
           <HomeContent
             categories={serializedCategories}

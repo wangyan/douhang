@@ -2,7 +2,6 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, normalize, sep } from 'node:path';
 import { NextResponse } from 'next/server';
-import { withAuth } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +22,7 @@ const MIME_MAP: Record<string, string> = {
  * 从 data/uploads/wallpapers/{filename} 读取并返回图片
  * 防止路径穿越攻击
  */
-export const GET = withAuth(async (_session, req) => {
+export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const filename = searchParams.get('path');
 
@@ -58,4 +57,4 @@ export const GET = withAuth(async (_session, req) => {
       'Cache-Control': 'public, max-age=31536000, immutable',
     },
   });
-});
+}

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { withAuth } from '@/lib/api';
 import { prisma } from '@/lib/db';
 import { searchCards } from '@/lib/search';
 
@@ -12,7 +11,7 @@ export const dynamic = 'force-dynamic';
  * - 服务端拉取所有卡片（含分类），调用 searchCards 匹配
  * - 返回 SearchHit[]（已序列化日期）
  */
-export const GET = withAuth(async (_session, req) => {
+export const GET = async (req: Request) => {
   const url = new URL(req.url);
   const q = url.searchParams.get('q')?.trim() ?? '';
   if (!q) {
@@ -45,4 +44,4 @@ export const GET = withAuth(async (_session, req) => {
       score: r.score,
     })),
   });
-});
+};

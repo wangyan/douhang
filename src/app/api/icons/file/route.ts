@@ -2,7 +2,6 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, normalize, sep } from 'node:path';
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +23,7 @@ const MIME_MAP: Record<string, string> = {
  * GET /api/icons/file?path=cards/abc-123.png
  *
  * 从 data/uploads/icons/{scope}/{filename} 读取并返回图片
- * 作用域包含 cards、library、brand；cards 与 library 需登录，brand 公开
+ * 作用域包含 cards、library、brand，均公开可读（支持未登录访问首页卡片与品牌 Logo）
  */
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -40,12 +39,6 @@ export async function GET(req: Request) {
 
   if (parts.length !== 2 || !['cards', 'library', 'brand'].includes(parts[0])) {
     return NextResponse.json({ error: '无效的路径' }, { status: 400 });
-  }
-
-  // brand 作用域公开（登录页加载品牌 Logo），cards 与 library 需登录
-  if (parts[0] !== 'brand') {
-    const [_session, authError] = await requireAuth();
-    if (authError) return authError;
   }
 
   // 校验绝对路径位于 UPLOAD_ROOT 内

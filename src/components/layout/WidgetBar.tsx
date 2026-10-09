@@ -128,8 +128,8 @@ export function WidgetBar({
     return null;
   }
 
-  // 未登录且没有 widget 实例时，不渲染占位横条
-  if (!isAuthed && effectiveInstances.length === 0) {
+  // 游客（未登录用户）不显示 WIDGETS 模块
+  if (!isAuthed) {
     return null;
   }
 
