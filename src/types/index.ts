@@ -299,7 +299,7 @@ export interface WallpaperPreferences {
 
 /** 远端最新 Release 信息（GitHub Releases 或 Forgejo/Gitea API） */
 export interface VersionUpdateInfo {
-  /** 版本 tag，如 v1.1.0 */
+  /** 版本 tag，如 v1.0.0 */
   tag: string;
   /** Release 说明（Keep a Changelog 段落，缺 ## vX.Y.Z 标题行） */
   notes: string;

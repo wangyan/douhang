@@ -110,7 +110,7 @@ export interface LatestRelease {
 /**
  * 解析 Releases API 响应
  *
- * releases/latest 不含 draft / prerelease；tag 形如 v1.1.0，
+ * releases/latest 不含 draft / prerelease；tag 形如 v1.0.0，
  * 非常规 tag（含后缀等）返回 null，避免版本比较误报。
  */
 export function parseLatestRelease(payload: unknown): LatestRelease | null {
