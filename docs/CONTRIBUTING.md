@@ -155,11 +155,17 @@ npm run release:sync v1.0.0
 主版本发布后，官方多架构 Docker 镜像由 GitHub Actions 云端流水线自动构建并交付至 GHCR。如需将镜像同步分发至自建私有镜像平台或 Docker Hub，可运行独立的同步工具（无需本地重复编译）：
 
 ```bash
-# 检查各镜像平台远端镜像版本发布状态（只读检查）
+# 检查各镜像平台 Release 镜像包状态（以主仓远程 Releases 为准；默认查最新，加 full 查全部）
 npm run image:check
+npm run image:check full
 
-# 高速清单同步：自动将官方 GHCR 产物快速分发至私有镜像库与 Docker Hub
+# 高速清单同步：自动将官方 GHCR 产物快速分发至私有镜像库与 Docker Hub（默认同步最新 Release）
 npm run image:sync
+
+# 全量同步所有 Releases 镜像包
+npm run image:sync -- --all
+# 或
+npm run image:sync full
 
 # 后台异步静默同步（不阻塞终端，支持 --status 查看进度与 --cancel 终止）
 npm run image:sync -- --async

@@ -52,29 +52,39 @@ show_help() {
   scripts/image-sync.sh [版本号] [选项]
 
 参数:
-  [版本号]        可选。若未指定，默认读取 package.json 中的当前版本（如 1.2.0）
+  [版本号]        可选。若未指定，默认针对远程主仓库最新 Release 执行操作
 
 选项:
+  full, --full, --all
+                  检查或同步远程主仓库所有 Releases 对应的容器镜像
   -a, --async     后台异步运行同步任务（即刻释放终端，避免网络或构建阻塞）
   -s, --status    查看当前后台异步同步任务的运行状态与最新日志
   -c, --cancel    中止当前正在运行的后台同步任务
   -b, --build     本地从源码完整构建镜像（默认优先从官方源直接同步清单，无需本地编译）
-  -f, --force     强制同步或覆盖目标仓库已存在的同名镜像标签
-  --check         只读检查各平台远端镜像存在性与一致性，不执行实际上传
+  -f, --force     强制同步或覆盖目标仓库已存在的同名镜像
+  --check         只读检查各镜像平台 Release 镜像包存在性与同步状态（默认仅检查最新 Release）
   -h, --help      显示本帮助信息
 
 示例:
-  # 1. 检查各镜像平台是否已同步当前版本（只读）
+  # 1. 检查最新 Release 在各平台的镜像包发布/同步状态
   npm run image:check
 
-  # 2. 默认模式：从官方 GHCR 快速流转多架构镜像至私有镜像库与 Docker Hub
+  # 2. 全量检查所有 Releases 在各平台的镜像包完整性
+  npm run image:check full
+
+  # 3. 仅检查指定版本的镜像包状态
+  npm run image:check 1.1.0
+
+  # 4. 同步最新 Release 镜像包至私有镜像库与 Docker Hub
   npm run image:sync
 
-  # 3. 异步后台执行（不阻塞终端，可随时通过 --status 查看进度）
-  npm run image:sync -- --async
+  # 5. 全量同步所有 Releases 镜像包至私有镜像库
+  npm run image:sync -- --all
+  # 或
+  npm run image:sync full
 
-  # 4. 显式指定版本并指定在本地交叉编译后推送
-  bash scripts/image-sync.sh 1.1.0 --build
+  # 6. 异步后台执行（不阻塞终端，可随时通过 --status 查看进度）
+  npm run image:sync -- --async
 EOF
 }
 
@@ -131,12 +141,15 @@ cancel_task() {
 }
 
 # 1. 解析初始参数
+initial_target_version=""
 target_version=""
 run_async=0
 is_worker=0
 do_build=0
 force_push=0
 readonly_check=0
+sync_all=0
+check_full=0
 forward_args=()
 
 for arg in "$@"; do
@@ -157,6 +170,16 @@ for arg in "$@"; do
     --internal-worker)
       is_worker=1
       ;;
+    full|--full)
+      check_full=1
+      sync_all=1
+      forward_args+=("$arg")
+      ;;
+    --all)
+      check_full=1
+      sync_all=1
+      forward_args+=("$arg")
+      ;;
     -b|--build)
       do_build=1
       forward_args+=("$arg")
@@ -171,6 +194,7 @@ for arg in "$@"; do
       ;;
     *)
       if [[ -z "$target_version" ]]; then
+        initial_target_version="${arg#v}"
         target_version="${arg#v}"
         forward_args+=("$target_version")
       else
@@ -179,17 +203,6 @@ for arg in "$@"; do
       ;;
   esac
 done
-
-# 推导版本号
-if [[ -z "$target_version" ]]; then
-  if [[ ! -f "package.json" ]]; then
-    fail "当前目录下未找到 package.json，无法自动推导版本号，请显式传入版本号。"
-  fi
-  target_version=$(node -p "require('./package.json').version" 2>/dev/null || echo "")
-  if [[ -z "$target_version" ]]; then
-    fail "未能从 package.json 中解析出 version 字段。"
-  fi
-fi
 
 # 2. 读取本地 .env 配置（若存在）
 if [[ -f .env ]]; then
@@ -238,6 +251,95 @@ MAIN_REGISTRY_USER="${MAIN_REGISTRY_USER:-${MAIN_REPO_NAME%%/*}}"
 MAIN_REGISTRY_TOKEN="${MAIN_REGISTRY_TOKEN:-}"
 repo_url="https://${MAIN_GIT_HOST}/${MAIN_REPO_NAME}"
 
+# 获取远程主仓库已发布的 Releases 列表（作为版本检查与镜像同步的唯一权威依据）
+get_remote_releases() {
+  MAIN_GIT_HOST="$MAIN_GIT_HOST" \
+  MAIN_REPO_NAME="$MAIN_REPO_NAME" \
+  MAIN_REPO_TOKEN="$MAIN_REPO_TOKEN" \
+  node -e '
+const host = (process.env.MAIN_GIT_HOST || "github.com").trim();
+const repo = (process.env.MAIN_REPO_NAME || "wangyan/douhang").trim();
+const token = process.env.MAIN_REPO_TOKEN?.trim();
+const isGitHub = host === "github.com" || host.endsWith(".github.com");
+
+const apiUrl = isGitHub
+  ? `https://api.github.com/repos/${repo}/releases`
+  : `https://${host}/api/v1/repos/${repo}/releases`;
+
+const headers = {
+  "Accept": isGitHub ? "application/vnd.github.v3+json" : "application/json",
+  "User-Agent": "DouHang-Image-Sync",
+};
+if (token) {
+  headers["Authorization"] = isGitHub ? `Bearer ${token}` : `token ${token}`;
+}
+
+async function fetchReleases() {
+  const res = await fetch(apiUrl, { headers });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  }
+  const data = await res.json();
+  if (!Array.isArray(data)) return [];
+  const tags = data
+    .filter(r => !r.draft && !r.prerelease && r.tag_name)
+    .map(r => r.tag_name.replace(/^v/, ""));
+  
+  tags.sort((a, b) => {
+    const pa = a.split(".").map(Number), pb = b.split(".").map(Number);
+    for (let i = 0; i < 3; i++) {
+      if ((pa[i] || 0) !== (pb[i] || 0)) return (pb[i] || 0) - (pa[i] || 0);
+    }
+    return 0;
+  });
+  return tags;
+}
+
+fetchReleases()
+  .then(tags => console.log(tags.join("\n")))
+  .catch(err => {
+    console.error(`无法获取远程主仓库 Release 发行版列表 (${err.message})`);
+    process.exit(1);
+  });
+'
+}
+
+declare -a remote_releases=()
+while IFS= read -r v || [[ -n "$v" ]]; do
+  [[ -n "$v" ]] && remote_releases+=("$v")
+done < <(get_remote_releases)
+
+if [[ ${#remote_releases[@]} -eq 0 ]]; then
+  fail "远程主仓库（${repo_url}）未检测到任何已发布的 Release 记录。请先在主仓库发布 Release。"
+fi
+
+latest_release="${remote_releases[0]}"
+latest_version="${latest_release}"
+
+# 确定本次操作的目标版本列表
+declare -a target_versions=()
+if [[ -n "$initial_target_version" ]]; then
+  found=0
+  for r in "${remote_releases[@]}"; do
+    if [[ "$r" == "$initial_target_version" ]]; then
+      found=1
+      break
+    fi
+  done
+  if [[ $found -eq 0 ]]; then
+    fail "远程主仓库未找到版本 v${initial_target_version} 的 Release 记录（可用版本: ${remote_releases[*]}）"
+  fi
+  target_versions=("$initial_target_version")
+  target_version="$initial_target_version"
+elif [[ $check_full -eq 1 || $sync_all -eq 1 ]]; then
+  target_versions=("${remote_releases[@]}")
+  target_version="${latest_release}"
+else
+  # 默认模式（不带 full）：只针对最新 Release
+  target_versions=("${latest_release}")
+  target_version="${latest_release}"
+fi
+
 # 镜像平台变量智能提取与默认值
 MIRROR_REPO_URL="${MIRROR_REPO_URL:-}"
 mirror_url_host=""
@@ -268,7 +370,11 @@ if [[ $run_async -eq 1 && $is_worker -eq 0 ]]; then
   fi
 
   mkdir -p "$LOGS_DIR"
-  log_file="${LOGS_DIR}/image-sync-${target_version}.log"
+  log_label="${target_version}"
+  if [[ ${#target_versions[@]} -gt 1 ]]; then
+    log_label="all"
+  fi
+  log_file="${LOGS_DIR}/image-sync-${log_label}.log"
 
   # 启动后台守护任务并脱离终端会话
   nohup bash "$0" "${forward_args[@]}" --internal-worker > "$log_file" 2>&1 &
@@ -278,7 +384,11 @@ if [[ $run_async -eq 1 && $is_worker -eq 0 ]]; then
   echo ""
   log_ok "镜像同步任务已成功转入后台异步运行！"
   echo "    • 任务 PID: ${worker_pid}"
-  echo "    • 目标版本: v${target_version}"
+  if [[ ${#target_versions[@]} -gt 1 ]]; then
+    echo "    • 目标版本: 全部已定义版本 (${target_versions[*]})"
+  else
+    echo "    • 目标版本: v${target_versions[0]}"
+  fi
   echo "    • 日志文件: ${log_file}"
   echo ""
   log_info "常用跟踪命令："
@@ -298,13 +408,18 @@ fi
 # 5. 同步/构建核心逻辑（前台直接运行 或 后台 Worker 执行）
 # ==============================================================================
 
-log_info "目标同步版本：v${target_version}（标签 :${target_version}、:v${target_version} 与 :latest）"
-if [[ $readonly_check -eq 1 ]]; then
-  log_warn "已启用 --check 只读检查模式，不发起任何写操作"
-elif [[ $do_build -eq 1 ]]; then
-  log_warn "已启用 --build 本地源码构建模式"
-else
-  log_info "执行模式：高速清单流转同步（默认优先以 GHCR 多架构为源直接同步）"
+ver_summary=""
+for v in "${target_versions[@]}"; do
+  ver_summary+="${ver_summary:+, }v${v}"
+done
+
+if [[ $readonly_check -eq 0 ]]; then
+  log_info "目标版本：${ver_summary}"
+  if [[ $do_build -eq 1 ]]; then
+    log_warn "已启用 --build 本地源码构建模式"
+  else
+    log_info "执行模式：高速清单流转同步（以 GHCR 多架构为源直接同步）"
+  fi
 fi
 
 # 收集镜像平台
@@ -317,7 +432,6 @@ declare -a target_repos=()
 # 官方源定义 (GHCR)
 source_host="$MAIN_REGISTRY"
 source_repo=$(echo "${source_host}/${MAIN_REPO_NAME}" | tr '[:upper:]' '[:lower:]')
-source_full_tag="${source_repo}:${target_version}"
 
 # --- 目标 1: 私有镜像库 (Forgejo / Harbor / 自建 Registry) ---
 mirror_registry="$MIRROR_REGISTRY"
@@ -327,13 +441,11 @@ mirror_user="$MIRROR_REGISTRY_USER"
 
 if [[ -n "$mirror_registry" && -n "$mirror_token" ]]; then
   mirror_repo=$(echo "${mirror_registry}/${mirror_repo_name}" | tr '[:upper:]' '[:lower:]')
-  target_platform_names+=("私有镜像库 (${mirror_registry})")
+  target_platform_names+=("私有镜像库")
   target_hosts+=("$mirror_registry")
   target_users+=("$mirror_user")
   target_passes+=("$mirror_token")
   target_repos+=("$mirror_repo")
-else
-  log_skip "未完整配置 MIRROR_REGISTRY（或通过 MIRROR_REPO_URL 推导）与 MIRROR_REGISTRY_TOKEN，跳过私有镜像库"
 fi
 
 # --- 目标 2: Docker Hub (docker.io) ---
@@ -346,18 +458,16 @@ if [[ -n "$dockerhub_user" && -n "$dockerhub_token" ]]; then
     dockerhub_repo="${dockerhub_user}/${MAIN_REPO_NAME##*/}"
   fi
   dockerhub_target=$(echo "docker.io/${dockerhub_repo}" | tr '[:upper:]' '[:lower:]')
-  target_platform_names+=("Docker Hub (docker.io)")
+  target_platform_names+=("Docker Hub")
   target_hosts+=("docker.io")
   target_users+=("$dockerhub_user")
   target_passes+=("$dockerhub_token")
   target_repos+=("$dockerhub_target")
-else
-  log_skip "未配置 DOCKERHUB_USERNAME 与 DOCKERHUB_TOKEN，跳过 Docker Hub 平台"
 fi
 
 # 如果是在本地执行 --build 构建模式，GHCR 也作为目标推送平台之一（若有凭据）
 if [[ $do_build -eq 1 && -n "$MAIN_REGISTRY_TOKEN" ]]; then
-  target_platform_names+=("GHCR (GitHub Packages)")
+  target_platform_names+=("官方镜像库")
   target_hosts+=("$MAIN_REGISTRY")
   target_users+=("$MAIN_REGISTRY_USER")
   target_passes+=("$MAIN_REGISTRY_TOKEN")
@@ -369,235 +479,215 @@ if [[ $total_targets -eq 0 && $readonly_check -eq 0 ]]; then
   fail "未检测到任何需要同步的远端平台配置，请在 .env 中配置私有平台凭据或 Docker Hub 凭据。"
 fi
 
-# 6. 鉴权登录
-log_info "正在检验镜像平台身份鉴权..."
-
-# 官方源鉴权
-printf '  ==> 正在登录 官方镜像库 (%s)... ' "$source_host"
-if [[ -n "$MAIN_REGISTRY_TOKEN" ]]; then
-  if echo "$MAIN_REGISTRY_TOKEN" | docker login "$source_host" -u "$MAIN_REGISTRY_USER" --password-stdin >/dev/null 2>&1; then
-    printf "${C_GREEN}认证成功${C_RESET}\n"
-  else
-    printf "${C_RED}认证失败${C_RESET}\n"
-    fail "平台 官方镜像库 (${source_host}) 登录认证失败，请检查 .env 中的 MAIN_REGISTRY_TOKEN 配置。"
-  fi
-else
-  printf "${C_CYAN}公开只读访问（未配置 MAIN_REGISTRY_TOKEN）${C_RESET}\n"
-fi
-
-for ((i=0; i<total_targets; i++)); do
-  host="${target_hosts[$i]}"
-  user="${target_users[$i]}"
-  pass="${target_passes[$i]}"
-  pname="${target_platform_names[$i]}"
-
-  printf '  ==> 正在登录 %s (%s)... ' "$pname" "$host"
-  if echo "$pass" | docker login "$host" -u "$user" --password-stdin >/dev/null 2>&1; then
-    printf "${C_GREEN}认证成功${C_RESET}\n"
-  else
-    printf "${C_RED}认证失败${C_RESET}\n"
-    fail "平台 ${pname} 登录认证失败，请检查 .env 中的用户与令牌配置。"
-  fi
-done
-
-# 7. 只读检查模式处理（输出完整的结构化诊断报告）
+# 6. 镜像发布状态检查报告
 if [[ $readonly_check -eq 1 ]]; then
-  echo ""
-  echo "======================================================"
-  echo "斗法领航 容器镜像版本发布状态检查 (只读模式)"
-  echo "======================================================"
-  echo "目标检测版本：v${target_version}（标签 :${target_version}、:v${target_version} 与 :latest）"
-  echo ""
-
-  all_synced=1
-
-  # ---------------- 检查目标 1: 官方镜像库 ----------------
-  echo "------------------------------------------------------"
-  echo "检查目标：官方镜像库 (${source_host}) -> 仓库：${source_repo}"
-  echo "------------------------------------------------------"
-  if ghcr_inspect=$(docker buildx imagetools inspect "$source_full_tag" 2>/dev/null); then
-    ghcr_platforms=$(echo "$ghcr_inspect" | grep -E "Platform:" | awk '{print $2}' | paste -sd, -)
-    printf "  ${C_GREEN}✓${C_RESET} 镜像版本 :${target_version} 已发布 (架构: %s)\n" "${ghcr_platforms:-未知}"
-    if docker buildx imagetools inspect "${source_repo}:v${target_version}" >/dev/null 2>&1; then
-      printf "  ${C_GREEN}✓${C_RESET} 标签 :v${target_version} 已就绪\n"
-    else
-      printf "  ${C_YELLOW}!${C_RESET} 标签 :v${target_version} 缺失\n"
-      all_synced=0
+  # 静默完成各已配置平台鉴权（失败则终止）
+  if [[ -n "$MAIN_REGISTRY_TOKEN" ]]; then
+    if ! echo "$MAIN_REGISTRY_TOKEN" | docker login "$source_host" -u "$MAIN_REGISTRY_USER" --password-stdin >/dev/null 2>&1; then
+      fail "官方镜像库 (${source_host}) 登录失败，请检查 MAIN_REGISTRY_TOKEN 配置。"
     fi
-    if docker buildx imagetools inspect "${source_repo}:latest" >/dev/null 2>&1; then
-      printf "  ${C_GREEN}✓${C_RESET} 标签 :latest 已就绪\n"
-    else
-      printf "  ${C_YELLOW}!${C_RESET} 标签 :latest 缺失\n"
-      all_synced=0
-    fi
-  else
-    printf "  ${C_RED}✗${C_RESET} 官方镜像库尚未发布版本 :${target_version}\n"
-    all_synced=0
   fi
+
+  for ((i=0; i<total_targets; i++)); do
+    host="${target_hosts[$i]}"
+    user="${target_users[$i]}"
+    pass="${target_passes[$i]}"
+    pname="${target_platform_names[$i]}"
+    if ! echo "$pass" | docker login "$host" -u "$user" --password-stdin >/dev/null 2>&1; then
+      fail "平台 ${pname} (${host}) 登录失败，请检查用户与令牌配置。"
+    fi
+  done
+
+  echo ""
+  if [[ $check_full -eq 1 ]]; then
+    printf "${C_BLUE}==>${C_RESET} 镜像发布状态检查 (全部版本: %s)\n\n" "${ver_summary}"
+  elif [[ -n "$initial_target_version" ]]; then
+    printf "${C_BLUE}==>${C_RESET} 镜像发布状态检查 (版本: v%s)\n\n" "${initial_target_version}"
+  else
+    printf "${C_BLUE}==>${C_RESET} 镜像发布状态检查 (版本: v%s)\n\n" "${latest_release}"
+  fi
+
+  diff_count=0
+
+  # 官方镜像库
+  echo "官方镜像库 (${source_repo})"
+  for ver in "${target_versions[@]}"; do
+    tag_name="v${ver}"
+    img="${source_repo}:${tag_name}"
+    if inspect_out=$(docker buildx imagetools inspect "$img" 2>/dev/null); then
+      platforms=$(echo "$inspect_out" | grep -E "Platform:" | awk '{print $2}' | paste -sd, -)
+      printf "  ${C_GREEN}✓${C_RESET} %-10s 已发布 (架构: %s)\n" "$tag_name" "${platforms:-未知}"
+    else
+      printf "  ${C_RED}✗${C_RESET} %-10s 未发布\n" "$tag_name"
+      ((diff_count++))
+    fi
+  done
   echo ""
 
-  # ---------------- 检查目标 2: 私有镜像库 ----------------
-  echo "------------------------------------------------------"
-  echo "检查目标：私有镜像库 (${mirror_registry:-未配置}) -> 仓库：${mirror_repo:-未配置}"
-  echo "------------------------------------------------------"
+  # 私有镜像库
   if [[ -n "$mirror_registry" && -n "$mirror_token" ]]; then
-    if mirror_inspect=$(docker buildx imagetools inspect "${mirror_repo}:${target_version}" 2>/dev/null); then
-      mirror_platforms=$(echo "$mirror_inspect" | grep -E "Platform:" | awk '{print $2}' | paste -sd, -)
-      printf "  ${C_GREEN}✓${C_RESET} 镜像版本 :${target_version} 已同步 (架构: %s)\n" "${mirror_platforms:-未知}"
-      if docker buildx imagetools inspect "${mirror_repo}:v${target_version}" >/dev/null 2>&1; then
-        printf "  ${C_GREEN}✓${C_RESET} 标签 :v${target_version} 已就绪\n"
+    echo "私有镜像库 (${mirror_repo})"
+    for ver in "${target_versions[@]}"; do
+      tag_name="v${ver}"
+      img="${mirror_repo}:${tag_name}"
+      if inspect_out=$(docker buildx imagetools inspect "$img" 2>/dev/null); then
+        platforms=$(echo "$inspect_out" | grep -E "Platform:" | awk '{print $2}' | paste -sd, -)
+        printf "  ${C_GREEN}✓${C_RESET} %-10s 已同步 (架构: %s)\n" "$tag_name" "${platforms:-未知}"
       else
-        printf "  ${C_YELLOW}!${C_RESET} 标签 :v${target_version} 缺失\n"
-        all_synced=0
+        printf "  ${C_YELLOW}!${C_RESET} %-10s 未同步\n" "$tag_name"
+        ((diff_count++))
       fi
-      if docker buildx imagetools inspect "${mirror_repo}:latest" >/dev/null 2>&1; then
-        printf "  ${C_GREEN}✓${C_RESET} 标签 :latest 已就绪\n"
-      else
-        printf "  ${C_YELLOW}!${C_RESET} 标签 :latest 缺失\n"
-        all_synced=0
-      fi
-    else
-      printf "  ${C_YELLOW}!${C_RESET} 私有镜像库尚未同步版本 :${target_version}（可执行 npm run image:sync 补齐）\n"
-      all_synced=0
-    fi
-  else
-    echo "  - 未在 .env 中完整配置私有镜像库凭据，已跳过"
+    done
+    echo ""
   fi
-  echo ""
 
-  # ---------------- 检查目标 3: Docker Hub ----------------
-  echo "------------------------------------------------------"
-  echo "检查目标：Docker Hub (docker.io) -> 仓库：${dockerhub_target:-未配置}"
-  echo "------------------------------------------------------"
+  # Docker Hub
   if [[ -n "$dockerhub_user" && -n "$dockerhub_token" ]]; then
-    if hub_inspect=$(docker buildx imagetools inspect "${dockerhub_target}:${target_version}" 2>/dev/null); then
-      hub_platforms=$(echo "$hub_inspect" | grep -E "Platform:" | awk '{print $2}' | paste -sd, -)
-      printf "  ${C_GREEN}✓${C_RESET} 镜像版本 :${target_version} 已同步 (架构: %s)\n" "${hub_platforms:-未知}"
-      if docker buildx imagetools inspect "${dockerhub_target}:v${target_version}" >/dev/null 2>&1; then
-        printf "  ${C_GREEN}✓${C_RESET} 标签 :v${target_version} 已就绪\n"
+    echo "Docker Hub (${dockerhub_target})"
+    for ver in "${target_versions[@]}"; do
+      tag_name="v${ver}"
+      img="${dockerhub_target}:${tag_name}"
+      if inspect_out=$(docker buildx imagetools inspect "$img" 2>/dev/null); then
+        platforms=$(echo "$inspect_out" | grep -E "Platform:" | awk '{print $2}' | paste -sd, -)
+        printf "  ${C_GREEN}✓${C_RESET} %-10s 已同步 (架构: %s)\n" "$tag_name" "${platforms:-未知}"
+      else
+        printf "  ${C_YELLOW}!${C_RESET} %-10s 未同步\n" "$tag_name"
+        ((diff_count++))
       fi
-      if docker buildx imagetools inspect "${dockerhub_target}:latest" >/dev/null 2>&1; then
-        printf "  ${C_GREEN}✓${C_RESET} 标签 :latest 已就绪\n"
-      fi
-    else
-      printf "  ${C_YELLOW}!${C_RESET} Docker Hub 尚未同步版本 :${target_version}（可执行 npm run image:sync 补齐）\n"
-      all_synced=0
-    fi
-  else
-    echo "  - 未在 .env 中配置 DOCKERHUB_USERNAME 与 DOCKERHUB_TOKEN，已跳过"
+    done
+    echo ""
   fi
 
-  echo ""
-  echo "======================================================"
-  if [[ $all_synced -eq 1 ]]; then
-    log_ok "所有已配置平台的容器镜像与版本标签均已 100% 同步就绪。"
-  else
-    log_warn "检测到部分平台尚未同步或标签不完整，可执行 npm run image:sync 进行对齐。"
-  fi
-  echo "======================================================"
   exit 0
-fi
-
-# 8. 同步执行前的存在性检测与任务队列收集
-log_info "正在检测各平台镜像存在性..."
-
-source_ready=0
-if docker buildx imagetools inspect "$source_full_tag" >/dev/null 2>&1; then
-  source_ready=1
-  log_ok "官方源镜像已就绪: ${source_full_tag}"
 else
-  log_warn "官方源镜像尚未就绪: ${source_full_tag}"
-fi
-
-declare -a sync_needed_indices=()
-
-for ((i=0; i<total_targets; i++)); do
-  repo="${target_repos[$i]}"
-  pname="${target_platform_names[$i]}"
-  tag_check="${repo}:${target_version}"
-
-  if docker buildx imagetools inspect "$tag_check" >/dev/null 2>&1; then
-    if [[ $force_push -eq 1 ]]; then
-      log_warn "[覆盖] ${pname}: 远端已存在 ${tag_check}，已指定 --force，加入队列"
-      sync_needed_indices+=("$i")
+  # 普通同步模式：输出标准登录日志
+  log_info "正在检验镜像平台身份鉴权..."
+  printf '  ==> 正在登录 官方镜像库 (%s)... ' "$source_host"
+  if [[ -n "$MAIN_REGISTRY_TOKEN" ]]; then
+    if echo "$MAIN_REGISTRY_TOKEN" | docker login "$source_host" -u "$MAIN_REGISTRY_USER" --password-stdin >/dev/null 2>&1; then
+      printf "${C_GREEN}认证成功${C_RESET}\n"
     else
-      log_skip "${pname}: 远端已存在 ${tag_check}，无需同步"
+      printf "${C_RED}认证失败${C_RESET}\n"
+      fail "平台 官方镜像库 (${source_host}) 登录认证失败，请检查 .env 中的 MAIN_REGISTRY_TOKEN 配置。"
     fi
   else
-    log_ok "[待同步] ${pname}: 尚未发布该版本，加入同步队列"
-    sync_needed_indices+=("$i")
+    printf "${C_CYAN}公开只读访问（未配置 MAIN_REGISTRY_TOKEN）${C_RESET}\n"
   fi
-done
 
-# 无需同步时的熔断
-if [[ ${#sync_needed_indices[@]} -eq 0 ]]; then
-  echo ""
-  log_ok "所有已配置的镜像平台均已存在版本 :${target_version}，无需重复同步！"
-  echo "提示：若需要强制重新同步覆盖，请附加 --force 参数执行。"
-  exit 0
+  for ((i=0; i<total_targets; i++)); do
+    host="${target_hosts[$i]}"
+    user="${target_users[$i]}"
+    pass="${target_passes[$i]}"
+    pname="${target_platform_names[$i]}"
+
+    printf '  ==> 正在登录 %s (%s)... ' "$pname" "$host"
+    if echo "$pass" | docker login "$host" -u "$user" --password-stdin >/dev/null 2>&1; then
+      printf "${C_GREEN}认证成功${C_RESET}\n"
+    else
+      printf "${C_RED}认证失败${C_RESET}\n"
+      fail "平台 ${pname} 登录认证失败，请检查 .env 中的用户与令牌配置。"
+    fi
+  done
 fi
 
 # 8. 执行同步或本地构建
-if [[ $do_build -eq 1 ]]; then
-  # ---------------- 本地构建模式 ----------------
-  echo ""
-  log_info "正在启动本地多架构 Docker 镜像交叉编译与分发..."
-  declare -a build_tags=()
-  for idx in "${sync_needed_indices[@]}"; do
-    repo="${target_repos[$idx]}"
-    build_tags+=("-t" "${repo}:${target_version}" "-t" "${repo}:v${target_version}" "-t" "${repo}:latest")
-  done
-
-  docker buildx build \
-    ${BUILDX_BUILDER:+--builder "$BUILDX_BUILDER"} \
-    --platform linux/amd64,linux/arm64 \
-    --provenance=false \
-    --build-arg REPO_URL="$repo_url" \
-    "${build_tags[@]}" \
-    --push \
-    .
+sync_one_version() {
+  local ver="$1"
+  local src_tag="${source_repo}:v${ver}"
+  local is_latest=0
+  [[ "$ver" == "$latest_version" ]] && is_latest=1
 
   echo ""
-  log_ok "本地多架构镜像构建与推送完成！"
-else
-  # ---------------- 高速清单流转模式 ----------------
-  if [[ $source_ready -eq 0 ]]; then
-    fail "源镜像 ${source_full_tag} 在 GHCR 尚未就绪，无法直接执行清单同步。\n请等待 GitHub Actions 构建完成，或使用 --build 参数在本地从源码构建。"
-  fi
+  log_info "------------------------------------------------------"
+  log_info "正在处理版本：v${ver} (权威源: ${src_tag})"
+  log_info "------------------------------------------------------"
 
-  echo ""
-  log_info "正在通过 buildx imagetools 高速同步多架构镜像清单与层..."
+  # 目标平台存在性检测与任务队列收集
+  local -a sync_needed_indices=()
+  for ((i=0; i<total_targets; i++)); do
+    local repo="${target_repos[$i]}"
+    local pname="${target_platform_names[$i]}"
+    local tag_check="${repo}:v${ver}"
 
-  for idx in "${sync_needed_indices[@]}"; do
-    repo="${target_repos[$idx]}"
-    pname="${target_platform_names[$idx]}"
-
-    echo "==> 正在同步至 ${pname} (${repo})..."
-    
-    # 尝试同步（带最多 3 次指数退避重试，防偶发网络抖动）
-    success=0
-    for attempt in 1 2 3; do
-      if docker buildx imagetools create \
-        --tag "${repo}:${target_version}" \
-        --tag "${repo}:v${target_version}" \
-        --tag "${repo}:latest" \
-        "$source_full_tag"; then
-        success=1
-        break
+    if docker buildx imagetools inspect "$tag_check" >/dev/null 2>&1; then
+      if [[ $force_push -eq 1 ]]; then
+        log_warn "[覆盖] ${pname}: 远端已存在 ${tag_check}，已指定 --force，加入同步队列"
+        sync_needed_indices+=("$i")
       else
-        log_warn "第 ${attempt} 次同步到 ${pname} 失败，将在 5 秒后重试..."
-        sleep 5
+        log_skip "${pname}: 远端已存在 ${tag_check}，无需同步"
       fi
-    done
-
-    if [[ $success -eq 1 ]]; then
-      log_ok "${pname} 同步完成！"
     else
-      fail "${pname} 镜像同步失败，请检查网络连接或权限。"
+      log_ok "[待同步] ${pname}: 尚未发布该版本，加入同步队列"
+      sync_needed_indices+=("$i")
     fi
   done
 
-  echo ""
-  log_ok "所有目标镜像平台多架构版本同步全部完成！"
-  log_info "同步完成的版本：v${target_version}、:${target_version} 与 :latest"
-fi
+  if [[ ${#sync_needed_indices[@]} -eq 0 ]]; then
+    log_ok "版本 v${ver} 在所有目标平台均已就绪，无需同步。"
+    return 0
+  fi
+
+  if [[ $do_build -eq 1 ]]; then
+    # 本地构建模式
+    log_info "正在启动本地多架构 Docker 镜像交叉编译与分发（版本: v${ver}）..."
+    local -a build_tags=()
+    for idx in "${sync_needed_indices[@]}"; do
+      local repo="${target_repos[$idx]}"
+      build_tags+=("-t" "${repo}:v${ver}")
+      if [[ $is_latest -eq 1 ]]; then
+        build_tags+=("-t" "${repo}:latest")
+      fi
+    done
+
+    docker buildx build \
+      ${BUILDX_BUILDER:+--builder "$BUILDX_BUILDER"} \
+      --platform linux/amd64,linux/arm64 \
+      --provenance=false \
+      --build-arg REPO_URL="$repo_url" \
+      "${build_tags[@]}" \
+      --push \
+      .
+    log_ok "版本 v${ver} 本地多架构镜像构建与推送完成！"
+  else
+    # 高速清单流转模式
+    if ! docker buildx imagetools inspect "$src_tag" >/dev/null 2>&1; then
+      fail "官方源镜像 ${src_tag} 在 GHCR 尚未就绪，无法直接执行清单同步。\n请等待云端构建完成，或附加 --build 参数在本地交叉编译。"
+    fi
+
+    log_info "正在通过 buildx imagetools 高速同步多架构镜像清单与层（版本: v${ver}）..."
+    for idx in "${sync_needed_indices[@]}"; do
+      local repo="${target_repos[$idx]}"
+      local pname="${target_platform_names[$idx]}"
+
+      echo "==> 正在同步至 ${pname} (${repo})..."
+      local -a create_tags=("--tag" "${repo}:v${ver}")
+      if [[ $is_latest -eq 1 ]]; then
+        create_tags+=("--tag" "${repo}:latest")
+      fi
+
+      local success=0
+      for attempt in 1 2 3; do
+        if docker buildx imagetools create "${create_tags[@]}" "$src_tag"; then
+          success=1
+          break
+        else
+          log_warn "第 ${attempt} 次同步到 ${pname} 失败，将在 5 秒后重试..."
+          sleep 5
+        fi
+      done
+
+      if [[ $success -eq 1 ]]; then
+        log_ok "${pname} (v${ver}) 同步完成！"
+      else
+        fail "${pname} 镜像同步失败，请检查网络连接或权限。"
+      fi
+    done
+  fi
+}
+
+for v in "${target_versions[@]}"; do
+  sync_one_version "$v"
+done
+
+echo ""
+log_ok "所有目标镜像版本处理全部完成！"

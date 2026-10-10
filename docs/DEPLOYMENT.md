@@ -266,22 +266,28 @@ MIRROR_REGISTRY_TOKEN="<私有镜像库 Package Token>"
 项目提供了专用的独立多架构容器镜像同步工具（`scripts/image-sync.sh`）：
 
 ```bash
-# 1. 检查各镜像平台远端版本发布状态（只读检查，不执行网络写入）
+# 1. 检查各镜像平台 Release 镜像包状态（以远程主仓库 Releases 为唯一基准；默认仅查最新 Release，加 full 查所有 Releases）
 npm run image:check
+npm run image:check full
 
-# 2. 高速清单同步：自动将官方 GHCR 产物快速分发至私有镜像库与 Docker Hub
+# 2. 高速清单同步：自动将官方 GHCR 产物快速分发至私有镜像库与 Docker Hub（默认同步最新 Release）
 npm run image:sync
 
-# 3. 后台异步静默同步：立即释放控制台，避免长耗时网络阻塞
+# 3. 全量同步所有已发布的 Releases 镜像包
+npm run image:sync -- --all
+# 或
+npm run image:sync full
+
+# 4. 后台异步静默同步：立即释放控制台，避免长耗时网络阻塞
 npm run image:sync -- --async
 
-# 4. 查看当前后台同步任务运行状态与最新日志
+# 5. 查看当前后台同步任务运行状态与最新日志
 npm run image:sync -- --status
 
-# 5. 安全中止正在运行的后台同步任务
+# 6. 安全中止正在运行的后台同步任务
 npm run image:sync -- --cancel
 
-# 6. 本地从源码完整交叉编译并推送（后备模式，需 BUILD_IMAGE_LOCAL=1 或显式指定参数）
+# 7. 本地从源码完整交叉编译并推送（后备模式，需 BUILD_IMAGE_LOCAL=1 或显式指定参数）
 npm run image:sync -- --build
 ```
 
@@ -299,7 +305,7 @@ npm run image:sync -- --build
    - 自动提交 Git 标签并推送到 GitHub 主仓；
    - 调用 API 在 GitHub 创建带有格式化更新日志的正式 Release。
 2. **云端多架构构建（GitHub Actions 全自动）**：
-   - GitHub Actions 监听到 `v*` 标签后，在云端 Runner 自动编译 `linux/amd64` 与 `linux/arm64` 镜像，并交付至 `ghcr.io`（约 5~8 分钟完成）。至此，官方正式版本发布全部完成！
+   - GitHub Actions 严格监听已发布的 `v*` 版本标签后，在云端 Runner 自动编译 `linux/amd64` 与 `linux/arm64` 镜像（仅为已发布标签产出 `:vX.Y.Z` 与 `:latest`，不支持分支构建），并交付至 `ghcr.io`（约 5~8 分钟完成）。亦支持在 Actions 页面通过 `Run workflow` 手动选择已发布标签按需重新构建。至此，官方正式版本发布全部完成！
 
 ### 6.2 扩展流程（可选，面向私有备份）
 
