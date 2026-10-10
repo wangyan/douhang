@@ -7,8 +7,7 @@ usage() {
   scripts/release.sh patch      # 补丁版本：1.0.0 -> 1.0.1
   scripts/release.sh minor      # 特性版本：1.0.0 -> 1.1.0
   scripts/release.sh major      # 主版本：1.0.0 -> 2.0.0
-  scripts/release.sh 1.2.3      # 显式指定版本号（须大于当前版本）
-  scripts/release.sh 1.0.0      # 首次发布：显式版本号等于当前版本，且尚无同名 tag
+  scripts/release.sh 1.0.0      # 显式指定版本号（如首次发版基线）
 
 # 流程：校验工作区与凭据 -> 定版本 -> 质量检查 -> 生产构建 -> 提交/tag -> 构建并推送镜像 -> 推送 Git 与创建 Release。
 EOF
@@ -49,58 +48,37 @@ parse_git_url() {
 }
 
 if [ -f .env ]; then
-  [ -z "${MAIN_GIT_HOST:-}" ] && MAIN_GIT_HOST=$(grep -E '^[[:space:]]*MAIN_GIT_HOST=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
-  [ -z "${MAIN_REPO_NAME:-}" ] && MAIN_REPO_NAME=$(grep -E '^[[:space:]]*MAIN_REPO_NAME=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
-  [ -z "${MAIN_REGISTRY:-}" ] && MAIN_REGISTRY=$(grep -E '^[[:space:]]*MAIN_REGISTRY=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
-  [ -z "${MAIN_REGISTRY_USER:-}" ] && MAIN_REGISTRY_USER=$(grep -E '^[[:space:]]*MAIN_REGISTRY_USER=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
-  [ -z "${MAIN_REPO_TOKEN:-}" ] && MAIN_REPO_TOKEN=$(grep -E '^[[:space:]]*MAIN_REPO_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
-  [ -z "${MAIN_REGISTRY_TOKEN:-}" ] && MAIN_REGISTRY_TOKEN=$(grep -E '^[[:space:]]*MAIN_REGISTRY_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
+  # 官方 GitHub 发版凭据
+  [ -z "${GITHUB_TOKEN:-}" ] && GITHUB_TOKEN=$(grep -E '^[[:space:]]*GITHUB_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
+
+  # 官方 GHCR 镜像库推送凭据（仅本地编译直推备选模式需要）
+  [ -z "${GHCR_TOKEN:-}" ] && GHCR_TOKEN=$(grep -E '^[[:space:]]*GHCR_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
+
   [ -z "${BUILD_IMAGE_LOCAL:-}" ] && BUILD_IMAGE_LOCAL=$(grep -E '^[[:space:]]*BUILD_IMAGE_LOCAL=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
 
   # 镜像平台同步配置（可选：同时发布至第二远端/私有平台）
   [ -z "${MIRROR_REPO_URL:-}" ] && MIRROR_REPO_URL=$(grep -E '^[[:space:]]*MIRROR_REPO_URL=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
-  [ -z "${MIRROR_GIT_HOST:-}" ] && MIRROR_GIT_HOST=$(grep -E '^[[:space:]]*MIRROR_GIT_HOST=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
-  [ -z "${MIRROR_REPO_NAME:-}" ] && MIRROR_REPO_NAME=$(grep -E '^[[:space:]]*MIRROR_REPO_NAME=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
-  [ -z "${MIRROR_REGISTRY:-}" ] && MIRROR_REGISTRY=$(grep -E '^[[:space:]]*MIRROR_REGISTRY=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
-  [ -z "${MIRROR_REGISTRY_USER:-}" ] && MIRROR_REGISTRY_USER=$(grep -E '^[[:space:]]*MIRROR_REGISTRY_USER=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
   [ -z "${MIRROR_REPO_TOKEN:-}" ] && MIRROR_REPO_TOKEN=$(grep -E '^[[:space:]]*MIRROR_REPO_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
   [ -z "${MIRROR_REGISTRY_TOKEN:-}" ] && MIRROR_REGISTRY_TOKEN=$(grep -E '^[[:space:]]*MIRROR_REGISTRY_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
 fi
 
-# 从 MIRROR_REPO_URL 智能提取 Host 与 Repo
+# 官方公开主仓库常量
+REPO_HOST="github.com"
+REPO_NAME="wangyan/douhang"
+REPO_URL="https://${REPO_HOST}/${REPO_NAME}"
+
+# 从 MIRROR_REPO_URL 智能提取 Host 与 Repo（若配置）
+MIRROR_GIT_HOST=""
+MIRROR_REPO_NAME=""
 if [ -n "${MIRROR_REPO_URL:-}" ]; then
   read -r mirror_url_host mirror_url_repo <<<"$(parse_git_url "$MIRROR_REPO_URL")"
-  [ -z "${MIRROR_GIT_HOST:-}" ] && MIRROR_GIT_HOST="$mirror_url_host"
-  [ -z "${MIRROR_REPO_NAME:-}" ] && MIRROR_REPO_NAME="$mirror_url_repo"
+  MIRROR_GIT_HOST="$mirror_url_host"
+  MIRROR_REPO_NAME="$mirror_url_repo"
 fi
 
-MAIN_GIT_HOST="${MAIN_GIT_HOST:-github.com}"
-MAIN_REPO_NAME="${MAIN_REPO_NAME:-wangyan/douhang}"
-
-is_github=0
-if [[ "$MAIN_GIT_HOST" == "github.com" || "$MAIN_GIT_HOST" == *.github.com ]]; then
-  is_github=1
-fi
-
-if [ -z "${MAIN_REGISTRY:-}" ]; then
-  if [[ $is_github -eq 1 ]]; then
-    MAIN_REGISTRY="ghcr.io"
-  else
-    MAIN_REGISTRY="$MAIN_GIT_HOST"
-  fi
-fi
-
-MAIN_REGISTRY_USER="${MAIN_REGISTRY_USER:-${MAIN_REPO_NAME%%/*}}"
-repo_url="https://$MAIN_GIT_HOST/$MAIN_REPO_NAME"
-
-MIRROR_GIT_HOST="${MIRROR_GIT_HOST:-}"
-MIRROR_REPO_NAME="${MIRROR_REPO_NAME:-$MAIN_REPO_NAME}"
-MIRROR_REGISTRY="${MIRROR_REGISTRY:-${MIRROR_GIT_HOST:-}}"
-MIRROR_REGISTRY_USER="${MIRROR_REGISTRY_USER:-${MIRROR_REPO_NAME%%/*}}"
-
-[[ -n "${MAIN_REPO_TOKEN:-}" ]] || fail "未在环境变量或 .env 中找到 MAIN_REPO_TOKEN（需具备仓库 Release/推送权限）"
+[[ -n "${GITHUB_TOKEN:-}" ]] || fail "未在环境变量或 .env 中找到 GITHUB_TOKEN（需具备 GitHub 仓库 Contents: Read & write 权限）"
 if [[ "${BUILD_IMAGE_LOCAL:-0}" -eq 1 ]]; then
-  [[ -n "${MAIN_REGISTRY_TOKEN:-}" ]] || fail "启用本地镜像构建时，未在环境变量或 .env 中找到 MAIN_REGISTRY_TOKEN"
+  [[ -n "${GHCR_TOKEN:-}" ]] || fail "启用本地镜像构建时，未在环境变量或 .env 中找到 GHCR_TOKEN（需具备 write:packages 权限）"
 fi
 
 current_version=$(node -p "require('./package.json').version")
@@ -112,7 +90,7 @@ else
     patch) next_version="$major.$minor.$((patch + 1))" ;;
     minor) next_version="$major.$((minor + 1)).0" ;;
     major) next_version="$((major + 1)).0.0" ;;
-    *) fail "无效版本参数：$release_mode" ;;
+    *) fail "无效版本参数：$release_mode（支持 patch / minor / major 或显式版本号如 1.0.0）" ;;
   esac
 fi
 
@@ -168,7 +146,7 @@ if [[ $first_release -eq 0 ]]; then
   npm version "$next_version" --no-git-tag-version
 fi
 
-node - "$next_version" <<'NODE'
+node - "$tag" <<'NODE'
 const fs = require('node:fs');
 const file = 'docker-compose.prod.yml';
 const content = fs.readFileSync(file, 'utf8');
@@ -223,8 +201,14 @@ release_committed=1
 git tag -a "$tag" -m "Release $tag"
 
 if [[ "${BUILD_IMAGE_LOCAL:-0}" -eq 1 ]]; then
-  printf '==> 发布 %s：本地多架构镜像构建并推送\n' "$tag"
-  bash scripts/image-sync.sh "$next_version" --build
+  printf '==> 发布 %s：本地多架构镜像构建并推送到 GHCR\n' "$tag"
+  echo "$GHCR_TOKEN" | docker login ghcr.io -u "${GHCR_USER:-wangyan}" --password-stdin
+  docker buildx build \
+    --platform linux/amd64,linux/arm64 \
+    --provenance=false \
+    -t "ghcr.io/wangyan/douhang:$tag" \
+    -t "ghcr.io/wangyan/douhang:latest" \
+    --push .
 else
   printf '==> 发布 %s：多架构容器镜像将由 GitHub Actions 自动构建并推送到 GHCR\n' "$tag"
 fi
@@ -239,14 +223,9 @@ if [ -n "${MIRROR_REPO_URL:-}" ]; then
   }
 fi
 
-printf '==> 发布 %s：创建 Release\n' "$tag"
-if [[ $is_github -eq 1 ]]; then
-  api_url="https://api.github.com/repos/$MAIN_REPO_NAME/releases"
-  auth_header="Authorization: Bearer $MAIN_REPO_TOKEN"
-else
-  api_url="https://$MAIN_GIT_HOST/api/v1/repos/$MAIN_REPO_NAME/releases"
-  auth_header="Authorization: token $MAIN_REPO_TOKEN"
-fi
+printf '==> 发布 %s：创建 GitHub Release\n' "$tag"
+api_url="https://api.github.com/repos/${REPO_NAME}/releases"
+auth_header="Authorization: Bearer $GITHUB_TOKEN"
 payload=$(node -e 'const fs=require("node:fs");process.stdout.write(JSON.stringify({tag_name:process.argv[1],name:process.argv[1],body:fs.readFileSync(process.argv[2],"utf8").trimEnd(),target_commitish:"main",draft:false,prerelease:false}))' "$tag" "$release_notes")
 resp_file=$(mktemp)
 http_code=$(curl --silent --show-error -o "$resp_file" -w '%{http_code}' \
@@ -261,10 +240,10 @@ if [[ $http_code != 200 && $http_code != 201 ]]; then
   cat "$resp_file" >&2 || true
   rm -f "$resp_file"
   rm -f "$release_notes"
-  fail "Release 创建失败（HTTP $http_code），请手动创建：https://$MAIN_GIT_HOST/$MAIN_REPO_NAME/releases/new?tag=$tag"
+  fail "GitHub Release 创建失败（HTTP $http_code），请手动创建：https://${REPO_HOST}/${REPO_NAME}/releases/new?tag=$tag"
 fi
 rm -f "$resp_file"
-echo "Release 已创建：https://$MAIN_GIT_HOST/$MAIN_REPO_NAME/releases/tag/$tag"
+echo "GitHub Release 已创建：https://${REPO_HOST}/${REPO_NAME}/releases/tag/$tag"
 
 # 同步创建镜像平台 Release（若已配置镜像平台凭据）
 if [ -n "${MIRROR_GIT_HOST:-}" ] && [ -n "${MIRROR_REPO_TOKEN:-}" ]; then
@@ -292,5 +271,5 @@ rm -f "$release_notes"
 printf '==> %s 发布完成！\n' "$tag"
 printf '    • 代码已推送并已在主仓与镜像仓库创建 Release\n'
 printf '    • GitHub Actions 正在云端构建并发布 GHCR 多架构镜像\n'
-printf '    • 如需同步至私有镜像库或 Docker Hub，可运行：npm run image:sync\n'
-printf '    • 或在后台异步静默同步：npm run image:sync -- --async\n'
+printf '    • 如需同步至 Docker Hub 或私有镜像库，可运行：npm run image:sync\n'
+printf '    • 全量同步所有历史版本镜像可运行：npm run image:sync full\n'

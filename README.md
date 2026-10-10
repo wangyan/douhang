@@ -26,7 +26,7 @@
 
 ## 快速部署
 
-推荐使用镜像方式部署（默认拉取 GitHub Packages 公开镜像 `ghcr.io/wangyan/douhang:latest`），无需克隆源码。完整部署方式（源码构建、`docker run` 单命令、环境变量、反向代理、升级、备份与故障排查）见[部署指南](./docs/DEPLOYMENT.md)。
+推荐使用镜像方式部署，默认拉取官方 GitHub Packages 公开镜像 `ghcr.io/wangyan/douhang:latest`（若网络受限亦可使用官方 Docker Hub 镜像 `wangyan/douhang:latest`），无需克隆源码。完整部署方式（源码构建、`docker run` 单命令、环境变量、反向代理、升级、备份与故障排查）见[部署指南](./docs/DEPLOYMENT.md)。
 
 **前置条件**：已安装 Docker 与 Docker Compose v2，且主机可访问互联网以下载镜像。
 

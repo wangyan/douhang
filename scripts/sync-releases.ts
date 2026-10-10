@@ -124,27 +124,23 @@ function loadChangelogReleases(): ParsedRelease[] {
   return releases.reverse();
 }
 
-/** 获取主仓库平台配置 */
+/** 获取主仓库平台配置（官方 GitHub） */
 function getPrimaryConfig(): PlatformConfig {
-  const host = (process.env.MAIN_GIT_HOST || 'github.com').trim();
-  const repo = (process.env.MAIN_REPO_NAME || 'wangyan/douhang').trim();
-  const token = process.env.MAIN_REPO_TOKEN?.trim();
-  const isGitHub = host === 'github.com' || host.endsWith('.github.com');
+  const host = 'github.com';
+  const repo = 'wangyan/douhang';
+  const token = process.env.GITHUB_TOKEN?.trim() || '';
 
-  const apiUrl = isGitHub
-    ? `https://api.github.com/repos/${repo}/releases`
-    : `https://${host}/api/v1/repos/${repo}/releases`;
-
-  const authHeader = isGitHub ? `Bearer ${token}` : `token ${token}`;
+  const apiUrl = `https://api.github.com/repos/${repo}/releases`;
+  const authHeader = token ? `Bearer ${token}` : '';
 
   return {
-    name: `主仓 (${host})`,
+    name: 'GitHub 官方主仓',
     host,
     repo,
     token,
     apiUrl,
     authHeader,
-    isGitHub,
+    isGitHub: true,
   };
 }
 
@@ -165,7 +161,7 @@ function getMirrorConfig(): PlatformConfig | null {
   }
 
   if (!host) return null;
-  if (!repo) repo = (process.env.MAIN_REPO_NAME || 'wangyan/douhang').trim();
+  if (!repo) repo = 'wangyan/douhang';
 
   const isGitHub = host === 'github.com' || host.endsWith('.github.com');
   const apiUrl = isGitHub
@@ -394,14 +390,14 @@ async function main() {
     args.includes('check') ||
     args.includes('--preview') ||
     args.includes('preview');
-  const targetTag = args.find(
-    (a) => a.startsWith('v') || a.match(/^\d+\.\d+\.\d+$/),
+  const explicitArg = args.find(
+    (a) => !a.startsWith('-') && a !== 'check' && a !== 'preview',
   );
-  const filterTag = targetTag
-    ? targetTag.startsWith('v')
-      ? targetTag
-      : `v${targetTag}`
-    : null;
+  if (explicitArg && !/^v\d+\.\d+\.\d+$/.test(explicitArg)) {
+    console.error(`错误：版本标签必须形如 v1.0.0（当前输入：${explicitArg}）`);
+    process.exit(1);
+  }
+  const filterTag = explicitArg ?? null;
 
   console.log('======================================================');
   console.log(

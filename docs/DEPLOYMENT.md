@@ -174,121 +174,73 @@ npm run start       # 启动生产服务器
 
 > **口令生效说明**：初始账号一经写入数据库，后续验证均以数据库中存储的凭据为准，修改口令请在「设置 → 通用」中操作。环境变量中的 `AUTH_PASSWORD` 仅用于首次初始化与启动时的安全合规校验。
 
-### 4.2 主代码仓库配置（可选）
-
-本节用于配置 Git 代码托管平台信息，主要供维护者执行版本发布（`scripts/release.sh`）、Release 同步（`npm run release:sync`）或进行二次开发 Fork 时使用。**日常作为使用者部署服务时，无需配置本节任何变量**，系统默认指向官方开源主仓。
-
-| 变量名 | 必填 | 默认值 | 说明 |
-|---|---|---|---|
-| `MAIN_GIT_HOST` | 否 | `github.com` | 主代码托管平台域名。支持自建 Forgejo / Gitea / GitLab 等平台 |
-| `MAIN_REPO_NAME` | 否 | `wangyan/douhang` | 主代码仓库路径，支持指定自定义 Fork 路径 |
-| `MAIN_REPO_TOKEN` | 否 | - | 主仓库发版令牌（PAT，需具备 Contents: Read and write 权限），供维护者运行发版脚本打 Tag 与创建 Release |
-| `UPDATE_CHECK_TOKEN` | 否 | - | 当主代码仓库设为私有仓库时，用于应用内检查 Releases 更新的只读令牌（未配置时回退使用 `MAIN_REPO_TOKEN`） |
-
-```dotenv
-# 主仓库发版配置示例（.env 片段，维护者发版时配置）
-MAIN_REPO_TOKEN="github_pat_xxxx"
-```
-
-### 4.3 镜像代码仓库配置（可选）
+### 4.2 维护者凭据配置（可选）
 
 > [!NOTE]
-> **本节为完全可选的高级扩展配置**。仅当维护者拥有自建的私有代码平台（如局域网/私有 Forgejo），并希望在发版时将 Git 标签与 Release 同步推送到第二远端以作容灾备份时使用。
+> **日常使用者部署服务时，无需配置本节任何变量**。系统默认指向官方开源主仓 `github.com/wangyan/douhang`，版本更新检测开箱即用。本节仅供代码维护者执行版本发布（`scripts/release.sh`）或多仓同步时使用。
 
 | 变量名 | 必填 | 默认值 | 说明 |
 |---|---|---|---|
-| `MIRROR_REPO_URL` | 否 | - | 私有 Git 仓库完整地址（如 `ssh://git@mirror.example.com/owner/douhang.git`）。脚本自动从中提取主机名与仓库路径，发版时自动同步推送 Git 标签与分支 |
-| `MIRROR_REPO_TOKEN` | 否 | - | 私有代码平台 API 访问令牌，用于发版与 Release 同步脚本调用 API 同步创建 Release |
-
-*(高级覆盖：若私有环境的 SSH 域名与 Web API 域名不一致，可按需可选配置 `MIRROR_GIT_HOST` 显式覆盖推导值)*
+| `GITHUB_TOKEN` | 否 | - | 官方 GitHub 发版令牌（PAT，需具备 `Contents: Read and write` 权限），供维护者运行发版脚本打 Tag 与创建 Release |
+| `MIRROR_REPO_URL` | 否 | - | （可选）私有 Git 仓库完整地址（如 `ssh://git@mirror.example.com/owner/douhang.git`）。脚本自动提取主机名与仓库路径，发版时同步推送 Git 标签与分支 |
+| `MIRROR_REPO_TOKEN` | 否 | - | （可选）私有代码平台 API 访问令牌，用于发版与 Release 同步脚本调用 API 同步创建 Release |
 
 ```dotenv
-# 镜像仓库配置示例（.env 片段，按需可选）
-MIRROR_REPO_URL="ssh://git@mirror.example.com/owner/douhang.git"
-MIRROR_REPO_TOKEN="<私有代码平台 API Token>"
+# 维护者发版配置示例（.env 片段，按需配置）
+GITHUB_TOKEN="github_pat_xxxx"
+
+# 私有镜像仓库同步（按需可选）
+# MIRROR_REPO_URL="ssh://git@mirror.example.com/owner/douhang.git"
+# MIRROR_REPO_TOKEN="your-mirror-repo-token"
 ```
 
 ---
 
-## 5. 容器镜像构建与分发
+## 5. 容器镜像渠道与多端分发
+
+### 5.1 官方公开镜像双源
+
+DouHang 官方默认提供两个公开镜像下载渠道，使用者可按需自由选用：
+
+- **主选渠道（文档默认）**：`ghcr.io/wangyan/douhang:latest`（GitHub Packages，多架构由 GitHub Actions 云端自动构建交付）
+- **备选渠道（通用/网络友好）**：`wangyan/douhang:latest`（Docker Hub，同为官方公开维护，当拉取 GHCR 受限时可直接替换使用）
+
+### 5.2 维护者镜像多端分发配置
 
 > [!NOTE]
-> 如果您直接使用官方镜像部署服务，**无需执行本节操作**。本节工具专为需要将官方镜像同步至自建私有镜像仓库的运维场景设计。
-
-### 5.1 官方镜像库（GitHub Packages）
-
-官方多架构镜像统一托管于 GitHub Packages（`ghcr.io`），构建默认由云端 GitHub Actions 流水线自动完成。
+> 如果您直接拉取上述官方镜像部署服务，**无需配置本节变量**。本节参数专供维护者运行 `npm run image:sync` 将官方镜像分发至 Docker Hub 与私有镜像仓库。
 
 | 变量名 | 必填 | 默认值 | 说明 |
 |---|---|---|---|
-| `MAIN_REGISTRY` | 否 | `ghcr.io`（GitHub）/ `$MAIN_GIT_HOST` | 主容器镜像库域名（官方为 `ghcr.io`；若自建主代码平台则默认对齐为 `$MAIN_GIT_HOST`） |
-| `MAIN_REGISTRY_USER` | 否 | 自动提取 `MAIN_REPO_NAME` 前缀 | 主容器镜像库推送登录用户名 |
-| `BUILD_IMAGE_LOCAL` | 否 | `0` | 本地镜像构建后备开关：默认 `0` 委托云端构建；设为 `1` 在发版脚本中直接在本地调用 Docker 交叉编译 |
-| `MAIN_REGISTRY_TOKEN` | 否 | - | 主镜像库推送令牌（仅当 `BUILD_IMAGE_LOCAL=1` 在本地编译并直推主镜像库时必填） |
-
-```dotenv
-# 官方镜像库默认无需配置；仅在本地编译并直推 GHCR 时配置：
-# BUILD_IMAGE_LOCAL=1
-# MAIN_REGISTRY_TOKEN="ghp_xxxx"
-```
-
-### 5.2 Docker Hub 公开渠道
-
-支持通过 `npm run image:sync` 将官方镜像快速分发至 Docker Hub（`hub.docker.com`）渠道：
-
-| 变量名 | 必填 | 默认值 | 说明 |
-|---|---|---|---|
-| `DOCKERHUB_USERNAME` | 否 | - | Docker Hub 登录用户名 |
+| `DOCKERHUB_USERNAME` | 否 | - | 官方 Docker Hub 登录用户名，用于同步流转官方镜像至 `hub.docker.com` |
 | `DOCKERHUB_TOKEN` | 否 | - | Docker Hub Personal Access Token（需具备 Read & Write 权限） |
-| `DOCKERHUB_REPO` | 否 | `${DOCKERHUB_USERNAME}/douhang` | Docker Hub 目标仓库路径 |
+| `MIRROR_REGISTRY_TOKEN` | 否 | - | 私有容器镜像库访问令牌，用于同步镜像至自建私有 Registry（自动复用 `MIRROR_REPO_URL` 域名与仓库路径） |
+| `BUILD_IMAGE_LOCAL` | 否 | `0` | 本地镜像构建后备开关：默认 `0` 委托云端构建；设为 `1` 在本地直接交叉编译多架构镜像 |
+| `GHCR_TOKEN` | 否 | - | 官方 GHCR 镜像库推送令牌（需具备 `write:packages` 权限，仅当 `BUILD_IMAGE_LOCAL=1` 在本地直推 GHCR 时必填） |
 
 ```dotenv
-# Docker Hub 同步配置示例（.env 片段，按需可选）
-DOCKERHUB_USERNAME="your-dockerhub-username"
+# Docker Hub 官方镜像分发配置（.env 片段）
+DOCKERHUB_USERNAME="wangyan"
 DOCKERHUB_TOKEN="dckr_pat_xxxx"
+
+# 私有镜像库同步配置（.env 片段，按需配置）
+# MIRROR_REGISTRY_TOKEN="your-mirror-registry-token"
 ```
 
-### 5.3 私有容器镜像库（Registry）
-
-| 变量名 | 必填 | 默认值 | 说明 |
-|---|---|---|---|
-| `MIRROR_REGISTRY_TOKEN` | 否 | - | 私有容器镜像库访问令牌，用于 `npm run image:sync` 高速清单同步或直推鉴权 |
-
-*(私有镜像库域名与推送用户名默认从 `MIRROR_REPO_URL` 自动推导对齐；若 Registry 域名与 Git 仓库域名不同，可按需可选配置 `MIRROR_REGISTRY` 显式覆盖)*
-
-```dotenv
-# 私有镜像仓库配置示例（.env 片段，按需可选）
-MIRROR_REGISTRY_TOKEN="<私有镜像库 Package Token>"
-```
-
-### 5.4 镜像同步命令使用方式
+### 5.3 镜像状态检查与同步命令
 
 项目提供了专用的独立多架构容器镜像同步工具（`scripts/image-sync.sh`）：
 
 ```bash
-# 1. 检查各镜像平台 Release 镜像包状态（以远程主仓库 Releases 为唯一基准；默认仅查最新 Release，加 full 查所有 Releases）
+# 1. 检查各镜像平台 Release 镜像包状态（默认查最新 Release，加 full 查所有 Releases）
 npm run image:check
 npm run image:check full
 
-# 2. 高速清单同步：自动将官方 GHCR 产物快速分发至私有镜像库与 Docker Hub（默认同步最新 Release）
+# 2. 高速清单同步：将官方 GHCR 镜像分发至 Docker Hub 与私有镜像库（默认同步最新 Release）
 npm run image:sync
 
 # 3. 全量同步所有已发布的 Releases 镜像包
-npm run image:sync -- --all
-# 或
 npm run image:sync full
-
-# 4. 后台异步静默同步：立即释放控制台，避免长耗时网络阻塞
-npm run image:sync -- --async
-
-# 5. 查看当前后台同步任务运行状态与最新日志
-npm run image:sync -- --status
-
-# 6. 安全中止正在运行的后台同步任务
-npm run image:sync -- --cancel
-
-# 7. 本地从源码完整交叉编译并推送（后备模式，需 BUILD_IMAGE_LOCAL=1 或显式指定参数）
-npm run image:sync -- --build
 ```
 
 ---
@@ -311,7 +263,7 @@ npm run image:sync -- --build
 
 3. **多端镜像流转分发（本地/运维机按需触发）**：
    - 若配置了 `MIRROR_*` 参数，发版脚本在第一阶段已自动将 Git 标签与 Release 同步推送至私有平台；
-   - 待官方 GHCR 镜像构建就绪后，在本地或运维节点运行 `npm run image:sync -- --async`，后台异步将镜像秒级同步至私有平台与 Docker Hub；
+   - 待官方 GHCR 镜像构建就绪后，在本地或运维节点运行 `npm run image:sync`，秒级将镜像高速同步至 Docker Hub 与私有镜像库；
    - 随时通过 `npm run image:check` 查看全网镜像就绪状态。
 
 ---

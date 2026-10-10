@@ -172,7 +172,7 @@ Next.js 16 采用根目录下的 [`src/proxy.ts`](file:///Users/wangyan/projects
 | `npm run doctor` | 调用 react-doctor 扫描最近变更的 React 代码反模式 |
 | `npm run release:sync` | 检查并全量同步主仓与镜像仓库 Release 记录（自动补齐缺失并对齐更新差异） |
 | `npm run release:check` | 检查主仓与镜像仓库 Release 一致性并预览差异（只读模式） |
-| `npm run image:sync` | 同步多架构容器镜像至私有镜像平台与 Docker Hub（支持 --async 异步模式与 full 全量） |
+| `npm run image:sync` | 同步多架构容器镜像至 Docker Hub 与私有镜像库（支持 full 全量） |
 | `npm run image:check` | 检查各平台 Release 镜像包完整性与同步状态（以远程主仓 Releases 为准，支持 full） |
 | `npm run db:migrate:dev` | 开发环境下执行并应用数据库迁移 |
 | `npm run db:seed` | 写入初始管理员账号与预设搜索引擎 |

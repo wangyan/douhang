@@ -3,7 +3,8 @@
 # 数据目录 ./data 自动创建，Docker 监控自动获取 socket 权限
 services:
   douhang:
-    image: ${MAIN_REGISTRY:-ghcr.io}/${MAIN_REPO_NAME:-wangyan/douhang}:latest   # 锁定版本可改为具体 tag（如 :1.2.0）
+    # 官方默认镜像（GitHub Packages）；若网络受限可直接替换为官方 Docker Hub 镜像：wangyan/douhang:latest
+    image: ghcr.io/wangyan/douhang:latest   # 锁定版本可改为具体 tag（如 :v1.0.0）
     container_name: douhang
     ports:
       - "3000:3000"

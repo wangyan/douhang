@@ -3,7 +3,6 @@ import type { VersionCheckResult, VersionUpdateInfo } from '@/types';
 import {
   APP_VERSION,
   getReleasesLatestUrl,
-  isGitHubHost,
   isNewerVersion,
   parseLatestRelease,
 } from './version';
@@ -28,7 +27,7 @@ async function getEffectiveToken(): Promise<string | undefined> {
   if (customToken && customToken.trim().length > 0) {
     return customToken.trim();
   }
-  return process.env.UPDATE_CHECK_TOKEN || process.env.MAIN_REPO_TOKEN;
+  return process.env.GITHUB_TOKEN;
 }
 
 /** 请求 Releases API（8s 超时，失败返回 null 不抛错） */
@@ -42,13 +41,7 @@ async function fetchLatestRelease(): Promise<Omit<
       headers: {
         Accept: 'application/json',
         'User-Agent': 'DouHang-version-check',
-        ...(token
-          ? {
-              Authorization: isGitHubHost()
-                ? `Bearer ${token}`
-                : `token ${token}`,
-            }
-          : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       signal: AbortSignal.timeout(8000),
       cache: 'no-store',

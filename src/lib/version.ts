@@ -3,52 +3,38 @@ import pkg from '../../package.json';
 /** 应用版本号（package.json 单一来源，不含 v 前缀），用于设置页展示 */
 export const APP_VERSION = pkg.version;
 
-/** 获取配置的主代码托管平台域名（默认：github.com） */
+/** 官方主仓库平台域名 */
+export const REPO_HOST = 'github.com';
+
+/** 官方主仓库路径 */
+export const REPO_NAME = 'wangyan/douhang';
+
+/** 官方主仓库主页地址 */
+export const REPO_URL = `https://${REPO_HOST}/${REPO_NAME}`;
+
+/** 获取主代码托管平台域名（兼容保留） */
 export function getCodeHost(): string {
-  return (
-    process.env.NEXT_PUBLIC_MAIN_GIT_HOST ||
-    process.env.MAIN_GIT_HOST ||
-    'github.com'
-  ).trim();
+  return REPO_HOST;
 }
 
-/** 获取配置的主仓库路径（默认：wangyan/douhang） */
+/** 获取主仓库路径（兼容保留） */
 export function getRepoName(): string {
-  return (
-    process.env.NEXT_PUBLIC_MAIN_REPO_NAME ||
-    process.env.MAIN_REPO_NAME ||
-    'wangyan/douhang'
-  ).trim();
-}
-
-/** 判断当前 Host 是否属于 GitHub */
-export function isGitHubHost(host = getCodeHost()): boolean {
-  return host === 'github.com' || host.endsWith('.github.com');
+  return REPO_NAME;
 }
 
 /** 远端仓库主页地址 */
 export function getRepoUrl(): string {
-  return `https://${getCodeHost()}/${getRepoName()}`;
+  return REPO_URL;
 }
 
-/** 获取用户指南完整 URL（面向访客与日常使用者，适配 GitHub blob 或 Forgejo/Gitea src/branch） */
+/** 获取用户指南完整 URL（面向访客与日常使用者） */
 export function getUserGuideUrl(): string {
-  const host = getCodeHost();
-  const repo = getRepoName();
-  const docPath = isGitHubHost(host)
-    ? 'blob/main/docs/USER_GUIDE.md'
-    : 'src/branch/main/docs/USER_GUIDE.md';
-  return `https://${host}/${repo}/${docPath}`;
+  return `${REPO_URL}/blob/main/docs/USER_GUIDE.md`;
 }
 
-/** 获取管理指南完整 URL（面向已登录管理员，适配 GitHub blob 或 Forgejo/Gitea src/branch） */
+/** 获取管理指南完整 URL（面向已登录管理员） */
 export function getAdminGuideUrl(): string {
-  const host = getCodeHost();
-  const repo = getRepoName();
-  const docPath = isGitHubHost(host)
-    ? 'blob/main/docs/ADMIN_GUIDE.md'
-    : 'src/branch/main/docs/ADMIN_GUIDE.md';
-  return `https://${host}/${repo}/${docPath}`;
+  return `${REPO_URL}/blob/main/docs/ADMIN_GUIDE.md`;
 }
 
 /** 获取使用指南完整 URL（默认指向用户指南） */
@@ -56,24 +42,18 @@ export function getManualUrl(): string {
   return getUserGuideUrl();
 }
 
-/** Releases 列表页地址（GitHub 与 Forgejo / Gitea 路径一致） */
+/** Releases 列表页地址 */
 export function getReleasesPageUrl(repoUrl?: string): string {
-  return `${repoUrl ?? getRepoUrl()}/releases`;
+  return `${repoUrl ?? REPO_URL}/releases`;
 }
 
-/** Releases 检测源（适配 GitHub api.github.com 或 Forgejo/Gitea api/v1） */
+/** Releases 检测源 API 地址 */
 export function getReleasesLatestUrl(): string {
-  const host = getCodeHost();
-  const repo = getRepoName();
-  if (isGitHubHost(host)) {
-    return `https://api.github.com/repos/${repo}/releases/latest`;
-  }
-  return `https://${host}/api/v1/repos/${repo}/releases/latest`;
+  return `https://api.github.com/repos/${REPO_NAME}/releases/latest`;
 }
 
 /** 静态只读属性（供同步引用场景使用） */
-export const REPO_URL = getRepoUrl();
-export const MANUAL_URL = getManualUrl();
+export const MANUAL_URL = getUserGuideUrl();
 export const USER_GUIDE_URL = getUserGuideUrl();
 export const ADMIN_GUIDE_URL = getAdminGuideUrl();
 export const RELEASES_LATEST_URL = getReleasesLatestUrl();

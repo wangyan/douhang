@@ -33,12 +33,8 @@ jobs:
           if [ -z "$TARGET_TAG" ] && [ "${{ github.ref_type }}" = "tag" ]; then
             TARGET_TAG="${{ github.ref_name }}"
           fi
-          # 规范化：兼容 1.1.0 或 v1.1.0
-          if [[ "$TARGET_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            TARGET_TAG="v$TARGET_TAG"
-          fi
           if [[ ! "$TARGET_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::无效或未指定版本标签：'$TARGET_TAG'。仅支持按已发布的版本标签 (vX.Y.Z) 进行构建发布！"
+            echo "::error::无效或未指定版本标签：'$TARGET_TAG'。必须为符合规范的发布版本标签 (vX.Y.Z)！"
             exit 1
           fi
           echo "tag=$TARGET_TAG" >> "$GITHUB_OUTPUT"

@@ -62,9 +62,8 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
   for (const rawLine of markdown.split(/\r?\n/)) {
     const line = rawLine.trim();
 
-    const heading = /^## (v[\d.]+)(?:\s*-\s*(\d{4}-\d{2}-\d{2}))?\s*$/.exec(
-      line,
-    );
+    const heading =
+      /^## (v\d+\.\d+\.\d+)(?:\s*-\s*(\d{4}-\d{2}-\d{2}))?\s*$/.exec(line);
     if (heading) {
       closeIntro();
       release = {

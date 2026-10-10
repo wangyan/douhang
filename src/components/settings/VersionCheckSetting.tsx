@@ -135,7 +135,7 @@ export function VersionCheckSetting({
               width="100%"
               hasClear
               type="password"
-              placeholder="留空默认使用 MAIN_REPO_TOKEN"
+              placeholder="留空默认使用 GITHUB_TOKEN 或匿名配额"
             />
           </div>
           {isTokenDirty && (
