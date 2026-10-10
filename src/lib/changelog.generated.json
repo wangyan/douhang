@@ -53,7 +53,7 @@
         {
           "name": "部署与运维",
           "items": [
-            "官方镜像 `code.bg7pbp.com/wangyan/douhang`（切换至 GitHub 平台时为 `ghcr.io/wangyan/douhang`），多架构支持（amd64 / arm64）",
+            "官方镜像 `ghcr.io/wangyan/douhang`（多架构支持 amd64 / arm64，亦支持切换至自建平台镜像）",
             "容器启动自动完成数据库迁移与种子写入，数据持久化在宿主机 `./data`",
             "自动探测 Docker socket 属组；`DOCKER_GID` / `PUID` / `PGID` 在 `.env` 设置即可生效",
             "无鉴权健康检查端点 `/api/health`，已接入容器 HEALTHCHECK"

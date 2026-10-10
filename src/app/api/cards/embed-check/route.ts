@@ -5,7 +5,7 @@ import { safeFetch } from '@/lib/url-guard';
 
 export const dynamic = 'force-dynamic';
 
-/** 从代理头还原斗航自身 origin，用于判断 SAMEORIGIN / 'self' */
+/** 从代理头还原斗法领航自身 origin，用于判断 SAMEORIGIN / 'self' */
 function requestOrigin(req: Request): string {
   const forwardedHost = req.headers
     .get('x-forwarded-host')

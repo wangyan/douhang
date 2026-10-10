@@ -5,7 +5,7 @@ import { fetchCachedFavicon } from '@/lib/favicon-cache';
 
 export const dynamic = 'force-dynamic';
 
-/** 优先抓取目标地址；失败时尝试备用外网地址 */
+/** 优先获取目标地址的图标；失败时尝试备用外网地址 */
 async function resolveCachedFavicon(
   targetUrl: string,
   fallbackUrl?: string,
@@ -14,7 +14,7 @@ async function resolveCachedFavicon(
 }
 
 /**
- * favicon 抓取 API
+ * Favicon 获取接口
  *
  * GET /api/icons/favicon?url=https://example.com
  * GET /api/icons/favicon?url=http://192.168.1.10&fallbackUrl=https://app.example.com

@@ -35,9 +35,18 @@ if [ -f .env ]; then
   [ -z "${DOCKER_USER:-}" ] && DOCKER_USER=$(grep -E '^[[:space:]]*DOCKER_USER=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
   [ -z "${REPO_TOKEN:-}" ] && REPO_TOKEN=$(grep -E '^[[:space:]]*REPO_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
   [ -z "${PACKAGE_TOKEN:-}" ] && PACKAGE_TOKEN=$(grep -E '^[[:space:]]*PACKAGE_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
+
+  # 镜像平台同步配置（可选：同时发布至第二远端/私有平台）
+  [ -z "${MIRROR_REPO_URL:-}" ] && MIRROR_REPO_URL=$(grep -E '^[[:space:]]*MIRROR_REPO_URL=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
+  [ -z "${MIRROR_CODE_HOST:-}" ] && MIRROR_CODE_HOST=$(grep -E '^[[:space:]]*MIRROR_CODE_HOST=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
+  [ -z "${MIRROR_REPO_NAME:-}" ] && MIRROR_REPO_NAME=$(grep -E '^[[:space:]]*MIRROR_REPO_NAME=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
+  [ -z "${MIRROR_CONTAINER_REGISTRY:-}" ] && MIRROR_CONTAINER_REGISTRY=$(grep -E '^[[:space:]]*MIRROR_CONTAINER_REGISTRY=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
+  [ -z "${MIRROR_DOCKER_USER:-}" ] && MIRROR_DOCKER_USER=$(grep -E '^[[:space:]]*MIRROR_DOCKER_USER=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
+  [ -z "${MIRROR_REPO_TOKEN:-}" ] && MIRROR_REPO_TOKEN=$(grep -E '^[[:space:]]*MIRROR_REPO_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
+  [ -z "${MIRROR_PACKAGE_TOKEN:-}" ] && MIRROR_PACKAGE_TOKEN=$(grep -E '^[[:space:]]*MIRROR_PACKAGE_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
 fi
 
-CODE_HOST="${CODE_HOST:-code.bg7pbp.com}"
+CODE_HOST="${CODE_HOST:-github.com}"
 REPO_NAME="${REPO_NAME:-wangyan/douhang}"
 
 is_github=0
@@ -56,6 +65,10 @@ fi
 DOCKER_USER="${DOCKER_USER:-${REPO_NAME%%/*}}"
 image="$CONTAINER_REGISTRY/$REPO_NAME"
 repo_url="https://$CODE_HOST/$REPO_NAME"
+
+MIRROR_REPO_NAME="${MIRROR_REPO_NAME:-$REPO_NAME}"
+MIRROR_CONTAINER_REGISTRY="${MIRROR_CONTAINER_REGISTRY:-${MIRROR_CODE_HOST:-}}"
+MIRROR_DOCKER_USER="${MIRROR_DOCKER_USER:-${MIRROR_REPO_NAME%%/*}}"
 
 [[ -n "${REPO_TOKEN:-}" ]] || fail "未在环境变量或 .env 中找到 REPO_TOKEN（需具备仓库 Release/推送权限）"
 [[ -n "${PACKAGE_TOKEN:-}" ]] || fail "未在环境变量或 .env 中找到 PACKAGE_TOKEN（需具备容器镜像库推送权限）"
@@ -182,6 +195,16 @@ git tag -a "$tag" -m "Release $tag"
 printf '==> 发布 %s：多架构 Docker 构建并推送\n' "$tag"
 docker info >/dev/null
 echo "$PACKAGE_TOKEN" | docker login "$CONTAINER_REGISTRY" -u "$DOCKER_USER" --password-stdin >/dev/null
+
+build_tags=("-t" "$image:$next_version" "-t" "$image:latest")
+
+if [ -n "${MIRROR_CONTAINER_REGISTRY:-}" ] && [ -n "${MIRROR_PACKAGE_TOKEN:-}" ]; then
+  printf '==> 登录镜像容器镜像库：%s\n' "$MIRROR_CONTAINER_REGISTRY"
+  echo "$MIRROR_PACKAGE_TOKEN" | docker login "$MIRROR_CONTAINER_REGISTRY" -u "$MIRROR_DOCKER_USER" --password-stdin >/dev/null
+  mirror_image="$MIRROR_CONTAINER_REGISTRY/$MIRROR_REPO_NAME"
+  build_tags+=("-t" "$mirror_image:$next_version" "-t" "$mirror_image:latest")
+fi
+
 # --load 无法装载多平台 manifest，双架构需直接 --push 到镜像仓库。
 # arm64 在 x86 主机走 QEMU 模拟（Docker Desktop VM 需已注册 binfmt：
 # docker run --privileged --rm tonistiigi/binfmt --install arm64）。
@@ -190,25 +213,33 @@ docker buildx build \
   ${BUILDX_BUILDER:+--builder "$BUILDX_BUILDER"} \
   --platform linux/amd64,linux/arm64 \
   --build-arg REPO_URL="$repo_url" \
-  -t "$image:$next_version" \
-  -t "$image:latest" \
+  "${build_tags[@]}" \
   --push \
   .
 
 printf '==> 发布 %s：推送 Git\n' "$tag"
 git push origin main "$tag"
 
+if [ -n "${MIRROR_REPO_URL:-}" ]; then
+  printf '==> 发布 %s：同步推送镜像 Git 仓库\n' "$tag"
+  git push "$MIRROR_REPO_URL" main "$tag" || {
+    echo "警告：镜像 Git 仓库推送失败，但主仓库已推送" >&2
+  }
+fi
+
 printf '==> 发布 %s：创建 Release\n' "$tag"
 if [[ $is_github -eq 1 ]]; then
   api_url="https://api.github.com/repos/$REPO_NAME/releases"
+  auth_header="Authorization: Bearer $REPO_TOKEN"
 else
   api_url="https://$CODE_HOST/api/v1/repos/$REPO_NAME/releases"
+  auth_header="Authorization: token $REPO_TOKEN"
 fi
 payload=$(node -e 'const fs=require("node:fs");process.stdout.write(JSON.stringify({tag_name:process.argv[1],name:process.argv[1],body:fs.readFileSync(process.argv[2],"utf8").trimEnd(),target_commitish:"main",draft:false,prerelease:false}))' "$tag" "$release_notes")
 resp_file=$(mktemp)
 http_code=$(curl --silent --show-error -o "$resp_file" -w '%{http_code}' \
   -X POST \
-  -H "Authorization: token $REPO_TOKEN" \
+  -H "$auth_header" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
   "$api_url" \
@@ -222,6 +253,28 @@ if [[ $http_code != 200 && $http_code != 201 ]]; then
 fi
 rm -f "$resp_file"
 echo "Release 已创建：https://$CODE_HOST/$REPO_NAME/releases/tag/$tag"
+
+# 同步创建镜像平台 Release（若已配置镜像平台凭据）
+if [ -n "${MIRROR_CODE_HOST:-}" ] && [ -n "${MIRROR_REPO_TOKEN:-}" ]; then
+  printf '==> 发布 %s：同步创建镜像平台 Release\n' "$tag"
+  mirror_api_url="https://$MIRROR_CODE_HOST/api/v1/repos/$MIRROR_REPO_NAME/releases"
+  mirror_resp_file=$(mktemp)
+  mirror_http_code=$(curl --silent --show-error -o "$mirror_resp_file" -w '%{http_code}' \
+    -X POST \
+    -H "Authorization: token $MIRROR_REPO_TOKEN" \
+    -H "Content-Type: application/json" \
+    -H "Accept: application/json" \
+    "$mirror_api_url" \
+    --data-binary "$payload") || true
+
+  if [[ $mirror_http_code == 200 || $mirror_http_code == 201 ]]; then
+    echo "镜像平台 Release 已创建：https://$MIRROR_CODE_HOST/$MIRROR_REPO_NAME/releases/tag/$tag"
+  else
+    echo "警告：镜像平台 Release 创建失败（HTTP $mirror_http_code）" >&2
+  fi
+  rm -f "$mirror_resp_file"
+fi
+
 rm -f "$release_notes"
 
 printf '==> %s 发布完成\n' "$tag"

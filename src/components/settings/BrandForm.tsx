@@ -50,7 +50,7 @@ export function BrandForm({ initialBrand }: BrandFormProps) {
             value={ctl.brand.title}
             onChange={(value) => ctl.update('title', value)}
             width="100%"
-            placeholder="斗航"
+            placeholder="斗法领航"
             isRequired
             status={
               ctl.titleError

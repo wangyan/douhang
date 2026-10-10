@@ -1,6 +1,6 @@
-# 斗航（DouHang）
+# 斗法领航（DouHang）
 
-自托管的容器与服务导航起始页，适用于工作工作台与自托管场景。把代码仓库、开发文档、运维控制台、内部系统与各类自托管服务做成卡片，配合容器状态监控、内外网地址自动切换与全局搜索，打开浏览器即可直达。
+自托管的容器与服务导航起始页，专为局域网、私有云与自托管环境设计。将代码仓库、开发文档、运维控制台、内部系统与各类服务整理为直观的卡片网格，配合容器状态监控、内外网智能分流与全局拼音搜索，打开浏览器即可一键直达。
 
 ## 核心功能
 
@@ -26,7 +26,7 @@
 
 ## 快速部署
 
-推荐使用镜像方式部署，无需克隆源码。完整部署方式（源码构建、环境变量、反向代理、升级、备份与故障排查）见[部署文档](./docs/DEPLOYMENT.md)。
+推荐使用镜像方式部署（默认拉取 GitHub Packages 公开镜像 `ghcr.io/wangyan/douhang:latest`），无需克隆源码。完整部署方式（源码构建、`docker run` 单命令、环境变量、反向代理、升级、备份与故障排查）见[部署指南](./docs/DEPLOYMENT.md)。
 
 **前置条件**：已安装 Docker 与 Docker Compose v2，且主机可访问互联网以下载镜像。
 
@@ -54,12 +54,81 @@ docker compose -f docker-compose.prod.yml up -d
 
 数据持久化在 `./data` 目录，容器启动时会自动完成数据库迁移与种子写入。
 
+## 本地开发
+
+针对二次开发与代码贡献，可在宿主机直接搭建基于 Node.js 22 的本地开发环境：
+
+```bash
+# 1. 克隆代码仓库并安装依赖
+git clone https://github.com/wangyan/douhang.git
+cd douhang
+npm ci
+
+# 2. 准备环境变量
+cp .env.example .env
+
+# 3. 初始化本地 SQLite 数据库与种子数据
+npm run db:migrate:dev
+npm run db:seed
+
+# 4. 启动开发服务器（Turbopack 热重载）
+npm run dev
+```
+
+启动后在浏览器访问 `http://localhost:3000` 即可开始调试。
+
+在提交改动前，请运行以下命令进行代码规范与类型校验：
+
+```bash
+npm run check       # 执行 Biome 静态检查与格式化
+npm run typecheck   # 执行 TypeScript 严格类型检查
+```
+
+完整环境变量说明、源码构建与故障排查详见[部署指南](./docs/DEPLOYMENT.md#3-本地开发环境搭建)。
+
+## 贡献指南
+
+代码提交遵循 [Conventional Commits](https://www.conventionalcommits.org/) 规范，版本发布严格遵循语义化版本（SemVer）。
+
+### 版本号规则（SemVer）
+
+项目版本号采用 `主版本号.次版本号.修订号`（`MAJOR.MINOR.PATCH`）格式，发版时按改动性质递增对应档位：
+
+| 档位 | 对应版本位 | 适用场景 | 示例 |
+|---|---|---|---|
+| `patch` | 修订号 | 缺陷修复、内部重构、样式对齐、工具链升级等**不改变既有用户能力**的变更 | 修复排版错位、微调色值、内部依赖升级 |
+| `minor` | 次版本号 | **向下兼容的新增用户能力**（如新增小组件、新增偏好选项等） | 新增 qBittorrent 监控、新增素材管理面板 |
+| `major` | 主版本号 | **破坏性架构变更**（部署架构重大变更、数据模型或接口不向下兼容） | 数据库底层重构、配置体系不兼容升级 |
+
+> **说明**：内部构建脚本、开发工具与类型调整默认按 `patch` 处理；混合改动按最高档位选取。
+
+### 正式版本发布流程
+
+版本的唯一事实源由 `package.json` 与 `CHANGELOG.md` 共同承载。所有发版操作必须通过自动化脚本 [`scripts/release.sh`](./scripts/release.sh) 执行，**严禁手动修改版本号或手动创建 Git Tag**：
+
+```bash
+# 1. 确保在 main 分支且工作区干净
+git status
+
+# 2. 发布常规补丁版本（最常用）
+bash scripts/release.sh patch
+
+# 或发布次版本（新功能）/ 主版本（重大变更）
+# bash scripts/release.sh minor
+# bash scripts/release.sh major
+```
+
+自动化脚本将依次执行：环境变量与凭据校验 → 版本号自动递增 → 生成更新日志 JSON → 运行 Biome 与 TypeScript 质量检查 → 生产构建 → 提交与打 Tag → 多架构 Docker 镜像构建推送 → 推送 Git 标签并创建 Release。
+
+完整代码提交格式、凭据配置与发版异常恢复详见[贡献指南](./docs/CONTRIBUTING.md)。
+
 ## 文档
 
 | 文档 | 面向 | 内容 |
 |---|---|---|
-| [使用手册](./docs/MANUAL.md) | 使用者 | 登录与基本操作、主页、卡片与分类、搜索、Widget、外观、设置、备份 |
-| [部署文档](./docs/DEPLOYMENT.md) | 部署者 | 镜像与源码部署、环境变量、数据持久化、启动流程、反向代理、升级、备份、故障排查 |
+| [用户指南](./docs/USER_GUIDE.md) | 访问者/用户 | 前台浏览、服务访问、内外网智能切换、全局搜索、外观调节与 PWA 体验 |
+| [管理指南](./docs/ADMIN_GUIDE.md) | 管理员 | 卡片与分类维护、Widget 监控配置、全局后台设置、素材管理与备份恢复 |
+| [部署指南](./docs/DEPLOYMENT.md) | 部署者 | 镜像与源码部署、本地开发、环境变量、反向代理、升级、故障排查 |
 | [架构文档](./docs/ARCHITECTURE.md) | 维护者 | 技术栈、目录结构与分层、核心机制、数据模型、质量工具与权威来源 |
 | [贡献指南](./docs/CONTRIBUTING.md) | 贡献者 | 提交信息写法、变更日志规范、发布流程 |
 

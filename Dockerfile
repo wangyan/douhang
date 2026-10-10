@@ -36,7 +36,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # runner 阶段显式声明（ENV 不跨 FROM 继承）；compose/运行时可覆盖
 ENV DATABASE_URL="file:./data/sqlite.db"
 
-ARG REPO_URL="https://code.bg7pbp.com/wangyan/douhang"
+ARG REPO_URL="https://github.com/wangyan/douhang"
 LABEL org.opencontainers.image.source="${REPO_URL}"
 
 RUN addgroup --system --gid 1001 nodejs

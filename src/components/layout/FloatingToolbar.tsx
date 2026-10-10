@@ -26,6 +26,7 @@ import {
   Palette,
   Pencil,
   Settings,
+  ShieldCheck,
   Sun,
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -54,7 +55,7 @@ import {
   NETWORK_MODE_META,
   NETWORK_MODE_ORDER,
 } from '@/lib/network-mode';
-import { MANUAL_URL, REPO_URL } from '@/lib/version';
+import { ADMIN_GUIDE_URL, MANUAL_URL, REPO_URL } from '@/lib/version';
 import { preferencesApi, versionApi } from '@/services';
 import type { NetworkMode, ThemeMode, VersionUpdateInfo } from '@/types';
 
@@ -66,8 +67,10 @@ interface FloatingToolbarProps {
   withinFrame?: boolean;
   /** 远端仓库主页地址（支持外部透传，回落至 REPO_URL） */
   repoUrl?: string;
-  /** 使用帮助文档地址（支持外部透传，回落至 MANUAL_URL） */
+  /** 用户指南文档地址（支持外部透传，回落至 MANUAL_URL / USER_GUIDE_URL） */
   manualUrl?: string;
+  /** 管理指南文档地址（支持外部透传，回落至 ADMIN_GUIDE_URL） */
+  adminGuideUrl?: string;
   /** 当前用户是否已登录，默认 true（设置页等私有页默认为 true） */
   isAuthed?: boolean;
   /** 外观快捷面板数据包（首页 SSR 取好传入；缺省时菜单不显示外观入口） */
@@ -266,6 +269,7 @@ export function FloatingToolbar({
   withinFrame = false,
   repoUrl = REPO_URL,
   manualUrl = MANUAL_URL,
+  adminGuideUrl = ADMIN_GUIDE_URL,
   isAuthed = true,
   appearance,
 }: FloatingToolbarProps) {
@@ -562,6 +566,7 @@ export function FloatingToolbar({
             isAuthed && appearance ? () => setAppearanceOpen(true) : undefined
           }
           manualUrl={manualUrl}
+          adminGuideUrl={adminGuideUrl}
         />
       </HStack>
 
@@ -605,11 +610,13 @@ function ToolbarUserMenu({
   onOpenAbout,
   onOpenAppearance,
   manualUrl,
+  adminGuideUrl,
 }: {
   isAuthed: boolean;
   onOpenAbout: () => void;
   onOpenAppearance?: () => void;
   manualUrl: string;
+  adminGuideUrl: string;
 }) {
   const router = useRouter();
 
@@ -643,9 +650,15 @@ function ToolbarUserMenu({
           />
           <DropdownMenuItem
             icon={<BookOpenText size={ICON_SIZE.md} />}
-            label="使用帮助"
+            label="用户指南"
             style={{ paddingInline: 12 }}
             onClick={() => window.open(manualUrl, '_blank', 'noopener')}
+          />
+          <DropdownMenuItem
+            icon={<ShieldCheck size={ICON_SIZE.md} />}
+            label="管理指南"
+            style={{ paddingInline: 12 }}
+            onClick={() => window.open(adminGuideUrl, '_blank', 'noopener')}
           />
           <DropdownMenuItem
             icon={<LogOut size={ICON_SIZE.md} />}
@@ -669,7 +682,7 @@ function ToolbarUserMenu({
           />
           <DropdownMenuItem
             icon={<BookOpenText size={ICON_SIZE.md} />}
-            label="使用帮助"
+            label="用户指南"
             style={{ paddingInline: 12 }}
             onClick={() => window.open(manualUrl, '_blank', 'noopener')}
           />

@@ -3,6 +3,7 @@ import type { VersionCheckResult, VersionUpdateInfo } from '@/types';
 import {
   APP_VERSION,
   getReleasesLatestUrl,
+  isGitHubHost,
   isNewerVersion,
   parseLatestRelease,
 } from './version';
@@ -41,7 +42,13 @@ async function fetchLatestRelease(): Promise<Omit<
       headers: {
         Accept: 'application/json',
         'User-Agent': 'DouHang-version-check',
-        ...(token ? { Authorization: `token ${token}` } : {}),
+        ...(token
+          ? {
+              Authorization: isGitHubHost()
+                ? `Bearer ${token}`
+                : `token ${token}`,
+            }
+          : {}),
       },
       signal: AbortSignal.timeout(8000),
       cache: 'no-store',

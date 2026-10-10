@@ -19,4 +19,8 @@ services:
       - AUTH_PASSWORD=${AUTH_PASSWORD:?请在 .env 中设置 AUTH_PASSWORD}
       - AUTH_URL=${AUTH_URL:-}
       - DATABASE_URL=file:./data/sqlite.db
+      # 可选：DOCKER_GID（手动指定 socket 组，默认自动探测）；PUID/PGID（匹配宿主机用户）
+      - DOCKER_GID=${DOCKER_GID:-}
+      - PUID=${PUID:-}
+      - PGID=${PGID:-}
     restart: unless-stopped

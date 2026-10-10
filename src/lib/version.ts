@@ -3,12 +3,12 @@ import pkg from '../../package.json';
 /** 应用版本号（package.json 单一来源，不含 v 前缀），用于设置页展示 */
 export const APP_VERSION = pkg.version;
 
-/** 获取配置的代码托管平台域名（默认：code.bg7pbp.com） */
+/** 获取配置的代码托管平台域名（默认：github.com） */
 export function getCodeHost(): string {
   return (
     process.env.NEXT_PUBLIC_CODE_HOST ||
     process.env.CODE_HOST ||
-    'code.bg7pbp.com'
+    'github.com'
   ).trim();
 }
 
@@ -31,14 +31,29 @@ export function getRepoUrl(): string {
   return `https://${getCodeHost()}/${getRepoName()}`;
 }
 
-/** 获取使用手册完整 URL（适配 GitHub blob 或 Forgejo/Gitea src/branch） */
-export function getManualUrl(): string {
+/** 获取用户指南完整 URL（面向访客与日常使用者，适配 GitHub blob 或 Forgejo/Gitea src/branch） */
+export function getUserGuideUrl(): string {
   const host = getCodeHost();
   const repo = getRepoName();
   const docPath = isGitHubHost(host)
-    ? 'blob/main/docs/MANUAL.md'
-    : 'src/branch/main/docs/MANUAL.md';
+    ? 'blob/main/docs/USER_GUIDE.md'
+    : 'src/branch/main/docs/USER_GUIDE.md';
   return `https://${host}/${repo}/${docPath}`;
+}
+
+/** 获取管理指南完整 URL（面向已登录管理员，适配 GitHub blob 或 Forgejo/Gitea src/branch） */
+export function getAdminGuideUrl(): string {
+  const host = getCodeHost();
+  const repo = getRepoName();
+  const docPath = isGitHubHost(host)
+    ? 'blob/main/docs/ADMIN_GUIDE.md'
+    : 'src/branch/main/docs/ADMIN_GUIDE.md';
+  return `https://${host}/${repo}/${docPath}`;
+}
+
+/** 获取使用指南完整 URL（默认指向用户指南） */
+export function getManualUrl(): string {
+  return getUserGuideUrl();
 }
 
 /** Releases 列表页地址（GitHub 与 Forgejo / Gitea 路径一致） */
@@ -59,6 +74,8 @@ export function getReleasesLatestUrl(): string {
 /** 静态只读属性（供同步引用场景使用） */
 export const REPO_URL = getRepoUrl();
 export const MANUAL_URL = getManualUrl();
+export const USER_GUIDE_URL = getUserGuideUrl();
+export const ADMIN_GUIDE_URL = getAdminGuideUrl();
 export const RELEASES_LATEST_URL = getReleasesLatestUrl();
 
 /** 解析 vX.Y.Z 版本号为 [major, minor, patch]，非法格式返回 null */
