@@ -93,7 +93,7 @@ fix(搜索): 修复拼音首字母匹配在包含数字的卡片上失效的问�
 | `patch` | 修订号 | 缺陷修复、内部重构、样式对齐、工具链升级等**不增减用户可见能力**的变更 | 修复布局抖动、微调颜色、代码清理 |
 | `minor` | 次版本号 | **向下兼容的新增用户能力**（新增小组件、新增偏好选项等） | 新增 qBittorrent 组件、新增壁纸库 |
 | `major` | 主版本号 | **破坏性架构变更**（部署架构重大变更、配置文件不兼容等） | 核心数据库重构、运行依赖断代升级 |
-| `X.Y.Z` | 显式版本号 | 直接指定目标显式版本号 | 如 `1.2.0`（常用于首次发版基线） |
+| `X.Y.Z` | 显式版本号 | 直接指定目标显式版本号 | 如 `1.0.0`（常用于首次发版基线） |
 
 > 内部构建工具、版本检测机制与工程脚本变更，默认按 `patch` 处理；混合变更按最高档位选取。
 
@@ -101,9 +101,9 @@ fix(搜索): 修复拼音首字母匹配在包含数字的卡片上失效的问�
 
 1. **工作区状态**：切换至 `main` 分支，且工作区保持干净无未提交变更（`git status` 为 clean）；
 2. **环境凭据就绪**（仅需单个细粒度 Token，本地无需镜像推送权限）：
-   - `REPO_TOKEN`：在 [Fine-grained tokens](https://github.com/settings/personal-access-tokens/new) 中仅勾选 `douhang` 仓库的 `Contents: Read and write` 权限（用于创建 Release 与推送标签）；
-   - （说明）：**Docker 镜像由 GitHub Actions 云端自动构建并推送**，无需在本地配置 `PACKAGE_TOKEN`，亦无需在本地运行 Docker 引擎；（若需本地直接编译推送，可设置 `BUILD_DOCKER_LOCAL=1` 并配置 `PACKAGE_TOKEN` 作为后备）；
-   - （可选）私有镜像平台参数（`MIRROR_*`）：若需同步发布至私有镜像平台，可在 `.env` 配置对应地址与令牌，并在 GitHub 仓库 Secrets 中配置 `MIRROR_REGISTRY`、`MIRROR_USERNAME`、`MIRROR_PASSWORD` 实现云端双推。
+   - `MAIN_REPO_TOKEN`：在 [Fine-grained tokens](https://github.com/settings/personal-access-tokens/new) 中仅勾选 `douhang` 仓库的 `Contents: Read and write` 权限（用于创建 Release 与推送标签）；
+   - （说明）：**容器镜像由 GitHub Actions 云端自动构建并交付至 GHCR**，无需在本地配置 `MAIN_REGISTRY_TOKEN`，亦无需在本地运行 Docker 引擎；（若需本地直接编译推送，可设置 `BUILD_IMAGE_LOCAL=1` 并配置 `MAIN_REGISTRY_TOKEN` 作为后备）；
+   - （可选）镜像平台参数（`MIRROR_*`）：若需同步发布至私有平台，可在 `.env` 配置 `MIRROR_REPO_URL`、`MIRROR_REPO_TOKEN` 与 `MIRROR_REGISTRY_TOKEN`。发版后可使用 `npm run image:sync` 高速流转镜像。
 3. **变更日志确认**：提前在 `CHANGELOG.md` 顶部整理好当前版本的 `### 亮点` 与变更条目。
 
 ### 3.3 执行发布命令
@@ -118,8 +118,8 @@ bash scripts/release.sh patch
 # bash scripts/release.sh minor
 # bash scripts/release.sh major
 
-# （可选）在本地直接进行跨架构 Docker 构建并推送（后备模式）
-# BUILD_DOCKER_LOCAL=1 bash scripts/release.sh minor
+# （可选）在本地直接进行跨架构容器镜像构建并推送（后备模式）
+# BUILD_IMAGE_LOCAL=1 bash scripts/release.sh minor
 ```
 
 **首次发布**：当 `package.json` 的版本号已是待发布版本且远端尚无同名 Tag 时，使用**显式版本号**调用：
@@ -127,7 +127,7 @@ bash scripts/release.sh patch
 bash scripts/release.sh 1.0.0
 ```
 
-> **自动化流水线动作**：凭据校验 → 升级版本号与编排示例 → 重新生成更新日志 JSON → 执行 Biome 与 TypeScript 质检 → 生产构建 → 生成版本提交与 Git Tag → 推送 Git 标签与分支 → 调用 API 创建正式 Release → GitHub Actions 云端自动执行多架构 Docker 构建并并行推送（GHCR + 私有镜像库）。
+> **自动化流水线动作**：凭据校验 → 升级版本号与编排示例 → 重新生成更新日志 JSON → 执行 Biome 与 TypeScript 质检 → 生产构建 → 生成版本提交与 Git Tag → 推送 Git 标签与分支 → 调用 API 创建正式 Release → GitHub Actions 云端自动执行多架构 Docker 构建并发布 GHCR 官方镜像（随后可在本地通过 `npm run image:sync` 同步至私有平台与 Docker Hub）。
 
 ### 3.4 异常处理与恢复
 
@@ -148,6 +148,21 @@ npm run release:sync
 
 # 仅针对指定单个版本进行检查与同步
 npm run release:sync v1.0.0
+```
+
+### 3.6 容器镜像多端同步与检查
+
+主版本发布后，官方多架构 Docker 镜像由 GitHub Actions 云端流水线自动构建并交付至 GHCR。如需将镜像同步分发至自建私有镜像平台或 Docker Hub，可运行独立的同步工具（无需本地重复编译）：
+
+```bash
+# 检查各镜像平台远端镜像版本发布状态（只读检查）
+npm run image:check
+
+# 高速清单同步：自动将官方 GHCR 产物快速分发至私有镜像库与 Docker Hub
+npm run image:sync
+
+# 后台异步静默同步（不阻塞终端，支持 --status 查看进度与 --cancel 终止）
+npm run image:sync -- --async
 ```
 
 ---

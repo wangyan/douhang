@@ -16,6 +16,8 @@
     "gen:changelog": "tsx scripts/generate-changelog.ts",
     "release:sync": "tsx scripts/sync-releases.ts",
     "release:check": "tsx scripts/sync-releases.ts --dry-run",
+    "image:sync": "bash scripts/image-sync.sh",
+    "image:check": "bash scripts/image-sync.sh --check",
     "doctor": "npx react-doctor@latest --verbose --scope changed",
     "doctor:full": "npx react-doctor@latest --verbose",
     "db:generate": "prisma generate",

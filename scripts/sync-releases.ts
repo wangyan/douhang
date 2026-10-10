@@ -6,7 +6,7 @@
  * 2. 全量一致性对齐：自动补齐缺失版本，并自动比对更新标题与正文差异，确保主仓与镜像仓 100% 完全一致；
  * 3. 自动分页检测：处理 API 分页（每页 100 条递增遍历），支持历史版本数十乃至上百个的场景；
  * 4. 超时与重试容错：内置 10 秒请求超时，防止内网/VPN 私有镜像服务器失联导致脚本卡死；
- * 5. 配置自适应解析：从 MIRROR_REPO_URL 智能提取 host 与 repo，容忍未显式配置 MIRROR_CODE_HOST；
+ * 5. 配置自适应解析：从 MIRROR_REPO_URL 智能提取 host 与 repo，无需手动配置冗余平台参数；
  * 6. 状态码友好诊断：针对 401/403/404/422 及网络断连给出清晰排错指引；
  * 7. 灵活参数过滤：支持仅针对指定版本号（如 `v1.0.0`）单项执行。
  *
@@ -126,9 +126,9 @@ function loadChangelogReleases(): ParsedRelease[] {
 
 /** 获取主仓库平台配置 */
 function getPrimaryConfig(): PlatformConfig {
-  const host = (process.env.CODE_HOST || 'github.com').trim();
-  const repo = (process.env.REPO_NAME || 'wangyan/douhang').trim();
-  const token = process.env.REPO_TOKEN?.trim();
+  const host = (process.env.MAIN_GIT_HOST || 'github.com').trim();
+  const repo = (process.env.MAIN_REPO_NAME || 'wangyan/douhang').trim();
+  const token = process.env.MAIN_REPO_TOKEN?.trim();
   const isGitHub = host === 'github.com' || host.endsWith('.github.com');
 
   const apiUrl = isGitHub
@@ -148,24 +148,24 @@ function getPrimaryConfig(): PlatformConfig {
   };
 }
 
-/** 获取镜像仓库平台配置（支持显式变量与 MIRROR_REPO_URL 智能提取） */
+/** 获取镜像仓库平台配置（从 MIRROR_REPO_URL 智能提取，支持可选显式覆盖） */
 function getMirrorConfig(): PlatformConfig | null {
-  let host = process.env.MIRROR_CODE_HOST?.trim();
+  const mirrorUrl = process.env.MIRROR_REPO_URL?.trim();
+  let host = process.env.MIRROR_GIT_HOST?.trim();
   let repo = process.env.MIRROR_REPO_NAME?.trim();
   const token = process.env.MIRROR_REPO_TOKEN?.trim();
-  const mirrorUrl = process.env.MIRROR_REPO_URL?.trim();
 
-  // 若未显式配置 MIRROR_CODE_HOST，尝试从 MIRROR_REPO_URL 自动推断
-  if (!host && mirrorUrl) {
+  // 若配置了 MIRROR_REPO_URL，优先提取 host 与 repo
+  if (mirrorUrl) {
     const parsed = parseGitUrl(mirrorUrl);
     if (parsed) {
-      host = parsed.host;
+      if (!host) host = parsed.host;
       if (!repo) repo = parsed.repo;
     }
   }
 
   if (!host) return null;
-  if (!repo) repo = (process.env.REPO_NAME || 'wangyan/douhang').trim();
+  if (!repo) repo = (process.env.MAIN_REPO_NAME || 'wangyan/douhang').trim();
 
   const isGitHub = host === 'github.com' || host.endsWith('.github.com');
   const apiUrl = isGitHub
@@ -432,9 +432,7 @@ async function main() {
   if (mirror) {
     platforms.push(mirror);
   } else {
-    console.log(
-      '未检测到镜像平台配置（MIRROR_CODE_HOST / MIRROR_REPO_URL），仅处理主平台。\n',
-    );
+    console.log('未检测到镜像平台配置（MIRROR_REPO_URL），仅处理主平台。\n');
   }
 
   let totalPendingMissing = 0;

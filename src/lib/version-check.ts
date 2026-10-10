@@ -28,7 +28,7 @@ async function getEffectiveToken(): Promise<string | undefined> {
   if (customToken && customToken.trim().length > 0) {
     return customToken.trim();
   }
-  return process.env.UPDATE_CHECK_TOKEN || process.env.REPO_TOKEN;
+  return process.env.UPDATE_CHECK_TOKEN || process.env.MAIN_REPO_TOKEN;
 }
 
 /** 请求 Releases API（8s 超时，失败返回 null 不抛错） */

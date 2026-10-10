@@ -1,6 +1,6 @@
 # 斗法领航部署指南
 
-本文档面向部署运维人员与二次开发者，涵盖容器部署、源码构建、本地开发环境搭建、环境变量配置、反向代理、版本升级、数据备份与故障排查。
+本文档面向部署运维人员与二次开发者，涵盖容器部署、源码构建、本地开发环境搭建、环境变量配置、容器镜像分发、版本发布与升级、反向代理、数据备份与故障排查。
 
 - **前台使用与访问**：请参阅[用户指南](./USER_GUIDE.md)
 - **后台管理与配置**：请参阅[管理指南](./ADMIN_GUIDE.md)
@@ -174,72 +174,145 @@ npm run start       # 启动生产服务器
 
 > **口令生效说明**：初始账号一经写入数据库，后续验证均以数据库中存储的凭据为准，修改口令请在「设置 → 通用」中操作。环境变量中的 `AUTH_PASSWORD` 仅用于首次初始化与启动时的安全合规校验。
 
-### 4.2 自定义主仓库与镜像源（高级配置）
+### 4.2 主代码仓库配置（可选）
 
-若进行二次开发或在内网自建代码平台（如 Forgejo / Gitea）独立运行，可通过以下变量覆盖官方主源：
-
-| 变量名 | 必填 | 默认值 | 说明 |
-|---|---|---|---|
-| `CODE_HOST` | 否 | `github.com` | 主代码托管平台域名，支持自建平台 |
-| `REPO_NAME` | 否 | `wangyan/douhang` | 主代码仓库路径，支持自定义 Fork 路径 |
-| `CONTAINER_REGISTRY` | 否 | `ghcr.io`（GitHub）/ `$CODE_HOST` | 容器镜像库域名（如 `registry.example.com`） |
-| `DOCKER_USER` | 否 | 自动提取 `REPO_NAME` 前缀 | 容器镜像库推送登录用户名 |
-| `UPDATE_CHECK_TOKEN` | 否 | - | 当主仓库设为私有仓库时，用于应用内检查 Releases 更新的只读令牌 |
-
-### 4.3 镜像平台发版同步（维护者高级配置）
-
-GitHub 为本项目唯一的公开开源仓库（`https://github.com/wangyan/douhang`），公开镜像统一由 GitHub Packages 承载（`ghcr.io/wangyan/douhang`）。
-
-若维护者拥有自建的私有镜像/备份平台（如私有 Git 仓库、私有 Docker 镜像库），发版流水线支持在向 GitHub 发布公开版本的同时，自动将多架构 Docker 镜像、Git 标签与 Release 同步推送至私有镜像平台。
-
-### 4.1 多架构镜像构建模式
-
-镜像分发支持**云端全自动分发**（推荐）与**本地直推**两种模式：
-
-1. **云端全自动分发（默认，推荐）**：
-   - 运行 `bash scripts/release.sh <type>` 仅负责代码质检、生产构建、打 Tag 并推送 Git 与创建 Release（秒级完成，本地零机器负载）；
-   - GitHub Actions 监听到 `v*` 标签后，在云端自动化执行 `linux/amd64` 与 `linux/arm64` 跨架构编译并推送到 `ghcr.io`；
-   - 若在 GitHub 仓库 Secrets 中配置了 `MIRROR_REGISTRY`、`MIRROR_USERNAME`、`MIRROR_PASSWORD`，云端流水线将并行推送到私有镜像库。
-2. **本地直推（后备模式）**：
-   - 若未配置云端 Actions 或需要在本地网络直推，可在环境变量或 `.env` 中设置 `BUILD_DOCKER_LOCAL=1`；
-   - 此时脚本将调用本地 Docker Buildx 编译并直接 `--push` 推送至 `ghcr.io`（需 `PACKAGE_TOKEN`）与私有镜像库（需 `MIRROR_PACKAGE_TOKEN`）。
-
-### 4.2 本地发布与同步配置
-
-在本地 `.env`（已被 `.gitignore` 忽略，不入库）中配置私有平台参数：
+本节用于配置 Git 代码托管平台信息，主要供维护者执行版本发布（`scripts/release.sh`）、Release 同步（`npm run release:sync`）或进行二次开发 Fork 时使用。**日常作为使用者部署服务时，无需配置本节任何变量**，系统默认指向官方开源主仓。
 
 | 变量名 | 必填 | 默认值 | 说明 |
 |---|---|---|---|
-| `BUILD_DOCKER_LOCAL` | 否 | `0` | 是否在本地执行 Docker 交叉编译并推送（`1` 为开启，默认 `0` 由云端构建） |
-| `PACKAGE_TOKEN` | 否 | - | GitHub Packages 推送令牌（仅 `BUILD_DOCKER_LOCAL=1` 时必填） |
-| `MIRROR_REPO_URL` | 否 | - | 私有 Git 仓库地址（如 `ssh://git@mirror.example.com/owner/douhang.git`） |
-| `MIRROR_CODE_HOST` | 否 | - | 私有托管平台域名（如 `mirror.example.com`），用于调用 API 创建 Release |
-| `MIRROR_REPO_NAME` | 否 | 同主仓库名 | 私有平台仓库路径 |
-| `MIRROR_CONTAINER_REGISTRY` | 否 | 同 `MIRROR_CODE_HOST` | 私有容器镜像库域名 |
-| `MIRROR_DOCKER_USER` | 否 | 自动提取属主 | 私有镜像库登录用户 |
-| `MIRROR_REPO_TOKEN` | 否 | - | 私有平台 API 令牌（用于创建 Release） |
-| `MIRROR_PACKAGE_TOKEN` | 否 | - | 私有镜像库推送令牌（仅本地直推私有镜像库时使用） |
+| `MAIN_GIT_HOST` | 否 | `github.com` | 主代码托管平台域名。支持自建 Forgejo / Gitea / GitLab 等平台 |
+| `MAIN_REPO_NAME` | 否 | `wangyan/douhang` | 主代码仓库路径，支持指定自定义 Fork 路径 |
+| `MAIN_REPO_TOKEN` | 否 | - | 主仓库发版令牌（PAT，需具备 Contents: Read and write 权限），供维护者运行发版脚本打 Tag 与创建 Release |
+| `UPDATE_CHECK_TOKEN` | 否 | - | 当主代码仓库设为私有仓库时，用于应用内检查 Releases 更新的只读令牌（未配置时回退使用 `MAIN_REPO_TOKEN`） |
 
 ```dotenv
-# 私有镜像平台同步配置示例
-# BUILD_DOCKER_LOCAL=0
-MIRROR_REPO_URL="ssh://git@mirror.example.com/owner/douhang.git"
-MIRROR_CODE_HOST="mirror.example.com"
-MIRROR_CONTAINER_REGISTRY="mirror.example.com"
-MIRROR_REPO_TOKEN="<私有平台 Repository Token>"
-# MIRROR_PACKAGE_TOKEN="<私有镜像库 Package Token，仅本地构建时需提供>"
+# 主仓库发版配置示例（.env 片段，维护者发版时配置）
+MAIN_REPO_TOKEN="github_pat_xxxx"
 ```
 
-执行 `bash scripts/release.sh <type>` 时，流水线将自动完成：
-1. **Git 代码与标签**：推送到 `origin`（GitHub）并同步推送到 `MIRROR_REPO_URL`；
-2. **Release 发布**：同时在 GitHub 与私有平台 API 创建带有更新日志的正式 Release；
-3. **多架构 Docker 镜像**：由 GitHub Actions 云端（或本地 Buildx 当 `BUILD_DOCKER_LOCAL=1` 时）自动构建并分发。
+### 4.3 镜像代码仓库配置（可选）
+
+> [!NOTE]
+> **本节为完全可选的高级扩展配置**。仅当维护者拥有自建的私有代码平台（如局域网/私有 Forgejo），并希望在发版时将 Git 标签与 Release 同步推送到第二远端以作容灾备份时使用。
+
+| 变量名 | 必填 | 默认值 | 说明 |
+|---|---|---|---|
+| `MIRROR_REPO_URL` | 否 | - | 私有 Git 仓库完整地址（如 `ssh://git@mirror.example.com/owner/douhang.git`）。脚本自动从中提取主机名与仓库路径，发版时自动同步推送 Git 标签与分支 |
+| `MIRROR_REPO_TOKEN` | 否 | - | 私有代码平台 API 访问令牌，用于发版与 Release 同步脚本调用 API 同步创建 Release |
+
+*(高级覆盖：若私有环境的 SSH 域名与 Web API 域名不一致，可按需可选配置 `MIRROR_GIT_HOST` 显式覆盖推导值)*
+
+```dotenv
+# 镜像仓库配置示例（.env 片段，按需可选）
+MIRROR_REPO_URL="ssh://git@mirror.example.com/owner/douhang.git"
+MIRROR_REPO_TOKEN="<私有代码平台 API Token>"
+```
 
 ---
 
-## 5. 数据持久化与存储结构
+## 5. 容器镜像构建与分发
 
-### 5.1 目录映射关系
+> [!NOTE]
+> 如果您直接使用官方镜像部署服务，**无需执行本节操作**。本节工具专为需要将官方镜像同步至自建私有镜像仓库的运维场景设计。
+
+### 5.1 官方镜像库（GitHub Packages）
+
+官方多架构镜像统一托管于 GitHub Packages（`ghcr.io`），构建默认由云端 GitHub Actions 流水线自动完成。
+
+| 变量名 | 必填 | 默认值 | 说明 |
+|---|---|---|---|
+| `MAIN_REGISTRY` | 否 | `ghcr.io`（GitHub）/ `$MAIN_GIT_HOST` | 主容器镜像库域名（官方为 `ghcr.io`；若自建主代码平台则默认对齐为 `$MAIN_GIT_HOST`） |
+| `MAIN_REGISTRY_USER` | 否 | 自动提取 `MAIN_REPO_NAME` 前缀 | 主容器镜像库推送登录用户名 |
+| `BUILD_IMAGE_LOCAL` | 否 | `0` | 本地镜像构建后备开关：默认 `0` 委托云端构建；设为 `1` 在发版脚本中直接在本地调用 Docker 交叉编译 |
+| `MAIN_REGISTRY_TOKEN` | 否 | - | 主镜像库推送令牌（仅当 `BUILD_IMAGE_LOCAL=1` 在本地编译并直推主镜像库时必填） |
+
+```dotenv
+# 官方镜像库默认无需配置；仅在本地编译并直推 GHCR 时配置：
+# BUILD_IMAGE_LOCAL=1
+# MAIN_REGISTRY_TOKEN="ghp_xxxx"
+```
+
+### 5.2 Docker Hub 公开渠道
+
+支持通过 `npm run image:sync` 将官方镜像快速分发至 Docker Hub（`hub.docker.com`）渠道：
+
+| 变量名 | 必填 | 默认值 | 说明 |
+|---|---|---|---|
+| `DOCKERHUB_USERNAME` | 否 | - | Docker Hub 登录用户名 |
+| `DOCKERHUB_TOKEN` | 否 | - | Docker Hub Personal Access Token（需具备 Read & Write 权限） |
+| `DOCKERHUB_REPO` | 否 | `${DOCKERHUB_USERNAME}/douhang` | Docker Hub 目标仓库路径 |
+
+```dotenv
+# Docker Hub 同步配置示例（.env 片段，按需可选）
+DOCKERHUB_USERNAME="your-dockerhub-username"
+DOCKERHUB_TOKEN="dckr_pat_xxxx"
+```
+
+### 5.3 私有容器镜像库（Registry）
+
+| 变量名 | 必填 | 默认值 | 说明 |
+|---|---|---|---|
+| `MIRROR_REGISTRY_TOKEN` | 否 | - | 私有容器镜像库访问令牌，用于 `npm run image:sync` 高速清单同步或直推鉴权 |
+
+*(私有镜像库域名与推送用户名默认从 `MIRROR_REPO_URL` 自动推导对齐；若 Registry 域名与 Git 仓库域名不同，可按需可选配置 `MIRROR_REGISTRY` 显式覆盖)*
+
+```dotenv
+# 私有镜像仓库配置示例（.env 片段，按需可选）
+MIRROR_REGISTRY_TOKEN="<私有镜像库 Package Token>"
+```
+
+### 5.4 镜像同步命令使用方式
+
+项目提供了专用的独立多架构容器镜像同步工具（`scripts/image-sync.sh`）：
+
+```bash
+# 1. 检查各镜像平台远端版本发布状态（只读检查，不执行网络写入）
+npm run image:check
+
+# 2. 高速清单同步：自动将官方 GHCR 产物快速分发至私有镜像库与 Docker Hub
+npm run image:sync
+
+# 3. 后台异步静默同步：立即释放控制台，避免长耗时网络阻塞
+npm run image:sync -- --async
+
+# 4. 查看当前后台同步任务运行状态与最新日志
+npm run image:sync -- --status
+
+# 5. 安全中止正在运行的后台同步任务
+npm run image:sync -- --cancel
+
+# 6. 本地从源码完整交叉编译并推送（后备模式，需 BUILD_IMAGE_LOCAL=1 或显式指定参数）
+npm run image:sync -- --build
+```
+
+---
+
+## 6. 正式版本发布流程
+
+执行 `bash scripts/release.sh <type>` 发布新版本时，全链路采用「主线标准发版 + 按需多端同步」的协作模型：
+
+### 6.1 主线流程（必经，全自动完成）
+
+1. **代码质检与版本发布（本地秒级完成）**：
+   - 本地自动执行代码风格校验（Biome）、TypeScript 类型检查与生产构建产物验证；
+   - 自动递增版本号并更新 `CHANGELOG.md`；
+   - 自动提交 Git 标签并推送到 GitHub 主仓；
+   - 调用 API 在 GitHub 创建带有格式化更新日志的正式 Release。
+2. **云端多架构构建（GitHub Actions 全自动）**：
+   - GitHub Actions 监听到 `v*` 标签后，在云端 Runner 自动编译 `linux/amd64` 与 `linux/arm64` 镜像，并交付至 `ghcr.io`（约 5~8 分钟完成）。至此，官方正式版本发布全部完成！
+
+### 6.2 扩展流程（可选，面向私有备份）
+
+3. **多端镜像流转分发（本地/运维机按需触发）**：
+   - 若配置了 `MIRROR_*` 参数，发版脚本在第一阶段已自动将 Git 标签与 Release 同步推送至私有平台；
+   - 待官方 GHCR 镜像构建就绪后，在本地或运维节点运行 `npm run image:sync -- --async`，后台异步将镜像秒级同步至私有平台与 Docker Hub；
+   - 随时通过 `npm run image:check` 查看全网镜像就绪状态。
+
+---
+
+## 7. 数据持久化与存储结构
+
+### 7.1 目录映射关系
 
 容器采用卷挂载保证数据在升级或重建过程中持久保留：
 
@@ -248,18 +321,27 @@ MIRROR_REPO_TOKEN="<私有平台 Repository Token>"
 | `./data` | `/app/data` | 数据持久化根目录：包含 SQLite 数据库文件（`sqlite.db`）及上传素材（`uploads/`） |
 | `/var/run/docker.sock` | `/var/run/docker.sock` | Docker Engine API 套接字，用于卡片与 Widget 读取容器监控指标 |
 
-### 5.2 权限控制机制
+### 7.2 权限控制机制
 
 为防止非 root 用户写入宿主机挂载目录失败，容器启动脚本会在初始化阶段执行权限对齐：
 1. 以 root 权限读取传入的 `PUID` / `PGID`，将容器内 `nextjs` 用户的 UID/GID 修正为目标数值；
 2. 自动修正 `./data` 挂载目录的所有权为目标用户；
 3. 执行安全降权后以普通用户身份启动 Node.js 进程。
 
+### 7.3 数据物理冷备份
+
+在版本升级或系统维护前，建议对宿主机的数据挂载目录执行物理冷备份：
+```bash
+# 备份数据目录
+tar -czvf douhang-data-backup-$(date +%F).tar.gz ./data
+```
+恢复时只需停止容器，解压覆盖 `./data` 目录后重新启动容器即可。若需在应用界面内导出或导入结构化数据包，请参阅[管理指南](./ADMIN_GUIDE.md#6-数据安全与备份迁移)。
+
 ---
 
-## 6. 容器启动机制与健康检查
+## 8. 容器启动机制与健康检查
 
-### 6.1 启动流程
+### 8.1 启动流程
 
 容器启动入口由 `docker-entrypoint.sh` 统一调度，执行顺序如下：
 1. **环境与权限校验**：校验 `AUTH_PASSWORD` 强度与合规性；探测 `docker.sock` 权限组并调整用户组归属；
@@ -268,7 +350,7 @@ MIRROR_REPO_TOKEN="<私有平台 Repository Token>"
 4. **数据初始化（`scripts/seed.ts`）**：若数据库为空，写入默认管理员凭据与预设搜索引擎；已有数据时自动跳过；
 5. **启动应用服务（`node server.js`）**：拉起 Next.js 生产独立服务（监听 `0.0.0.0:3000`）。
 
-### 6.2 容器健康检查
+### 8.2 容器健康检查
 
 应用内置 `/api/health` 探活路由（无需认证，用于探测 HTTP 可达性与数据库连通性）。
 
@@ -285,11 +367,11 @@ docker inspect --format '{{.State.Health.Status}}' douhang
 
 ---
 
-## 7. 反向代理与 HTTPS 配置
+## 9. 反向代理与 HTTPS 配置
 
 在生产环境中，建议通过 Nginx、Caddy 或 Traefik 等反向代理暴露服务并配置 SSL 证书。
 
-### 7.1 配置要点
+### 9.1 配置要点
 
 1. **域名与回调地址**：
    在 `.env` 中设置 `AUTH_URL=https://douhang.example.com`，NextAuth 会据此生成正确的重定向与登录回调地址。
@@ -298,7 +380,7 @@ docker inspect --format '{{.State.Health.Status}}' douhang
 3. **API 路由放行**：
    不得拦截或缓存 `/api/` 路由（例如 qBittorrent 与 Docker 监控等 Widget 依赖实时 API）。
 
-### 7.2 Nginx 示例配置
+### 9.2 Nginx 示例配置
 
 ```nginx
 server {
@@ -333,9 +415,9 @@ server {
 
 ---
 
-## 8. 版本升级
+## 10. 版本升级
 
-### 8.1 镜像部署升级
+### 10.1 镜像部署升级
 
 1. 修改 `docker-compose.prod.yml` 中的镜像标签（若使用 `latest` 则保持不变）；
 2. 拉取最新镜像并重启容器：
@@ -345,7 +427,7 @@ server {
    ```
 3. 容器启动时会自动执行 `prisma migrate deploy` 应用结构迁移，无需手动干预。
 
-### 8.2 源码部署升级
+### 10.2 源码部署升级
 
 1. 拉取最新代码：
    ```bash
@@ -356,61 +438,41 @@ server {
    docker compose up -d --build
    ```
 
-### 8.3 升级注意事项
+### 10.3 升级注意事项
 
 - **密码校验防护**：确保 `.env` 中的 `AUTH_PASSWORD` 处于已配置状态。升级重启时容器依然会执行格式校验。
 - **数据兼容保障**：系统采用增量数据库迁移，升级不会覆盖或清除卡片、分类及个性化配置数据。为防极端意外，升级前仍建议执行数据备份。
 
 ---
 
-## 9. 数据备份与恢复
+## 11. 常见问题排查（FAQ）
 
-### 9.1 应用内一键备份（推荐）
-
-1. **导出备份**：
-   以管理员身份登录后，进入「设置 → 通用 → 数据备份与恢复」，点击导出备份。系统将生成打包 ZIP 文件，包含全量业务数据（`backup.json`）与自定义上传素材（`uploads/` 目录）。
-2. **导入恢复**：
-   在新实例或重置后的环境中，在同一界面上传备份 ZIP 或 JSON 文件，系统会自动校验并恢复全量数据。
-
-### 9.2 文件系统物理备份
-
-直接备份宿主机的数据挂载目录即可完成冷备份：
-```bash
-# 备份数据目录
-tar -czvf douhang-data-backup-$(date +%F).tar.gz ./data
-```
-恢复时只需停止容器，解压覆盖 `./data` 目录后重新启动容器。
-
----
-
-## 10. 常见问题排查（FAQ）
-
-### 10.1 Docker 监控组件显示无数据或状态降级
+### 11.1 Docker 监控组件显示无数据或状态降级
 
 - **排查原因**：宿主机 `docker.sock` 套接字未授予容器内运行用户读取权限。
 - **解决方案**：
   在宿主机运行 `stat -c %g /var/run/docker.sock` 获取 GID（如 `998`），在 `.env` 中设置 `DOCKER_GID=998` 并重启容器。容器启动脚本会自动将运行用户加入该权限组。
 
-### 10.2 数据目录权限拒绝（EACCES: permission denied）
+### 11.2 数据目录权限拒绝（EACCES: permission denied）
 
 - **排查原因**：宿主机 `./data` 目录由 root 账号自动创建，容器内普通用户无权写入。
 - **解决方案**：
   在 `.env` 中指定宿主机当前用户的 UID 与 GID：`PUID=$(id -u) PGID=$(id -g)`，重启容器即可自动完成权限对齐。亦可在宿主机手动授权：`chown -R 1001:1001 ./data`。
 
-### 10.3 忘记管理员登录口令
+### 11.3 忘记管理员登录口令
 
 - **解决方案**：
   由于口令经过哈希加密存储，目前无直接命令行重置指令。
   最彻底的重置方式是停止容器，移除 `./data/sqlite.db` 数据库文件后重新启动，系统会读取 `.env` 中的 `AUTH_PASSWORD` 重新建立管理员账号。
   > **警告**：该操作会清空数据库内配置与卡片信息，操作前请务必先对 `./data` 目录进行物理备份。
 
-### 10.4 登录后提示 `JWTSessionError: no matching decryption secret`
+### 11.4 登录后提示 `JWTSessionError: no matching decryption secret`
 
 - **排查原因**：更换过 `.env` 中的 `AUTH_SECRET`，导致浏览器 Cookie 中遗留的旧 Token 无法被新密钥解密。
 - **解决方案**：
   清除浏览器对应域名的 Cookie，或使用浏览器隐私/无痕模式重新登录。生产环境部署后请固定 `AUTH_SECRET`，避免随意变更。
 
-### 10.5 升级后页面报错或迁移异常
+### 11.5 升级后页面报错或迁移异常
 
 - **排查原因**：容器未成功完成数据库迁移。
 - **解决方案**：

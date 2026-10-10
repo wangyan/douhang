@@ -3,20 +3,20 @@ import pkg from '../../package.json';
 /** 应用版本号（package.json 单一来源，不含 v 前缀），用于设置页展示 */
 export const APP_VERSION = pkg.version;
 
-/** 获取配置的代码托管平台域名（默认：github.com） */
+/** 获取配置的主代码托管平台域名（默认：github.com） */
 export function getCodeHost(): string {
   return (
-    process.env.NEXT_PUBLIC_CODE_HOST ||
-    process.env.CODE_HOST ||
+    process.env.NEXT_PUBLIC_MAIN_GIT_HOST ||
+    process.env.MAIN_GIT_HOST ||
     'github.com'
   ).trim();
 }
 
-/** 获取配置的仓库路径（默认：wangyan/douhang） */
+/** 获取配置的主仓库路径（默认：wangyan/douhang） */
 export function getRepoName(): string {
   return (
-    process.env.NEXT_PUBLIC_REPO_NAME ||
-    process.env.REPO_NAME ||
+    process.env.NEXT_PUBLIC_MAIN_REPO_NAME ||
+    process.env.MAIN_REPO_NAME ||
     'wangyan/douhang'
   ).trim();
 }
