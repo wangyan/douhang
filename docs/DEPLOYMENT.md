@@ -192,31 +192,48 @@ GitHub 为本项目唯一的公开开源仓库（`https://github.com/wangyan/dou
 
 若维护者拥有自建的私有镜像/备份平台（如私有 Git 仓库、私有 Docker 镜像库），发版流水线支持在向 GitHub 发布公开版本的同时，自动将多架构 Docker 镜像、Git 标签与 Release 同步推送至私有镜像平台。
 
-在本地 `.env`（已被 `.gitignore` 忽略，不入库）中配置私有镜像平台参数：
+### 4.1 多架构镜像构建模式
+
+镜像分发支持**云端全自动分发**（推荐）与**本地直推**两种模式：
+
+1. **云端全自动分发（默认，推荐）**：
+   - 运行 `bash scripts/release.sh <type>` 仅负责代码质检、生产构建、打 Tag 并推送 Git 与创建 Release（秒级完成，本地零机器负载）；
+   - GitHub Actions 监听到 `v*` 标签后，在云端自动化执行 `linux/amd64` 与 `linux/arm64` 跨架构编译并推送到 `ghcr.io`；
+   - 若在 GitHub 仓库 Secrets 中配置了 `MIRROR_REGISTRY`、`MIRROR_USERNAME`、`MIRROR_PASSWORD`，云端流水线将并行推送到私有镜像库。
+2. **本地直推（后备模式）**：
+   - 若未配置云端 Actions 或需要在本地网络直推，可在环境变量或 `.env` 中设置 `BUILD_DOCKER_LOCAL=1`；
+   - 此时脚本将调用本地 Docker Buildx 编译并直接 `--push` 推送至 `ghcr.io`（需 `PACKAGE_TOKEN`）与私有镜像库（需 `MIRROR_PACKAGE_TOKEN`）。
+
+### 4.2 本地发布与同步配置
+
+在本地 `.env`（已被 `.gitignore` 忽略，不入库）中配置私有平台参数：
 
 | 变量名 | 必填 | 默认值 | 说明 |
 |---|---|---|---|
+| `BUILD_DOCKER_LOCAL` | 否 | `0` | 是否在本地执行 Docker 交叉编译并推送（`1` 为开启，默认 `0` 由云端构建） |
+| `PACKAGE_TOKEN` | 否 | - | GitHub Packages 推送令牌（仅 `BUILD_DOCKER_LOCAL=1` 时必填） |
 | `MIRROR_REPO_URL` | 否 | - | 私有 Git 仓库地址（如 `ssh://git@mirror.example.com/owner/douhang.git`） |
 | `MIRROR_CODE_HOST` | 否 | - | 私有托管平台域名（如 `mirror.example.com`），用于调用 API 创建 Release |
 | `MIRROR_REPO_NAME` | 否 | 同主仓库名 | 私有平台仓库路径 |
 | `MIRROR_CONTAINER_REGISTRY` | 否 | 同 `MIRROR_CODE_HOST` | 私有容器镜像库域名 |
 | `MIRROR_DOCKER_USER` | 否 | 自动提取属主 | 私有镜像库登录用户 |
 | `MIRROR_REPO_TOKEN` | 否 | - | 私有平台 API 令牌（用于创建 Release） |
-| `MIRROR_PACKAGE_TOKEN` | 否 | - | 私有镜像库推送令牌（用于推送 Docker 镜像） |
+| `MIRROR_PACKAGE_TOKEN` | 否 | - | 私有镜像库推送令牌（仅本地直推私有镜像库时使用） |
 
 ```dotenv
 # 私有镜像平台同步配置示例
+# BUILD_DOCKER_LOCAL=0
 MIRROR_REPO_URL="ssh://git@mirror.example.com/owner/douhang.git"
 MIRROR_CODE_HOST="mirror.example.com"
 MIRROR_CONTAINER_REGISTRY="mirror.example.com"
 MIRROR_REPO_TOKEN="<私有平台 Repository Token>"
-MIRROR_PACKAGE_TOKEN="<私有镜像库 Package Token>"
+# MIRROR_PACKAGE_TOKEN="<私有镜像库 Package Token，仅本地构建时需提供>"
 ```
 
 执行 `bash scripts/release.sh <type>` 时，流水线将自动完成：
-1. **多架构 Docker 镜像**：单次 Buildx 同时推送至 `ghcr.io` 与私有镜像库；
-2. **Git 代码与标签**：推送到 `origin`（GitHub）并同步推送到 `MIRROR_REPO_URL`；
-3. **Release 发布**：同时在 GitHub 与私有平台 API 创建带有更新日志的正式 Release。
+1. **Git 代码与标签**：推送到 `origin`（GitHub）并同步推送到 `MIRROR_REPO_URL`；
+2. **Release 发布**：同时在 GitHub 与私有平台 API 创建带有更新日志的正式 Release；
+3. **多架构 Docker 镜像**：由 GitHub Actions 云端（或本地 Buildx 当 `BUILD_DOCKER_LOCAL=1` 时）自动构建并分发。
 
 ---
 

@@ -71,7 +71,9 @@ MIRROR_CONTAINER_REGISTRY="${MIRROR_CONTAINER_REGISTRY:-${MIRROR_CODE_HOST:-}}"
 MIRROR_DOCKER_USER="${MIRROR_DOCKER_USER:-${MIRROR_REPO_NAME%%/*}}"
 
 [[ -n "${REPO_TOKEN:-}" ]] || fail "未在环境变量或 .env 中找到 REPO_TOKEN（需具备仓库 Release/推送权限）"
-[[ -n "${PACKAGE_TOKEN:-}" ]] || fail "未在环境变量或 .env 中找到 PACKAGE_TOKEN（需具备容器镜像库推送权限）"
+if [[ "${BUILD_DOCKER_LOCAL:-0}" -eq 1 ]]; then
+  [[ -n "${PACKAGE_TOKEN:-}" ]] || fail "启用本地 Docker 构建时，未在环境变量或 .env 中找到 PACKAGE_TOKEN"
+fi
 
 current_version=$(node -p "require('./package.json').version")
 if [[ $release_mode =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
@@ -192,30 +194,34 @@ fi
 release_committed=1
 git tag -a "$tag" -m "Release $tag"
 
-printf '==> 发布 %s：多架构 Docker 构建并推送\n' "$tag"
-docker info >/dev/null
-echo "$PACKAGE_TOKEN" | docker login "$CONTAINER_REGISTRY" -u "$DOCKER_USER" --password-stdin >/dev/null
+if [[ "${BUILD_DOCKER_LOCAL:-0}" -eq 1 ]]; then
+  printf '==> 发布 %s：本地多架构 Docker 构建并推送\n' "$tag"
+  docker info >/dev/null
+  echo "$PACKAGE_TOKEN" | docker login "$CONTAINER_REGISTRY" -u "$DOCKER_USER" --password-stdin >/dev/null
 
-build_tags=("-t" "$image:$next_version" "-t" "$image:latest")
+  build_tags=("-t" "$image:$next_version" "-t" "$image:latest")
 
-if [ -n "${MIRROR_CONTAINER_REGISTRY:-}" ] && [ -n "${MIRROR_PACKAGE_TOKEN:-}" ]; then
-  printf '==> 登录镜像容器镜像库：%s\n' "$MIRROR_CONTAINER_REGISTRY"
-  echo "$MIRROR_PACKAGE_TOKEN" | docker login "$MIRROR_CONTAINER_REGISTRY" -u "$MIRROR_DOCKER_USER" --password-stdin >/dev/null
-  mirror_image="$MIRROR_CONTAINER_REGISTRY/$MIRROR_REPO_NAME"
-  build_tags+=("-t" "$mirror_image:$next_version" "-t" "$mirror_image:latest")
+  if [ -n "${MIRROR_CONTAINER_REGISTRY:-}" ] && [ -n "${MIRROR_PACKAGE_TOKEN:-}" ]; then
+    printf '==> 登录镜像容器镜像库：%s\n' "$MIRROR_CONTAINER_REGISTRY"
+    echo "$MIRROR_PACKAGE_TOKEN" | docker login "$MIRROR_CONTAINER_REGISTRY" -u "$MIRROR_DOCKER_USER" --password-stdin >/dev/null
+    mirror_image="$MIRROR_CONTAINER_REGISTRY/$MIRROR_REPO_NAME"
+    build_tags+=("-t" "$mirror_image:$next_version" "-t" "$mirror_image:latest")
+  fi
+
+  # --load 无法装载多平台 manifest，双架构需直接 --push 到镜像仓库。
+  # arm64 在 x86 主机走 QEMU 模拟（Docker Desktop VM 需已注册 binfmt：
+  # docker run --privileged --rm tonistiigi/binfmt --install arm64）。
+  # 可用 BUILDX_BUILDER 覆盖构建器（默认走 buildx 当前所选 builder）。
+  docker buildx build \
+    ${BUILDX_BUILDER:+--builder "$BUILDX_BUILDER"} \
+    --platform linux/amd64,linux/arm64 \
+    --build-arg REPO_URL="$repo_url" \
+    "${build_tags[@]}" \
+    --push \
+    .
+else
+  printf '==> 发布 %s：多架构 Docker 镜像将由 GitHub Actions 自动构建并并行推送（GHCR + 私有镜像库）\n' "$tag"
 fi
-
-# --load 无法装载多平台 manifest，双架构需直接 --push 到镜像仓库。
-# arm64 在 x86 主机走 QEMU 模拟（Docker Desktop VM 需已注册 binfmt：
-# docker run --privileged --rm tonistiigi/binfmt --install arm64）。
-# 可用 BUILDX_BUILDER 覆盖构建器（默认走 buildx 当前所选 builder）。
-docker buildx build \
-  ${BUILDX_BUILDER:+--builder "$BUILDX_BUILDER"} \
-  --platform linux/amd64,linux/arm64 \
-  --build-arg REPO_URL="$repo_url" \
-  "${build_tags[@]}" \
-  --push \
-  .
 
 printf '==> 发布 %s：推送 Git\n' "$tag"
 git push origin main "$tag"

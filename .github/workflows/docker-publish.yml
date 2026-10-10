@@ -1,0 +1,112 @@
+name: Docker Build & Push
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# 并发保护：同一个 ref 重复触发时自动取消在途旧作业，避免资源浪费与推送冲突
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  docker:
+    name: Build & Push Multi-Arch Docker Images
+    runs-on: ubuntu-latest
+    timeout-minutes: 60 # 兜底超时保护，防止 QEMU 模拟跨架构构建在异常时无限期挂起
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check private mirror configuration
+        id: check-mirror
+        env:
+          MIRROR_REGISTRY: ${{ secrets.MIRROR_REGISTRY }}
+          MIRROR_USERNAME: ${{ secrets.MIRROR_USERNAME }}
+          MIRROR_PASSWORD: ${{ secrets.MIRROR_PASSWORD }}
+        run: |
+          if [ -n "$MIRROR_REGISTRY" ] && [ -n "$MIRROR_USERNAME" ] && [ -n "$MIRROR_PASSWORD" ]; then
+            echo "enabled=true" >> $GITHUB_OUTPUT
+            echo "==> 私有镜像平台凭据已完整配置，将同步分发构建镜像"
+          else
+            echo "enabled=false" >> $GITHUB_OUTPUT
+            echo "==> 未完整配置私有镜像凭据，跳过私有镜像库推送（仅分发至 GHCR）"
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Private Mirror Registry
+        if: steps.check-mirror.outputs.enabled == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.MIRROR_REGISTRY }}
+          username: ${{ secrets.MIRROR_USERNAME }}
+          password: ${{ secrets.MIRROR_PASSWORD }}
+
+      - name: Prepare container image list
+        id: prep
+        env:
+          ENABLE_MIRROR: ${{ steps.check-mirror.outputs.enabled }}
+          GITHUB_REPO: ${{ github.repository }}
+          MIRROR_REGISTRY: ${{ secrets.MIRROR_REGISTRY }}
+          MIRROR_REPO: ${{ secrets.MIRROR_REPO_NAME }}
+        run: |
+          # 必须全部转为小写，防止 GitHub 用户名或仓库名含大写字母触发 OCI 命名校验失败
+          LOWER_GH_REPO=$(echo "$GITHUB_REPO" | tr '[:upper:]' '[:lower:]')
+          IMAGES="ghcr.io/${LOWER_GH_REPO}"
+
+          if [ "$ENABLE_MIRROR" = "true" ]; then
+            TARGET_MIRROR_REPO="$MIRROR_REPO"
+            if [ -z "$TARGET_MIRROR_REPO" ]; then
+              TARGET_MIRROR_REPO="$LOWER_GH_REPO"
+            else
+              TARGET_MIRROR_REPO=$(echo "$TARGET_MIRROR_REPO" | tr '[:upper:]' '[:lower:]')
+            fi
+            LOWER_MIRROR_REGISTRY=$(echo "$MIRROR_REGISTRY" | tr '[:upper:]' '[:lower:]')
+            IMAGES="${IMAGES},${LOWER_MIRROR_REGISTRY}/${TARGET_MIRROR_REPO}"
+          fi
+
+          echo "images=${IMAGES}" >> $GITHUB_OUTPUT
+          echo "==> 目标推送镜像列表: ${IMAGES}"
+
+      - name: Extract Docker metadata (Tags & Labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.prep.outputs.images }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{version}},prefix=v
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=ref,event=branch
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false # 保持最高兼容性，避免部分自建私有 Registry 不兼容 OCI attestation
+          build-args: |
+            REPO_URL=${{ github.server_url }}/${{ github.repository }}

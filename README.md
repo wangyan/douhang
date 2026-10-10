@@ -118,7 +118,7 @@ bash scripts/release.sh patch
 # bash scripts/release.sh major
 ```
 
-自动化脚本将依次执行：环境变量与凭据校验 → 版本号自动递增 → 生成更新日志 JSON → 运行 Biome 与 TypeScript 质量检查 → 生产构建 → 提交与打 Tag → 多架构 Docker 镜像构建推送 → 推送 Git 标签并创建 Release。
+自动化流程将依次执行：凭据校验 → 版本号自动递增 → 生成更新日志 JSON → 运行 Biome 与 TypeScript 质量检查 → 生产构建 → 提交与打 Tag → 推送 Git 标签并创建 Release → GitHub Actions 云端自动构建双架构 Docker 镜像并推送。
 
 完整代码提交格式、凭据配置与发版异常恢复详见[贡献指南](./docs/CONTRIBUTING.md)。
 

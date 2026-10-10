@@ -100,14 +100,11 @@ fix(搜索): 修复拼音首字母匹配在包含数字的卡片上失效的问�
 ### 3.2 发布前置准备
 
 1. **工作区状态**：切换至 `main` 分支，且工作区保持干净无未提交变更（`git status` 为 clean）；
-2. **环境凭据就绪**（详见 [官方文档](https://docs.github.com/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens)；由于 GitHub 细粒度 Token 暂未支持 Packages，推荐采用权限隔离配置）：
-   - **安全推荐（权限隔离，无全局代码权限）**：
-     - `REPO_TOKEN`：使用 [Fine-grained tokens](https://github.com/settings/personal-access-tokens/new)，仅勾选 `douhang` 仓库的 `Contents: Read and write` 权限（用于创建 Release 与推送标签）；
-     - `PACKAGE_TOKEN`：使用 [Tokens (classic)](https://github.com/settings/tokens)，**仅勾选 `write:packages`**（切勿勾选 `repo`，不给予任何仓库代码读写权限，仅用于推送 `ghcr.io` 镜像）；
-   - **简易方式（单 Token）**：在 Tokens (classic) 中同时勾选 `repo` 与 `write:packages`，两者填入同一个 Token；
-   - （可选）私有镜像平台参数（`MIRROR_*`）：若需同步发布至私有镜像平台，在 `.env` 配置对应地址与令牌（详见[部署指南](./DEPLOYMENT.md)第 4.3 节）。
-3. **Docker 引擎**：Docker 服务正常运行，且支持 `docker buildx` 多架构镜像构建；
-4. **变更日志确认**：提前在 `CHANGELOG.md` 顶部整理好当前版本的 `### 亮点` 与变更条目。
+2. **环境凭据就绪**（仅需单个细粒度 Token，本地无需镜像推送权限）：
+   - `REPO_TOKEN`：在 [Fine-grained tokens](https://github.com/settings/personal-access-tokens/new) 中仅勾选 `douhang` 仓库的 `Contents: Read and write` 权限（用于创建 Release 与推送标签）；
+   - （说明）：**Docker 镜像由 GitHub Actions 云端自动构建并推送**，无需在本地配置 `PACKAGE_TOKEN`，亦无需在本地运行 Docker 引擎；（若需本地直接编译推送，可设置 `BUILD_DOCKER_LOCAL=1` 并配置 `PACKAGE_TOKEN` 作为后备）；
+   - （可选）私有镜像平台参数（`MIRROR_*`）：若需同步发布至私有镜像平台，可在 `.env` 配置对应地址与令牌，并在 GitHub 仓库 Secrets 中配置 `MIRROR_REGISTRY`、`MIRROR_USERNAME`、`MIRROR_PASSWORD` 实现云端双推。
+3. **变更日志确认**：提前在 `CHANGELOG.md` 顶部整理好当前版本的 `### 亮点` 与变更条目。
 
 ### 3.3 执行发布命令
 
@@ -120,6 +117,9 @@ bash scripts/release.sh patch
 # 或发布特性版本 / 主版本
 # bash scripts/release.sh minor
 # bash scripts/release.sh major
+
+# （可选）在本地直接进行跨架构 Docker 构建并推送（后备模式）
+# BUILD_DOCKER_LOCAL=1 bash scripts/release.sh minor
 ```
 
 **首次发布**：当 `package.json` 的版本号已是待发布版本且远端尚无同名 Tag 时，使用**显式版本号**调用：
@@ -127,7 +127,7 @@ bash scripts/release.sh patch
 bash scripts/release.sh 1.0.0
 ```
 
-> **自动化流水线动作**：凭据校验 → 升级版本号与编排示例 → 重新生成更新日志 JSON → 执行 Biome 与 TypeScript 质检 → 生产构建 → 生成版本提交与 Git Tag → Docker Buildx 双架构镜像构建推送 → 推送 Git 标签与分支 → 调用 API 创建正式 Release。
+> **自动化流水线动作**：凭据校验 → 升级版本号与编排示例 → 重新生成更新日志 JSON → 执行 Biome 与 TypeScript 质检 → 生产构建 → 生成版本提交与 Git Tag → 推送 Git 标签与分支 → 调用 API 创建正式 Release → GitHub Actions 云端自动执行多架构 Docker 构建并并行推送（GHCR + 私有镜像库）。
 
 ### 3.4 异常处理与恢复
 
