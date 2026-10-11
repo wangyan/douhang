@@ -1,5 +1,5 @@
 # 多阶段构建：deps → builder → runner
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
 # 安装全部依赖（含 devDependencies），供 builder 阶段类型检查与构建使用
@@ -7,14 +7,14 @@ COPY package.json package-lock.json* ./
 ENV HUSKY=0
 RUN npm ci
 
-FROM node:22-alpine AS prod-deps
+FROM node:24-alpine AS prod-deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev --ignore-scripts
 # --ignore-scripts 跳过依赖安装脚本；此处显式执行 @prisma/engines 的引擎下载，
 # 使 schema-engine 在构建期落入镜像，运行时离线可用
 RUN node node_modules/@prisma/engines/scripts/postinstall.js
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -29,7 +29,7 @@ RUN mkdir -p data
 RUN npx prisma migrate deploy
 RUN npm run build
 
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
