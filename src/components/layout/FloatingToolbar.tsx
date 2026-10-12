@@ -11,8 +11,6 @@ import {
   ArrowUpCircle,
   BookOpenText,
   Check,
-  ChevronLeft,
-  ChevronRight,
   CircleUserRound,
   Command,
   Grid2x2,
@@ -87,43 +85,32 @@ interface FloatingToolbarProps {
  * 分区逻辑：环境（网络/主题）｜ 视图（⌘/Widget/简洁）｜ 模式（编辑/批量）｜ 账户
  * 高频操作直达，低频配置在设置页，账户菜单只做导航。
  */
-/** ESC 逐层退出画布模式：批量删除 → 编辑模式 → 折叠工具栏（由本 hook 统一监听） */
+/** ESC 逐层退出画布模式：批量删除 → 编辑模式（由本 hook 统一监听） */
 function useEscapeExitModes(
   editMode: boolean,
   batchMode: boolean,
-  expanded: boolean,
   dispatchEditModeChange: (value: boolean) => void,
   dispatchBatchModeChange: (value: boolean) => void,
-  setExpanded: (value: boolean) => void,
 ) {
   useEffect(() => {
-    if (!editMode && !batchMode && !expanded) return;
+    if (!editMode && !batchMode) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         // 打开中的原生 dialog / 命令面板消费 ESC 时不退出画布模式
         if (e.defaultPrevented || document.querySelector('dialog[open]')) {
           return;
         }
-        // 逐层退出：优先退出批量选择模式，其次退出编辑模式，最后折叠工具栏
+        // 逐层退出：优先退出批量选择模式，其次退出编辑模式
         if (batchMode) {
           dispatchBatchModeChange(false);
         } else if (editMode) {
           dispatchEditModeChange(false);
-        } else if (expanded) {
-          setExpanded(false);
         }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [
-    editMode,
-    batchMode,
-    expanded,
-    dispatchEditModeChange,
-    dispatchBatchModeChange,
-    setExpanded,
-  ]);
+  }, [editMode, batchMode, dispatchEditModeChange, dispatchBatchModeChange]);
 }
 /** 环境区按钮：网络模式 + 主题循环（高频，各自循环/切换） */
 function ToolbarEnvCluster({
@@ -278,9 +265,6 @@ export function FloatingToolbar({
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [batchMode, setBatchMode] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  // 编辑态或批量删除态下强制保持展开，避免用户无法退出编辑
-  const isExpanded = expanded || editMode || batchMode;
   const [simpleMode, setSimpleMode] = useState(cardSimpleMode);
   const [netMode, setNetMode] = useState<NetworkMode>(networkMode);
   const { mode, resolved, setMode } = useTheme();
@@ -344,23 +328,6 @@ export function FloatingToolbar({
     );
   }, []);
 
-  // 折叠 / 展开工具栏切换：退出时同步退出编辑与批量删除状态
-  const handleToggleExpand = useCallback(() => {
-    if (isExpanded) {
-      if (batchMode) dispatchBatchModeChange(false);
-      if (editMode) dispatchEditModeChange(false);
-      setExpanded(false);
-    } else {
-      setExpanded(true);
-    }
-  }, [
-    isExpanded,
-    batchMode,
-    editMode,
-    dispatchBatchModeChange,
-    dispatchEditModeChange,
-  ]);
-
   // 监听外部触发的编辑模式变更（如 WidgetBar 添加 widget 后自动进入编辑态）
   useEffect(() => {
     const handler = (e: Event) => {
@@ -391,14 +358,12 @@ export function FloatingToolbar({
     return () => window.removeEventListener(CARD_SIMPLE_MODE_EVENT, handler);
   }, []);
 
-  // ESC 逐层退出画布模式：批量删除 → 编辑模式 → 折叠工具栏（由 useEscapeExitModes 统一监听）
+  // ESC 逐层退出画布模式：批量删除 → 编辑模式（由 useEscapeExitModes 统一监听）
   useEscapeExitModes(
     editMode,
     batchMode,
-    expanded,
     dispatchEditModeChange,
     dispatchBatchModeChange,
-    setExpanded,
   );
 
   // 监听设置页触发的网络模式变更，保持工具栏同步
@@ -492,69 +457,48 @@ export function FloatingToolbar({
       <HStack
         gap={1}
         align="center"
-        className={`${withinFrame ? 'absolute' : 'fixed'} top-6 right-4 md:right-6 z-chrome rounded-full bg-surface/80 backdrop-blur-md border border-border shadow-float ${isExpanded ? 'px-1.5 py-1 sm:px-2 md:px-3' : 'px-1.5 py-1 sm:px-2'} transition-all duration-300 ease-out`}
+        className={`${withinFrame ? 'absolute' : 'fixed'} top-6 right-4 md:right-6 z-chrome rounded-full bg-surface/80 backdrop-blur-md border border-border shadow-float px-1.5 py-1 sm:px-2 md:px-3`}
       >
-        <IconButton
-          label={isExpanded ? '折叠工具栏' : '展开工具栏'}
-          icon={
-            isExpanded ? (
-              <ChevronRight size={ICON_SIZE.md} />
-            ) : (
-              <ChevronLeft size={ICON_SIZE.md} />
-            )
-          }
-          variant="ghost"
-          tooltip={isExpanded ? '折叠工具栏' : '展开工具栏'}
-          onClick={handleToggleExpand}
+        {/* 环境区：网络模式 + 主题（高频，各自循环/切换） */}
+        <ToolbarEnvCluster
+          netMode={netMode}
+          onCycleNetwork={handleCycleNetworkMode}
+          mode={mode}
+          resolved={resolved}
+          onCycleTheme={handleCycleTheme}
         />
 
-        {isExpanded && (
+        {/* 视图区：显示开关 */}
+        <ToolbarViewCluster
+          onOpenCmdK={() => setCmdKOpen(true)}
+          simpleMode={simpleMode}
+          onToggleSimpleMode={handleToggleSimpleMode}
+        />
+
+        {/* 模式区：仅登录用户可见（Widget 显隐、编辑模式、批量删除） */}
+        {isAuthed && (
+          <ToolbarModeCluster
+            widgetBarVisible={widgetBarVisible}
+            onToggleWidgetBar={() => setWidgetBarVisible(!widgetBarVisible)}
+            editMode={editMode}
+            batchMode={batchMode}
+            showBatch={pathname === '/'}
+            dispatchEditModeChange={dispatchEditModeChange}
+            dispatchBatchModeChange={dispatchBatchModeChange}
+          />
+        )}
+
+        {/* 更新提醒：仅登录态检查与展示，浮层关闭后才出现的常驻入口，直达关于弹窗 */}
+        {isAuthed && dismissedUpdate && (
           <>
-            {/* hairline 分隔：折叠箭头 | 环境区 */}
-            <span className="mx-1 h-5 w-px bg-border" aria-hidden />
-
-            {/* 环境区：网络模式 + 主题（高频，各自循环/切换） */}
-            <ToolbarEnvCluster
-              netMode={netMode}
-              onCycleNetwork={handleCycleNetworkMode}
-              mode={mode}
-              resolved={resolved}
-              onCycleTheme={handleCycleTheme}
+            <span className="mx-2 h-5 w-px bg-border" aria-hidden />
+            <IconButton
+              label={`新版本 ${dismissedUpdate.tag} 可用`}
+              icon={<ArrowUpCircle size={ICON_SIZE.md} />}
+              variant="secondary"
+              tooltip={`新版本 ${dismissedUpdate.tag} 可用，点击查看更新日志`}
+              onClick={() => setAboutOpen(true)}
             />
-
-            {/* 视图区：显示开关 */}
-            <ToolbarViewCluster
-              onOpenCmdK={() => setCmdKOpen(true)}
-              simpleMode={simpleMode}
-              onToggleSimpleMode={handleToggleSimpleMode}
-            />
-
-            {/* 模式区：仅登录用户可见（Widget 显隐、编辑模式、批量删除） */}
-            {isAuthed && (
-              <ToolbarModeCluster
-                widgetBarVisible={widgetBarVisible}
-                onToggleWidgetBar={() => setWidgetBarVisible(!widgetBarVisible)}
-                editMode={editMode}
-                batchMode={batchMode}
-                showBatch={pathname === '/'}
-                dispatchEditModeChange={dispatchEditModeChange}
-                dispatchBatchModeChange={dispatchBatchModeChange}
-              />
-            )}
-
-            {/* 更新提醒：仅登录态检查与展示，浮层关闭后才出现的常驻入口，直达关于弹窗 */}
-            {isAuthed && dismissedUpdate && (
-              <>
-                <span className="mx-2 h-5 w-px bg-border" aria-hidden />
-                <IconButton
-                  label={`新版本 ${dismissedUpdate.tag} 可用`}
-                  icon={<ArrowUpCircle size={ICON_SIZE.md} />}
-                  variant="secondary"
-                  tooltip={`新版本 ${dismissedUpdate.tag} 可用，点击查看更新日志`}
-                  onClick={() => setAboutOpen(true)}
-                />
-              </>
-            )}
           </>
         )}
 
