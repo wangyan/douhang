@@ -8,9 +8,14 @@ import { CardPreviewDialog } from '@/components/cards/CardPreviewDialog';
 import { StatusDot } from '@/components/cards/StatusDot';
 import { IconImage } from '@/components/icons/IconImage';
 import { ICON_SIZE } from '@/lib/design-tokens';
-import type { CardStatus, Card as CardType } from '@/types';
+import {
+  CARD_DENSITY_CONFIGS,
+  type CardDensity,
+  type CardStatus,
+  type Card as CardType,
+} from '@/types';
 
-/** 卡片视觉宽度，拖拽预览与网格间距计算共用 */
+/** 默认卡片视觉宽度（向后兼容） */
 export const CARD_WIDTH = 80;
 
 interface CardItemProps {
@@ -27,6 +32,8 @@ interface CardItemProps {
   onDelete?: () => void;
   /** 简洁模式：仅图标，不显示标题 */
   simple?: boolean;
+  /** 显示密度档位：compact / normal / cozy */
+  density?: CardDensity;
   /** 是否显示右上角状态徽章（默认显示） */
   showStatus?: boolean;
   /** 批量选择模式：卡片不可交互，点击切换选中 */
@@ -130,6 +137,7 @@ function CardItemImpl({
   onEdit,
   onDelete,
   simple = false,
+  density = 'normal',
   showStatus = true,
   selectionMode = false,
   selected = false,
@@ -140,6 +148,10 @@ function CardItemImpl({
   // 弹框预览开关（点击 openInDialog 卡片 / 右键「弹框打开」）
   const [previewOpen, setPreviewOpen] = useState(false);
 
+  const densityMode = density ?? 'normal';
+  const config = CARD_DENSITY_CONFIGS[densityMode];
+  const cardWidth = config.cardWidth;
+
   const cardVisual = (
     <CardItemVisual
       card={card}
@@ -148,6 +160,7 @@ function CardItemImpl({
       selectionMode={selectionMode}
       selected={selected}
       simple={simple}
+      density={densityMode}
       interactive={interactive}
     />
   );
@@ -159,7 +172,8 @@ function CardItemImpl({
         type="button"
         aria-pressed={selected}
         onClick={(e) => onToggleSelect?.(e.shiftKey)}
-        className="group inline-flex flex-col items-center gap-1.5 w-[80px] cursor-pointer focus-ring rounded-panel"
+        style={{ width: cardWidth }}
+        className="group inline-flex flex-col items-center gap-1.5 cursor-pointer focus-ring rounded-panel"
       >
         {cardVisual}
       </button>
@@ -169,7 +183,10 @@ function CardItemImpl({
   // 非交互模式：渲染 <div>，用于排序模式与拖拽预览，避免 dead link
   if (!interactive) {
     return (
-      <div className="group inline-flex flex-col items-center gap-1.5 w-[80px] cursor-grab active:cursor-grabbing">
+      <div
+        style={{ width: cardWidth }}
+        className="group inline-flex flex-col items-center gap-1.5 cursor-grab active:cursor-grabbing"
+      >
         {cardVisual}
       </div>
     );
@@ -203,7 +220,8 @@ function CardItemImpl({
         }
         onClick?.();
       }}
-      className="group inline-flex flex-col items-center gap-1.5 w-[80px] focus-ring rounded-panel"
+      style={{ width: cardWidth }}
+      className="group inline-flex flex-col items-center gap-1.5 focus-ring rounded-panel"
     >
       {cardVisual}
     </a>
@@ -253,6 +271,7 @@ interface CardItemVisualProps {
   selected: boolean;
   interactive: boolean;
   simple: boolean;
+  density: CardDensity;
 }
 
 function CardItemVisual({
@@ -262,21 +281,25 @@ function CardItemVisual({
   selectionMode,
   selected,
   simple,
+  density,
   interactive = true,
 }: CardItemVisualProps) {
+  const config = CARD_DENSITY_CONFIGS[density];
+  const { cardWidth, iconSize, titleTextClass, titleHeightClass } = config;
+
   // 卡片视觉主体（由 <a> / <button> / <div> 包裹）
   return (
     <>
       <Card
-        width={CARD_WIDTH}
-        height={CARD_WIDTH}
+        width={cardWidth}
+        height={cardWidth}
         padding={0}
         className={`widget-card relative overflow-hidden transition-[translate,box-shadow] duration-200 ${interactive ? 'hover:-translate-y-px hover:shadow-md active:translate-y-0' : ''} group-focus-visible:ring-2 group-focus-visible:ring-accent ${selected ? 'ring-2 ring-accent' : ''}`}
       >
         {/* 批量选择勾选框（左上角，与右上角状态徽章对称） */}
         {selectionMode && (
           <span
-            className={`absolute top-2.5 left-2.5 z-selected flex h-3.5 w-3.5 items-center justify-center rounded-full border transition-colors ${
+            className={`absolute top-2 left-2 z-selected flex h-3.5 w-3.5 items-center justify-center rounded-full border transition-colors ${
               selected
                 ? 'border-accent bg-accent text-on-accent'
                 : 'border-border bg-surface/80'
@@ -288,14 +311,14 @@ function CardItemVisual({
 
         {/* 右上角状态徽章：可配置显隐；「未知」不渲染，避免探测完成前满屏灰点噪音 */}
         {showStatus && status !== 'unknown' && (
-          <span className="absolute top-2.5 right-2.5 z-raised flex">
+          <span className="absolute top-2 right-2 z-raised flex">
             <StatusDot status={status} />
           </span>
         )}
 
         {/* 图标居中 */}
-        <div className="w-full h-full flex items-center justify-center p-2.5">
-          <IconImage icon={card.icon} name={card.name} />
+        <div className="w-full h-full flex items-center justify-center p-2">
+          <IconImage icon={card.icon} name={card.name} size={iconSize} />
         </div>
       </Card>
 
@@ -303,7 +326,8 @@ function CardItemVisual({
       {!simple && (
         <span
           title={card.name}
-          className="block w-[80px] text-center text-xs font-medium leading-tight [overflow-wrap:anywhere] line-clamp-2 min-h-[1.75rem]"
+          style={{ width: cardWidth }}
+          className={`block text-center font-medium leading-tight [overflow-wrap:anywhere] line-clamp-2 ${titleTextClass} ${titleHeightClass}`}
         >
           {card.name}
         </span>
@@ -326,6 +350,7 @@ function areCardItemPropsEqual(a: CardItemProps, b: CardItemProps): boolean {
     a.status === b.status &&
     a.href === b.href &&
     a.simple === b.simple &&
+    a.density === b.density &&
     a.showStatus === b.showStatus &&
     a.selectionMode === b.selectionMode &&
     a.selected === b.selected &&
@@ -341,6 +366,7 @@ type ComparedDataProps =
   | 'status'
   | 'href'
   | 'simple'
+  | 'density'
   | 'showStatus'
   | 'selectionMode'
   | 'selected'

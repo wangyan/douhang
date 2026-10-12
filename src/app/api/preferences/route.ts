@@ -8,15 +8,19 @@ import {
   preferencesUpdateSchema,
   validatePreferenceValue,
 } from '@/lib/validation';
-import type { NetworkMode } from '@/types';
-import { FONT_SIZE_DEFAULT, WALLPAPER_SCRIM_DEFAULT } from '@/types';
+import type { CardDensity, NetworkMode } from '@/types';
+import {
+  CARD_DENSITY_DEFAULT,
+  FONT_SIZE_DEFAULT,
+  WALLPAPER_SCRIM_DEFAULT,
+} from '@/types';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * 用户首选项 API
  *
- * - GET: 读取全部首选项（networkMode / theme / fontSize / searchEngine / brand / cardSimpleMode / cardStatusBadge / wallpaperScrim）
+ * - GET: 读取全部首选项（networkMode / theme / fontSize / searchEngine / brand / cardDensity / cardSimpleMode / cardStatusBadge / wallpaperScrim）
  * - PATCH: 更新单个首选项（body: { key, value })
  */
 export const GET = async () => {
@@ -26,6 +30,7 @@ export const GET = async () => {
     rawFontSize,
     searchEngine,
     brand,
+    cardDensity,
     cardSimpleMode,
     cardStatusBadge,
     wallpaperScrim,
@@ -35,6 +40,7 @@ export const GET = async () => {
     getUserPreference<unknown>('fontSize', FONT_SIZE_DEFAULT),
     getUserPreference<string>('searchEngine', 'google'),
     getBrandConfig(),
+    getUserPreference<CardDensity>('cardDensity', CARD_DENSITY_DEFAULT),
     getUserPreference<boolean>('cardSimpleMode', false),
     getUserPreference<boolean>('cardStatusBadge', true),
     getUserPreference<unknown>('wallpaperScrim', WALLPAPER_SCRIM_DEFAULT),
@@ -46,6 +52,7 @@ export const GET = async () => {
     fontSize: normalizeFontSize(rawFontSize),
     searchEngine,
     brand: brand ?? DEFAULT_BRAND_CONFIG,
+    cardDensity: cardDensity ?? CARD_DENSITY_DEFAULT,
     cardSimpleMode,
     cardStatusBadge,
     wallpaperScrim:

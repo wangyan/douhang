@@ -13,6 +13,7 @@ import { ViewDisplaySetting } from '@/components/settings/ViewDisplaySetting';
 import { WallpaperManager } from '@/components/settings/WallpaperManager';
 import { DIALOG_WIDTH, ICON_SIZE } from '@/lib/design-tokens';
 import type {
+  CardDensity,
   FontSizePreference,
   Wallpaper,
   WallpaperPreferences,
@@ -24,6 +25,7 @@ export interface AppearancePanelData {
   wallpaperPreferences: WallpaperPreferences;
   wallpaperScrim: number;
   fontSize: FontSizePreference;
+  cardDensity: CardDensity;
   cardStatusBadge: boolean;
 }
 
@@ -81,7 +83,10 @@ export function AppearanceQuickPanel({
               title="显示"
               description="卡片与 Widget 横条的显示开关（与工具栏同步）"
             >
-              <ViewDisplaySetting initialCardSimpleMode={cardSimpleMode} />
+              <ViewDisplaySetting
+                initialCardSimpleMode={cardSimpleMode}
+                initialCardDensity={data.cardDensity}
+              />
             </SettingsSection>
             <WallpaperManager
               wallpapers={data.wallpapers}

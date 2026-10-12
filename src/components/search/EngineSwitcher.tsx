@@ -5,13 +5,15 @@ import { useState } from 'react';
 import { EngineIcon } from '@/components/icons/EngineIcon';
 import { ICON_SIZE } from '@/lib/design-tokens';
 import { preferencesApi } from '@/services';
-import type { SearchEngine, SearchEngineConfig } from '@/types';
+import type { CardDensity, SearchEngine, SearchEngineConfig } from '@/types';
 
 interface EngineSwitcherProps {
   /** 初始引擎 key（SSR 时从 UserPreference 读取，避免客户端闪烁） */
   initialEngine: SearchEngine;
   /** 合并引擎列表（内置 + 自定义，SSR 传入） */
   engines: SearchEngineConfig[];
+  /** 显示密度 */
+  density?: CardDensity;
   /** 引擎切换回调（SearchBox 监听用于回车跳转） */
   onChange?: (engine: SearchEngine) => void;
 }
@@ -29,11 +31,13 @@ interface EngineSwitcherProps {
 export function EngineSwitcher({
   initialEngine,
   engines,
+  density = 'normal',
   onChange,
 }: EngineSwitcherProps) {
   const [engine, setEngine] = useState<SearchEngine>(initialEngine);
 
   const currentConfig = engines.find((e) => e.key === engine) ?? engines[0];
+  const iconSize = density === 'compact' ? ICON_SIZE.md : ICON_SIZE.lg;
 
   const handleChange = async (key: SearchEngine) => {
     setEngine(key);
@@ -50,7 +54,7 @@ export function EngineSwitcher({
   const items = engines.map((e) => ({
     label: e.name,
     onClick: () => handleChange(e.key),
-    icon: <EngineIcon engine={e} size={ICON_SIZE.lg} />,
+    icon: <EngineIcon engine={e} size={iconSize} />,
   }));
 
   return (
@@ -60,7 +64,7 @@ export function EngineSwitcher({
         variant: 'ghost',
         size: 'sm',
         isIconOnly: true,
-        icon: <EngineIcon engine={currentConfig} size={ICON_SIZE.lg} />,
+        icon: <EngineIcon engine={currentConfig} size={iconSize} />,
         tooltip: currentConfig.name,
       }}
       hasChevron={false}

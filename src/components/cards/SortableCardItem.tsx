@@ -3,7 +3,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { CardItem } from '@/components/cards/CardItem';
-import type { Card, CardStatus } from '@/types';
+import type { Card, CardDensity, CardStatus } from '@/types';
 
 interface SortableCardItemProps {
   card: Card;
@@ -14,6 +14,8 @@ interface SortableCardItemProps {
   onDelete?: () => void;
   /** 简洁模式：仅图标，不显示标题 */
   simple?: boolean;
+  /** 显示密度档位：compact / normal / cozy */
+  density?: CardDensity;
   /** 是否显示右上角状态徽章 */
   showStatus?: boolean;
   /** 批量选择模式：禁用拖拽，点击切换选中 */
@@ -53,6 +55,7 @@ export function SortableCardItem({
   onEdit,
   onDelete,
   simple = false,
+  density = 'normal',
   showStatus = true,
   selectionMode = false,
   selected = false,
@@ -98,6 +101,7 @@ export function SortableCardItem({
         onEdit={onEdit}
         onDelete={onDelete}
         simple={simple}
+        density={density}
         showStatus={showStatus}
         selectionMode={selectionMode}
         selected={selected}

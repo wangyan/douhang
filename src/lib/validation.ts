@@ -425,6 +425,8 @@ const PREFERENCE_VALUE_SCHEMAS: Record<string, z.ZodSchema> = {
   /** 壁纸遮罩强度（百分比） */
   wallpaperScrim: z.number().min(WALLPAPER_SCRIM_MIN).max(WALLPAPER_SCRIM_MAX),
   searchEngine: z.string().min(1),
+  /** 卡片显示密度（auto=自动 / compact=紧凑 / normal=标准 / cozy=宽松） */
+  cardDensity: z.enum(['auto', 'compact', 'normal', 'cozy']),
   /** 卡片简洁模式（仅图标，隐藏标题） */
   cardSimpleMode: z.boolean(),
   /** 卡片状态徽章（右上角在线/离线圆点） */

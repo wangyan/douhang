@@ -4,23 +4,31 @@ import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { getCardUrl } from '@/components/cards/card-url';
 import { EngineSwitcher } from '@/components/search/EngineSwitcher';
+import { useEffectiveDensity } from '@/hooks/useEffectiveDensity';
 import { ICON_SIZE } from '@/lib/design-tokens';
 import { NETWORK_MODE_CHANGE_EVENT } from '@/lib/network-mode';
 import { preferencesApi, searchApi } from '@/services';
-import type { NetworkMode, SearchEngine, SearchEngineConfig } from '@/types';
+import type {
+  CardDensity,
+  NetworkMode,
+  SearchEngine,
+  SearchEngineConfig,
+} from '@/types';
 
 interface SearchBoxProps {
   /** 初始引擎（SSR 时从 UserPreference 读取） */
   initialEngine?: SearchEngine;
   /** 合并引擎列表（内置 + 自定义，SSR 传入） */
   engines: SearchEngineConfig[];
+  /** 显示密度 */
+  density?: CardDensity;
 }
 
 /**
  * 独立居中搜索框（主流导航站风格）
  *
  * 设计要点：
- * - 大尺寸：640px 宽，52px 高，胶囊圆角
+ * - 响应全局显示密度：紧凑 (42px) / 标准 (52px) / 宽松 (58px)
  * - 双层阴影：低高度 base + focus 时强化
  * - 用 CSS focus-within 实现 focus 反馈（避免 React state 时序问题）
  * - 左侧 EngineSwitcher（icon-only 引擎 logo）+ 分隔线 + 输入框 + 右侧 Cmd+K 提示
@@ -37,9 +45,11 @@ interface SearchBoxProps {
 export function SearchBox({
   initialEngine = 'google',
   engines,
+  density: initialDensity = 'auto',
 }: SearchBoxProps) {
   const [keyword, setKeyword] = useState('');
   const [engine, setEngine] = useState<SearchEngine>(initialEngine);
+  const density = useEffectiveDensity(initialDensity);
   // 当前网络模式：卡片直达 URL 与 CardItem 点击保持同一选择口径
   const [networkMode, setNetworkMode] = useState<NetworkMode>('auto');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -124,21 +134,52 @@ export function SearchBox({
     );
   };
 
+  const isCompact = density === 'compact';
+  const isCozy = density === 'cozy';
+  const containerMaxWidth = isCompact
+    ? 'max-w-[540px]'
+    : isCozy
+      ? 'max-w-[720px]'
+      : 'max-w-[640px]';
+  const boxHeight = isCompact ? 'h-[42px]' : isCozy ? 'h-[58px]' : 'h-[52px]';
+  const dividerClass = isCompact
+    ? 'h-4 w-px bg-border mx-1.5'
+    : isCozy
+      ? 'h-7 w-px bg-border mx-2.5'
+      : 'h-6 w-px bg-border mx-2';
+  const inputClass = isCompact ? 'text-sm' : isCozy ? 'text-lg' : 'text-base';
+  const rightPad = isCompact ? 'pr-3' : isCozy ? 'pr-5' : 'pr-4';
+  const clearIconSize = isCompact
+    ? ICON_SIZE.sm
+    : isCozy
+      ? ICON_SIZE.lg
+      : ICON_SIZE.md;
+  const kbdClass = isCompact
+    ? 'px-1.5 py-0.5 text-[11px]'
+    : isCozy
+      ? 'px-2.5 py-1 text-xs'
+      : 'px-2 py-0.5 text-xs';
+
   return (
-    <search className="mx-auto w-full max-w-[640px]">
+    <search
+      className={`mx-auto w-full transition-[max-width] duration-200 ${containerMaxWidth}`}
+    >
       <form onSubmit={handleSubmit}>
-        <div className="group flex items-center h-[52px] rounded-full bg-surface border border-border shadow-md shadow-foreground/5 transition-[box-shadow,border-color] duration-200 hover:shadow-lg hover:border-accent/60 focus-within:border-accent focus-within:shadow-lg focus-within:ring-4 focus-within:ring-accent/20">
+        <div
+          className={`group flex items-center rounded-full bg-surface border border-border shadow-md shadow-foreground/5 transition-[box-shadow,border-color,height] duration-200 hover:shadow-lg hover:border-accent/60 focus-within:border-accent focus-within:shadow-lg focus-within:ring-4 focus-within:ring-accent/20 ${boxHeight}`}
+        >
           {/* 左侧引擎切换器（icon-only：当前引擎 logo，点击切换） */}
           <div className="pl-2 flex items-center">
             <EngineSwitcher
               initialEngine={engine}
               engines={engines}
+              density={density}
               onChange={setEngine}
             />
           </div>
 
           {/* 分隔线 */}
-          <div className="h-6 w-px bg-border mx-2" />
+          <div className={dividerClass} />
 
           {/* 输入框 */}
           <input
@@ -148,12 +189,14 @@ export function SearchBox({
             placeholder="输入卡片名直达，或关键词跳转搜索引擎…"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            className="search-input flex-1 h-full bg-transparent outline-none text-base text-primary placeholder:text-secondary text-ellipsis min-w-0"
+            className={`search-input flex-1 h-full bg-transparent outline-none text-primary placeholder:text-secondary text-ellipsis min-w-0 ${inputClass}`}
           />
 
           {/* 右侧 Cmd+K 提示 */}
-          <div className="pr-4 flex items-center gap-2 shrink-0">
-            <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-control bg-surface-hover border border-border text-xs text-secondary font-mono">
+          <div className={`${rightPad} flex items-center gap-2 shrink-0`}>
+            <kbd
+              className={`hidden sm:inline-flex items-center gap-1 rounded-control bg-surface-hover border border-border text-secondary font-mono ${kbdClass}`}
+            >
               <span>{modKey}</span>
               <span>K</span>
             </kbd>
@@ -164,7 +207,7 @@ export function SearchBox({
                 aria-label="清除"
                 className="text-secondary hover:text-primary focus-ring"
               >
-                <X size={ICON_SIZE.md} aria-hidden="true" />
+                <X size={clearIconSize} aria-hidden="true" />
               </button>
             )}
           </div>

@@ -10,19 +10,21 @@ import { SectionHeader } from '@/components/layout/SectionHeader';
 import { AddWidgetDialog } from '@/components/widgets/AddWidgetDialog';
 import { WidgetGrid } from '@/components/widgets/WidgetGrid';
 import { WIDGET_INSTANCE_REMOVE_EVENT } from '@/components/widgets/widget-events';
+import { useEffectiveDensity } from '@/hooks/useEffectiveDensity';
 import { useUndoableDelete } from '@/hooks/useUndoableDelete';
 import { useWidgetBarVisibility } from '@/hooks/useWidgetBarVisibility';
 import { useWidgetInstances } from '@/hooks/useWidgetConfig';
 import { ICON_SIZE } from '@/lib/design-tokens';
 import { WIDGET_REGISTRY } from '@/lib/widgets/registry';
 import { widgetsApi } from '@/services/widgets';
-import type { WidgetInstance } from '@/types';
+import type { CardDensity, WidgetInstance } from '@/types';
 
 // 删除确认等处的标签文案从 widget 注册表读取（单一来源）
 
 interface WidgetBarProps {
   initialInstances?: WidgetInstance[];
   isAuthed?: boolean;
+  initialDensity?: CardDensity;
 }
 
 /**
@@ -36,6 +38,7 @@ interface WidgetBarProps {
 export function WidgetBar({
   initialInstances,
   isAuthed = true,
+  initialDensity = 'normal',
 }: WidgetBarProps) {
   const {
     instances,
@@ -50,6 +53,7 @@ export function WidgetBar({
   const showToast = useToast();
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const density = useEffectiveDensity(initialDensity);
   const { visible: isVisible } = useWidgetBarVisibility();
   const { scheduleDelete } = useUndoableDelete();
 
@@ -133,15 +137,22 @@ export function WidgetBar({
     return null;
   }
 
+  const isCompact = density === 'compact';
+  const outerGap = isCompact ? 2 : 3;
+  const headerIconSize = isCompact ? ICON_SIZE.sm : ICON_SIZE.md;
+  const headerBoxClass = isCompact ? 'size-6' : 'size-7';
+  const addIconSize = isCompact ? ICON_SIZE.md : ICON_SIZE.lg;
+  const emptyIconSize = isCompact ? ICON_SIZE.md : ICON_SIZE.lg;
+
   return (
-    <VStack gap={3} className="group/widget-bar">
+    <VStack gap={outerGap} className="group/widget-bar">
       <SectionHeader
         icon={
           <span
             aria-hidden
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-control border border-border bg-surface/70 text-secondary backdrop-blur-sm"
+            className={`inline-flex shrink-0 items-center justify-center rounded-control border border-border bg-surface/70 text-secondary backdrop-blur-sm ${headerBoxClass}`}
           >
-            <Grid2x2 size={ICON_SIZE.md} />
+            <Grid2x2 size={headerIconSize} />
           </span>
         }
         title={<span className="widget-bar-title">WIDGETS</span>}
@@ -157,7 +168,7 @@ export function WidgetBar({
             >
               <IconButton
                 label="添加 widget"
-                icon={<Plus size={ICON_SIZE.lg} />}
+                icon={<Plus size={addIconSize} />}
                 variant="ghost"
                 tooltip="添加 widget"
                 onClick={() => setLibraryOpen(true)}
@@ -179,14 +190,27 @@ export function WidgetBar({
       ) : (
         <button
           type="button"
+          data-density={density}
           onClick={() => setLibraryOpen(true)}
           className="widget-bar-empty"
         >
           <span className="widget-bar-empty-icon">
-            <Blocks size={ICON_SIZE.lg} />
+            <Blocks size={emptyIconSize} />
           </span>
-          <span className="text-sm font-medium">还没有 widget</span>
-          <span className="text-xs text-secondary">
+          <span
+            className={
+              isCompact ? 'text-xs font-medium' : 'text-sm font-medium'
+            }
+          >
+            还没有 widget
+          </span>
+          <span
+            className={
+              isCompact
+                ? 'text-[11px] text-secondary'
+                : 'text-xs text-secondary'
+            }
+          >
             点击添加倒数日、NAS 状态等卡片
           </span>
         </button>

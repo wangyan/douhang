@@ -6,10 +6,9 @@ import { DefaultPasswordBanner } from '@/components/layout/DefaultPasswordBanner
 import { EditModeBanner } from '@/components/layout/EditModeBanner';
 import { FloatingLogo } from '@/components/layout/FloatingLogo';
 import { FloatingToolbar } from '@/components/layout/FloatingToolbar';
-import { HomeClock } from '@/components/layout/HomeClock';
 import { HomeContent } from '@/components/layout/HomeContent';
+import { HomeHeaderSection } from '@/components/layout/HomeHeaderSection';
 import { WidgetBar } from '@/components/layout/WidgetBar';
-import { SearchBox } from '@/components/search/SearchBox';
 import { auth } from '@/lib/auth';
 import { getBrandConfig } from '@/lib/brand';
 import { prisma } from '@/lib/db';
@@ -20,7 +19,9 @@ import { isUsingDefaultPassword } from '@/lib/security';
 import { getManualUrl, getRepoUrl } from '@/lib/version';
 import { getWallpaperPreferences, getWallpapers } from '@/lib/wallpaper';
 import {
+  CARD_DENSITY_DEFAULT,
   type Card,
+  type CardDensity,
   type Category,
   FONT_SIZE_DEFAULT,
   type NetworkMode,
@@ -55,6 +56,7 @@ export default async function HomePage() {
     wallpaperPreferences,
     brand,
     engines,
+    cardDensity,
     cardSimpleMode,
     cardStatusBadge,
     usingDefaultPassword,
@@ -84,6 +86,8 @@ export default async function HomePage() {
     getBrandConfig(),
     // 合并引擎列表（内置 + 自定义，SSR 传入避免客户端闪烁）
     listSearchEngines(),
+    // 卡片显示密度（SSR 初始值，避免客户端闪烁）
+    getUserPreference<CardDensity>('cardDensity', CARD_DENSITY_DEFAULT),
     // 卡片简洁模式（SSR 初始值，避免客户端闪烁）
     getUserPreference<boolean>('cardSimpleMode', false),
     // 卡片状态徽章显隐（SSR 初始值，避免客户端闪烁）
@@ -162,24 +166,33 @@ export default async function HomePage() {
               wallpaperPreferences,
               wallpaperScrim: wallpaperScrimValue,
               fontSize: normalizeFontSize(rawFontSize),
+              cardDensity: cardDensity ?? CARD_DENSITY_DEFAULT,
               cardStatusBadge,
             } satisfies AppearancePanelData
           }
         />
         <EditModeBanner />
 
-        {/* 首屏分三段：时钟/搜索聚焦入口、widget 状态横条、图标内容区。 */}
-        <VStack gap={10} className="mx-auto w-full max-w-[1360px] pt-28">
+        {/* 首屏分三段：时钟/搜索聚焦入口、widget 状态横条、图标内容区。采用视口高度自适应留白与间距。 */}
+        <VStack
+          className="mx-auto w-full max-w-[1360px]"
+          style={{
+            paddingTop: 'clamp(3.5rem, 15vh, 15rem)',
+            gap: 'clamp(2rem, 4.5vh, 4.5rem)',
+          }}
+        >
           {isAuthed && usingDefaultPassword && <DefaultPasswordBanner />}
-          <VStack gap={4} className="mx-auto w-full max-w-[720px]">
-            <HomeClock />
-            <SearchBox initialEngine={searchEngine} engines={engines} />
-          </VStack>
+          <HomeHeaderSection
+            initialDensity={cardDensity ?? CARD_DENSITY_DEFAULT}
+            initialEngine={searchEngine}
+            engines={engines}
+          />
 
           {isAuthed && (
             <WidgetBar
               initialInstances={initialInstances}
               isAuthed={isAuthed}
+              initialDensity={cardDensity ?? CARD_DENSITY_DEFAULT}
             />
           )}
 
@@ -187,6 +200,7 @@ export default async function HomePage() {
             categories={serializedCategories}
             unclassifiedCards={serializedUnclassified}
             networkMode={networkMode}
+            cardDensity={cardDensity ?? CARD_DENSITY_DEFAULT}
             cardSimpleMode={cardSimpleMode}
             cardStatusBadge={cardStatusBadge}
             isAuthed={isAuthed}

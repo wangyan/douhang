@@ -1,6 +1,12 @@
 import { CardItem } from '@/components/cards/CardItem';
 import { getCardUrl } from '@/components/cards/card-url';
-import type { CardStatus, Card as CardType, NetworkMode } from '@/types';
+import {
+  CARD_DENSITY_CONFIGS,
+  type CardDensity,
+  type CardStatus,
+  type Card as CardType,
+  type NetworkMode,
+} from '@/types';
 
 interface CardGridProps {
   cards: CardType[];
@@ -8,6 +14,8 @@ interface CardGridProps {
   statuses?: Record<string, CardStatus>;
   /** 网络模式（决定卡片点击跳转 URL） */
   networkMode?: NetworkMode;
+  /** 显示密度档位：compact / normal / cozy */
+  density?: CardDensity;
   onEditCard?: (card: CardType) => void;
   onDeleteCard?: (card: CardType) => void;
   /** 点击卡片时触发（fire-and-forget 单卡片探测） */
@@ -29,8 +37,8 @@ interface CardGridProps {
  *
  * 视觉规范（ui-spec §4.5）：
  * - flex-wrap + justify-start：卡片紧密排列、行末自动换行、整体居左
- * - 卡片宽度固定 80px，gap-5（20px）
- * - 列数自适应容器宽度（每列 80px + 20px gap），不会因断点抖动
+ * - 卡片宽度与间隙随 density 动态适配（compact 56px/gap-3, normal 68px/gap-4, cozy 80px/gap-5）
+ * - 列数自适应容器宽度，不会因断点抖动
  *
  * 新建入口不在网格末尾，而在 CategorySection 标题行右侧的 IconButton，
  * 避免占位卡片破坏网格视觉、占用空间。
@@ -41,6 +49,7 @@ export function CardGrid({
   cards,
   statuses,
   networkMode = 'auto',
+  density = 'normal',
   onEditCard,
   onDeleteCard,
   onCardClick,
@@ -50,8 +59,13 @@ export function CardGrid({
   selectedIds,
   onToggleSelect,
 }: CardGridProps) {
+  const densityMode = density ?? 'normal';
+  const config = CARD_DENSITY_CONFIGS[densityMode];
+
   return (
-    <div className="flex flex-wrap gap-5 justify-start stagger-cards">
+    <div
+      className={`flex flex-wrap ${config.gapClass} justify-start stagger-cards`}
+    >
       {cards.map((card, idx) => (
         <div
           key={card.id}
@@ -59,6 +73,7 @@ export function CardGrid({
         >
           <CardItem
             card={card}
+            density={densityMode}
             status={statuses?.[card.id] ?? 'unknown'}
             href={getCardUrl(card, networkMode)}
             onClick={onCardClick ? () => onCardClick(card.id) : undefined}

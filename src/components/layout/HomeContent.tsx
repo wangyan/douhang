@@ -28,13 +28,14 @@ import { useBatchDeleteCards } from '@/hooks/useBatchDeleteCards';
 import { useCardReorder } from '@/hooks/useCardReorder';
 import { useCardStatuses } from '@/hooks/useCardStatuses';
 import { useCategoryDelete } from '@/hooks/useCategoryDelete';
+import { useEffectiveDensity } from '@/hooks/useEffectiveDensity';
 import { useExternalDrop } from '@/hooks/useExternalDrop';
 import { useExternalPaste } from '@/hooks/useExternalPaste';
 import { useUndoableDelete } from '@/hooks/useUndoableDelete';
 import { isCategoryDroppableId } from '@/lib/category-droppable';
 import { ICON_SIZE } from '@/lib/design-tokens';
 import { cardsApi } from '@/services/cards';
-import type { Card, Category, NetworkMode } from '@/types';
+import type { Card, CardDensity, Category, NetworkMode } from '@/types';
 
 /**
  * 卡片拖拽碰撞检测：指针命中优先
@@ -92,6 +93,8 @@ interface HomeContentProps {
   cardSimpleMode: boolean;
   /** 卡片状态徽章显隐（SSR 初始值） */
   cardStatusBadge: boolean;
+  /** 卡片显示密度（SSR 初始值） */
+  cardDensity?: CardDensity;
   /** 当前用户是否已登录，默认 true */
   isAuthed?: boolean;
 }
@@ -109,6 +112,7 @@ export function HomeContent({
   networkMode,
   cardSimpleMode,
   cardStatusBadge,
+  cardDensity = 'normal',
   isAuthed = true,
 }: HomeContentProps) {
   const [modal, dispatchModal] = useReducer(editModalReducer, {
@@ -121,6 +125,8 @@ export function HomeContent({
   const initialUrl = modal.mode === 'create' ? modal.url : undefined;
   const [dropKey, setDropKey] = useState(0);
   const [reorderMode, setReorderMode] = useState(false);
+  // 卡片显示密度（响应式 hook：auto 模式自适应分辨率，手动切档即时响应）
+  const density = useEffectiveDensity(cardDensity);
   // 卡片简洁模式（FloatingToolbar 切换，事件同步；SSR 初始值避免闪烁）
   const [simpleMode, setSimpleMode] = useState(cardSimpleMode);
   // 卡片状态徽章显隐（FloatingToolbar 切换，事件同步；SSR 初始值避免闪烁）
@@ -271,7 +277,13 @@ export function HomeContent({
       onDragEnd={handleDragEnd}
     >
       {hasCards || reorderMode ? (
-        <div>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'clamp(0.5rem, 1.5vh, 1.5rem)',
+          }}
+        >
           {/* 分类分区纵向铺开，保持所有分区共用同一条左边界（启用拖拽）
            * 编辑模式下标题右侧 hover 显示 新建卡片 / 删除分类 操作。 */}
           {localCategories.map((category) => (
@@ -294,6 +306,7 @@ export function HomeContent({
                 isAuthed ? () => handleDeleteCategory(category.id) : undefined
               }
               simple={simpleMode}
+              density={density}
               showStatus={showStatusBadge}
               selectionMode={batch.active}
               selectedIds={batch.selectedIds}
@@ -317,6 +330,7 @@ export function HomeContent({
               onDeleteCard={isAuthed ? handleDeleteCard : undefined}
               onAddCard={isAuthed ? () => handleNewCard(null) : undefined}
               simple={simpleMode}
+              density={density}
               showStatus={showStatusBadge}
               selectionMode={batch.active}
               selectedIds={batch.selectedIds}
@@ -386,6 +400,7 @@ export function HomeContent({
               status={statuses[activeCard.id]}
               href={getCardUrl(activeCard, networkMode)}
               simple={simpleMode}
+              density={density}
               showStatus={showStatusBadge}
             />
           </div>

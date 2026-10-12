@@ -6,7 +6,12 @@ import { SortableCardGrid } from '@/components/cards/SortableCardGrid';
 import { CategoryBadge } from '@/components/categories/CategoryBadge';
 import { SectionHeader } from '@/components/layout/SectionHeader';
 import { ICON_SIZE } from '@/lib/design-tokens';
-import type { CardStatus, Card as CardType, NetworkMode } from '@/types';
+import type {
+  CardDensity,
+  CardStatus,
+  Card as CardType,
+  NetworkMode,
+} from '@/types';
 
 interface CategorySectionProps {
   /** 分类名称（null = 未分类） */
@@ -26,6 +31,8 @@ interface CategorySectionProps {
   onCardClick?: (cardId: string) => void;
   /** 简洁模式：仅图标，不显示标题 */
   simple?: boolean;
+  /** 显示密度档位：compact / normal / cozy */
+  density?: CardDensity;
   /** 是否显示右上角状态徽章 */
   showStatus?: boolean;
   /** 批量选择模式：隐藏新建入口，卡片点击切换选中 */
@@ -76,6 +83,7 @@ export function CategorySection({
   onDeleteCard,
   onCardClick,
   simple = false,
+  density = 'normal',
   showStatus = true,
   selectionMode = false,
   selectedIds,
@@ -91,30 +99,38 @@ export function CategorySection({
 
   const displayTitle = title ?? '未分类';
 
+  const isCompact = density === 'compact';
+  const isCozy = density === 'cozy';
+
+  const badgeSize: 'sm' | 'md' | 'lg' = isCompact ? 'sm' : isCozy ? 'lg' : 'md';
+  const titleStyle = isCompact
+    ? { fontSize: '1.125rem', fontWeight: 700, lineHeight: '1.5rem' }
+    : isCozy
+      ? { fontSize: '1.5rem', fontWeight: 700, lineHeight: '2rem' }
+      : { fontSize: '1.3125rem', fontWeight: 700, lineHeight: '1.875rem' };
+  const headerMbClass = isCompact ? 'mb-2' : isCozy ? 'mb-4' : 'mb-3';
+  const sectionPyClass = isCompact
+    ? 'py-2 first:pt-0 last:pb-0'
+    : isCozy
+      ? 'py-4 first:pt-0 last:pb-0'
+      : 'py-3 first:pt-0 last:pb-0';
+
   return (
-    <section className="group py-3 first:pt-0 last:pb-0">
+    <section className={`group ${sectionPyClass}`}>
       <SectionHeader
-        className="mb-3"
+        className={headerMbClass}
         icon={
           icon || color ? (
             <CategoryBadge
               name={displayTitle}
               icon={icon}
               color={color}
-              size="md"
+              size={badgeSize}
             />
           ) : undefined
         }
         title={
-          <Text
-            as="h2"
-            className="text-primary"
-            style={{
-              fontSize: '1.3125rem',
-              fontWeight: 700,
-              lineHeight: '1.875rem',
-            }}
-          >
+          <Text as="h2" className="text-primary" style={titleStyle}>
             {displayTitle}
           </Text>
         }
@@ -157,6 +173,7 @@ export function CategorySection({
           cards={cards}
           statuses={statuses}
           networkMode={networkMode}
+          density={density}
           onEditCard={onEditCard}
           onDeleteCard={onDeleteCard}
           onCardClick={onCardClick}
@@ -174,6 +191,7 @@ export function CategorySection({
           cards={cards}
           statuses={statuses}
           networkMode={networkMode}
+          density={density}
           onEditCard={onEditCard}
           onDeleteCard={onDeleteCard}
           onCardClick={onCardClick}

@@ -688,6 +688,11 @@ html[data-theme="dark"] .date-widget-surface::before {
     background-color 160ms ease;
 }
 
+.widget-bar-empty[data-density="compact"] {
+  padding: 1.125rem 1.25rem;
+  gap: 0.35rem;
+}
+
 .widget-bar-empty:hover {
   border-color: var(--color-accent);
   background-color: color-mix(in srgb, var(--color-surface) 72%, transparent);
@@ -718,6 +723,12 @@ html[data-theme="dark"] .date-widget-surface::before {
   border-color: var(--color-accent);
   color: var(--color-accent);
   transform: scale(1.06);
+}
+
+.widget-bar-empty[data-density="compact"] .widget-bar-empty-icon {
+  width: 1.85rem;
+  height: 1.85rem;
+  margin-bottom: 0.1rem;
 }
 /* === react-grid-layout 自定义样式 ===
  * 对齐 iOS 主屏 widget 编辑态：
@@ -901,6 +912,32 @@ html[data-theme="dark"]
   .home-clock-halo::before {
     inset: -0.75rem 0;
   }
+}
+
+/* 首屏时钟三档密度响应：compact 紧凑 / normal 标准 / cozy 宽松 */
+.home-clock-halo[data-density="compact"] .home-clock-time {
+  font-size: 2.625rem;
+  letter-spacing: -0.03em;
+}
+
+.home-clock-halo[data-density="compact"] .home-clock-meta {
+  font-size: 0.75rem;
+}
+
+.home-clock-halo[data-density="compact"]::before {
+  inset: -0.5rem -1rem;
+}
+
+.home-clock-halo[data-density="cozy"] .home-clock-time {
+  font-size: 4.5rem;
+}
+
+.home-clock-halo[data-density="cozy"] .home-clock-meta {
+  font-size: 1rem;
+}
+
+.home-clock-halo[data-density="cozy"]::before {
+  inset: -1rem -2rem;
 }
 
 /* === hover-scrollbar：默认隐藏滚动条，hover/focus 才显示 ===

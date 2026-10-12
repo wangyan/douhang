@@ -4,8 +4,14 @@ import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { rectSortingStrategy, SortableContext } from '@dnd-kit/sortable';
 import { useEffect, useRef } from 'react';
 import { categoryDroppableId } from '@/lib/category-droppable';
-import type { Card, CardStatus, NetworkMode } from '@/types';
-import { CARD_WIDTH, CardItem } from './CardItem';
+import {
+  CARD_DENSITY_CONFIGS,
+  type Card,
+  type CardDensity,
+  type CardStatus,
+  type NetworkMode,
+} from '@/types';
+import { CardItem } from './CardItem';
 import { getCardUrl } from './card-url';
 import { SortableCardItem } from './SortableCardItem';
 
@@ -13,6 +19,8 @@ interface SortableCardGridProps {
   cards: Card[];
   statuses?: Record<string, CardStatus>;
   networkMode?: NetworkMode;
+  /** 显示密度档位：compact / normal / cozy */
+  density?: CardDensity;
   onEditCard?: (card: Card) => void;
   onDeleteCard?: (card: Card) => void;
   /** 点击卡片时触发（fire-and-forget 单卡片探测） */
@@ -53,6 +61,7 @@ export function SortableCardGrid({
   cards,
   statuses,
   networkMode = 'auto',
+  density = 'normal',
   onEditCard,
   onDeleteCard,
   onCardClick,
@@ -65,6 +74,10 @@ export function SortableCardGrid({
   categoryId,
   activeCard = null,
 }: SortableCardGridProps) {
+  const densityMode = density ?? 'normal';
+  const config = CARD_DENSITY_CONFIGS[densityMode];
+  const cardWidth = config.cardWidth;
+
   const { setNodeRef } = useDroppable({
     id: categoryDroppableId(categoryId),
     disabled: !reorderMode,
@@ -125,8 +138,8 @@ export function SortableCardGrid({
   const showEmptyDropPreview =
     cards.length === 0 && activeCard !== null && insertIndex === 0;
 
-  // marginLeft/marginRight 的值：等于卡片宽度，gap 由 flex gap-5 提供
-  const PREVIEW_MARGIN = `${CARD_WIDTH}px`;
+  // marginLeft/marginRight 的值：等于卡片宽度，gap 由 flex gap 样式提供
+  const PREVIEW_MARGIN = `${cardWidth}px`;
 
   return (
     <SortableContext
@@ -135,13 +148,16 @@ export function SortableCardGrid({
     >
       <div
         ref={setRef}
-        className="flex flex-wrap gap-5 justify-start min-h-[40px] rounded-panel stagger-cards"
+        className={`flex flex-wrap ${config.gapClass} justify-start min-h-[40px] rounded-panel stagger-cards`}
       >
         {cards.length === 0 && (
           // 槽位高度与一行卡片一致，悬停出现预览时无布局跳动
-          <div className="flex min-h-[114px] w-full items-center">
+          <div
+            className="flex w-full items-center"
+            style={{ minHeight: `${cardWidth + 34}px` }}
+          >
             {showEmptyDropPreview && activeCard ? (
-              <GhostCard card={activeCard} />
+              <GhostCard card={activeCard} density={densityMode} />
             ) : (
               <div className="w-full text-center">
                 <p className="text-base font-medium text-secondary">
@@ -186,17 +202,17 @@ export function SortableCardGrid({
               {showPreviewBefore && activeCard && (
                 <div
                   className="absolute top-0"
-                  style={{ left: `-${CARD_WIDTH}px` }}
+                  style={{ left: `-${cardWidth}px` }}
                 >
-                  <GhostCard card={activeCard} />
+                  <GhostCard card={activeCard} density={densityMode} />
                 </div>
               )}
               {showPreviewAfter && activeCard && (
                 <div
                   className="absolute top-0"
-                  style={{ right: `-${CARD_WIDTH}px` }}
+                  style={{ right: `-${cardWidth}px` }}
                 >
-                  <GhostCard card={activeCard} />
+                  <GhostCard card={activeCard} density={densityMode} />
                 </div>
               )}
               <SortableCardItem
@@ -207,6 +223,7 @@ export function SortableCardGrid({
                 onEdit={onEditCard ? () => onEditCard(card) : undefined}
                 onDelete={onDeleteCard ? () => onDeleteCard(card) : undefined}
                 simple={simple}
+                density={densityMode}
                 showStatus={showStatus}
                 selectionMode={selectionMode}
                 selected={selectedIds?.has(card.id) ?? false}
@@ -248,10 +265,20 @@ function computeInsertIndex(opts: {
  * 空分类槽位 / 插入位置前 / 追加到末尾 三处共用，
  * 定位（absolute + 偏移）由调用方的包裹层负责。
  */
-function GhostCard({ card }: { card: Card }) {
+function GhostCard({
+  card,
+  density = 'normal',
+}: {
+  card: Card;
+  density?: CardDensity;
+}) {
+  const config = CARD_DENSITY_CONFIGS[density];
   return (
-    <div className="w-[80px] opacity-30 pointer-events-none">
-      <CardItem card={card} interactive={false} />
+    <div
+      style={{ width: `${config.cardWidth}px` }}
+      className="opacity-30 pointer-events-none"
+    >
+      <CardItem card={card} density={density} interactive={false} />
     </div>
   );
 }

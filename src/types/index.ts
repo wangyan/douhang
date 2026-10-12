@@ -44,6 +44,56 @@ import type { DateItemWidgetKey, WidgetKey } from '@/lib/widgets/registry';
 
 export type { DateItemWidgetKey, WidgetKey };
 
+/** 卡片显示密度配置档位：auto=自动 / compact=紧凑(56px) / normal=标准(68px) / cozy=宽松(80px) */
+export type CardDensity = 'auto' | 'compact' | 'normal' | 'cozy';
+/** 实际渲染生效的具体密度档位 */
+export type ConcreteCardDensity = 'compact' | 'normal' | 'cozy';
+export const CARD_DENSITY_DEFAULT: CardDensity = 'auto';
+
+export interface CardDensityConfig {
+  cardWidth: number;
+  iconSize: number;
+  gapClass: string;
+  gapPx: number;
+  titleHeightClass: string;
+  titleTextClass: string;
+}
+
+export const CARD_DENSITY_CONFIGS: Record<CardDensity, CardDensityConfig> = {
+  auto: {
+    cardWidth: 68,
+    iconSize: 44,
+    gapClass: 'gap-4',
+    gapPx: 16,
+    titleHeightClass: 'min-h-[1.75rem]',
+    titleTextClass: 'text-xs',
+  },
+  compact: {
+    cardWidth: 56,
+    iconSize: 36,
+    gapClass: 'gap-3',
+    gapPx: 12,
+    titleHeightClass: 'min-h-[1.5rem]',
+    titleTextClass: 'text-[11px]',
+  },
+  normal: {
+    cardWidth: 68,
+    iconSize: 44,
+    gapClass: 'gap-4',
+    gapPx: 16,
+    titleHeightClass: 'min-h-[1.75rem]',
+    titleTextClass: 'text-xs',
+  },
+  cozy: {
+    cardWidth: 80,
+    iconSize: 56,
+    gapClass: 'gap-5',
+    gapPx: 20,
+    titleHeightClass: 'min-h-[1.75rem]',
+    titleTextClass: 'text-xs',
+  },
+};
+
 /** 卡片状态灯三态 */
 export type CardStatus = 'online' | 'offline' | 'unknown';
 

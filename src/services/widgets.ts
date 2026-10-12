@@ -1,6 +1,7 @@
 import { request } from '@/lib/request/request';
 import type {
   BrandConfig,
+  CardDensity,
   DateItem,
   DockerStats,
   FontSizePreference,
@@ -31,6 +32,8 @@ export interface Preferences {
   wallpaperScrim: number;
   /** 品牌（标题 + Logo） */
   brand: BrandConfig;
+  /** 卡片显示密度（compact=紧凑 / normal=标准 / cozy=宽松） */
+  cardDensity: CardDensity;
   /** 卡片简洁模式（仅图标，隐藏标题） */
   cardSimpleMode: boolean;
   /** 卡片状态徽章（右上角在线/离线圆点） */

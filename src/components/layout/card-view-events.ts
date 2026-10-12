@@ -6,3 +6,6 @@ export const CARD_SIMPLE_MODE_EVENT = 'card-simple-mode-change';
 
 /** 卡片状态徽章显隐变更事件名（FloatingToolbar ↔ HomeContent） */
 export const CARD_STATUS_BADGE_EVENT = 'card-status-badge-change';
+
+/** 卡片显示密度变更事件名（FloatingToolbar / ViewDisplaySetting ↔ HomeContent） */
+export const CARD_DENSITY_EVENT = 'card-density-change';
