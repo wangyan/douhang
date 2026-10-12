@@ -5,10 +5,15 @@ import { Slider } from '@astryxdesign/core/Slider';
 import { HStack, StackItem } from '@astryxdesign/core/Stack';
 import { Text } from '@astryxdesign/core/Text';
 import { VStack } from '@astryxdesign/core/VStack';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { useTheme } from '@/hooks/useTheme';
+import {
+  GUEST_PREF_KEYS,
+  getGuestPreference,
+  setGuestPreference,
+} from '@/lib/guest-preferences';
 import { ApiError } from '@/lib/request/ApiError';
 import { preferencesApi } from '@/services';
 import {
@@ -22,8 +27,8 @@ import {
 /**
  * 外观设置
  *
- * - 主题模式：视觉化预览瓦片，点击即时保存
- * - 字体大小：滑杆预览 + 数字输入，提交时保存
+ * - 主题模式：视觉化预览瓦片，点击即时保存（游客仅写入本地）
+ * - 字体大小：滑杆预览 + 数字输入，提交时保存（游客仅写入本地）
  */
 interface ThemeFormProps {
   /** 分区标题（默认「外观」；快捷面板内传入别的标题避免与面板头重复） */
@@ -31,6 +36,8 @@ interface ThemeFormProps {
   initialFontSize: FontSizePreference;
   /** 外观卡片内的附加设置行（如可达状态开关），渲染在字体大小之后 */
   children?: React.ReactNode;
+  /** 是否已登录（未登录游客仅在本地保存偏好） */
+  isAuthed?: boolean;
 }
 
 const FONT_SIZE_MARKS = [
@@ -50,6 +57,7 @@ export function ThemeForm({
   title = '外观',
   initialFontSize,
   children,
+  isAuthed = true,
 }: ThemeFormProps) {
   const { mode, setMode } = useTheme();
   const [saving, setSaving] = useState(false);
@@ -60,6 +68,21 @@ export function ThemeForm({
   const [fontSize, setFontSize] = useState(initialFontSize);
   const savedFontSizeRef = useRef(initialFontSize);
   const { mutate } = useSWRConfig();
+
+  // 挂载后若本地有游客字号偏好则采信
+  useEffect(() => {
+    if (!isAuthed) {
+      const guestFontSize = getGuestPreference<number | null>(
+        GUEST_PREF_KEYS.FONT_SIZE,
+        null,
+      );
+      if (guestFontSize !== null) {
+        setFontSize(guestFontSize);
+        savedFontSizeRef.current = guestFontSize;
+        document.documentElement.style.fontSize = `${guestFontSize}%`;
+      }
+    }
+  }, [isAuthed]);
 
   const savePreference = async (save: () => Promise<void>) => {
     setSaving(true);
@@ -84,7 +107,11 @@ export function ThemeForm({
   // 主题在本地即时生效并持久化；服务端保存失败时保留本地主题
   const handleChange = (newMode: ThemeMode) => {
     setMode(newMode);
-    void savePreference(() => preferencesApi.update('theme', newMode));
+    if (isAuthed) {
+      void savePreference(() => preferencesApi.update('theme', newMode));
+    } else {
+      setMsg({ type: 'success', text: '已应用' });
+    }
   };
 
   const applyFontSize = (value: number) => {
@@ -105,6 +132,13 @@ export function ThemeForm({
 
     savedFontSizeRef.current = value;
     applyFontSize(value);
+    setGuestPreference(GUEST_PREF_KEYS.FONT_SIZE, value);
+
+    if (!isAuthed) {
+      setMsg({ type: 'success', text: '已应用' });
+      return;
+    }
+
     const isSaved = await savePreference(async () => {
       await preferencesApi.update('fontSize', value);
       await mutate(preferencesApi.getKey);

@@ -29,6 +29,22 @@ export function useEffectiveDensity(
   }, [initialPreference]);
 
   useEffect(() => {
+    // 挂载时检查本地是否有游客偏好覆盖
+    try {
+      const stored = localStorage.getItem(
+        'douhang-card-density',
+      ) as CardDensity | null;
+      if (
+        stored &&
+        (stored === 'auto' ||
+          stored === 'compact' ||
+          stored === 'normal' ||
+          stored === 'cozy')
+      ) {
+        currentPrefRef.current = stored;
+      }
+    } catch {}
+
     // 挂载时立即执行一次客户端分辨率判定
     setEffectiveDensity(resolveConcreteDensity(currentPrefRef.current));
 

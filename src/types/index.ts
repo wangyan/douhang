@@ -61,36 +61,36 @@ export interface CardDensityConfig {
 
 export const CARD_DENSITY_CONFIGS: Record<CardDensity, CardDensityConfig> = {
   auto: {
-    cardWidth: 68,
+    cardWidth: 88,
     iconSize: 44,
     gapClass: 'gap-4',
     gapPx: 16,
-    titleHeightClass: 'min-h-[1.75rem]',
-    titleTextClass: 'text-xs',
+    titleHeightClass: 'min-h-[2rem]',
+    titleTextClass: 'text-[13px]',
   },
   compact: {
-    cardWidth: 56,
-    iconSize: 36,
+    cardWidth: 80,
+    iconSize: 40,
     gapClass: 'gap-3',
     gapPx: 12,
-    titleHeightClass: 'min-h-[1.5rem]',
-    titleTextClass: 'text-[11px]',
+    titleHeightClass: 'min-h-[1.75rem]',
+    titleTextClass: 'text-xs',
   },
   normal: {
-    cardWidth: 68,
+    cardWidth: 88,
     iconSize: 44,
     gapClass: 'gap-4',
     gapPx: 16,
-    titleHeightClass: 'min-h-[1.75rem]',
-    titleTextClass: 'text-xs',
+    titleHeightClass: 'min-h-[2rem]',
+    titleTextClass: 'text-[13px]',
   },
   cozy: {
-    cardWidth: 80,
-    iconSize: 56,
+    cardWidth: 100,
+    iconSize: 52,
     gapClass: 'gap-5',
     gapPx: 20,
-    titleHeightClass: 'min-h-[1.75rem]',
-    titleTextClass: 'text-xs',
+    titleHeightClass: 'min-h-[2.25rem]',
+    titleTextClass: 'text-sm',
   },
 };
 
@@ -319,7 +319,7 @@ export interface Category {
 }
 
 /** 壁纸来源 */
-type WallpaperSource = 'preset' | 'upload';
+export type WallpaperSource = 'preset' | 'upload' | 'local';
 
 /** 壁纸（前端使用的结构，对应 Prisma Wallpaper model）
  *

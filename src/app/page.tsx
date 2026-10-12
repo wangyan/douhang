@@ -145,6 +145,7 @@ export default async function HomePage() {
         wallpapers={wallpapers}
         preferences={wallpaperPreferences}
         scrim={wallpaperScrimValue}
+        isAuthed={isAuthed}
       />
       <AppShell
         contentPadding={4}

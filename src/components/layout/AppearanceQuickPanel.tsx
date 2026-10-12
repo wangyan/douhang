@@ -5,13 +5,14 @@ import { HStack } from '@astryxdesign/core/HStack';
 import { IconButton } from '@astryxdesign/core/IconButton';
 import { Text } from '@astryxdesign/core/Text';
 import { VStack } from '@astryxdesign/core/VStack';
-import { X } from 'lucide-react';
+import { RotateCcw, X } from 'lucide-react';
 import { CardStatusBadgeSetting } from '@/components/settings/CardStatusBadgeSetting';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { ThemeForm } from '@/components/settings/ThemeForm';
 import { ViewDisplaySetting } from '@/components/settings/ViewDisplaySetting';
 import { WallpaperManager } from '@/components/settings/WallpaperManager';
 import { DIALOG_WIDTH, ICON_SIZE } from '@/lib/design-tokens';
+import { clearAllGuestPreferences } from '@/lib/guest-preferences';
 import type {
   CardDensity,
   FontSizePreference,
@@ -35,6 +36,8 @@ interface AppearanceQuickPanelProps {
   data: AppearancePanelData;
   /** 卡片简洁模式（工具栏 SSR 初始值，传入「显示」分区） */
   cardSimpleMode: boolean;
+  /** 是否已登录（未登录时采用双层偏好模式） */
+  isAuthed?: boolean;
 }
 
 /**
@@ -42,13 +45,15 @@ interface AppearanceQuickPanelProps {
  *
  * 贴视口右侧的纵向面板，直接复用外观设置页同一套组件
  * （ThemeForm / CardStatusBadgeSetting / WallpaperManager），零复制：
- * 主题与字号即时保存，壁纸上传删除走 router.refresh()，行为与设置页一致。
+ * - 管理员：全站偏好即时落库，具备完整上传与 Widget 管理权限
+ * - 游客：双层偏好模式，仅保存在当前浏览器本地，预置壁纸即时生效
  */
 export function AppearanceQuickPanel({
   isOpen,
   onOpenChange,
   data,
   cardSimpleMode,
+  isAuthed = true,
 }: AppearanceQuickPanelProps) {
   return (
     <Dialog
@@ -76,23 +81,54 @@ export function AppearanceQuickPanel({
         {/* 高度 = 对话框 maxHeight 偏移(32px) + 内边距/标题行/间距(约 5.5rem，随字号缩放) */}
         <div className="max-h-[calc(100dvh-32px-5.5rem)] overflow-y-auto">
           <VStack gap={4}>
-            <ThemeForm title="主题与字体" initialFontSize={data.fontSize}>
-              <CardStatusBadgeSetting initialEnabled={data.cardStatusBadge} />
+            <ThemeForm
+              title="主题与字体"
+              initialFontSize={data.fontSize}
+              isAuthed={isAuthed}
+            >
+              <CardStatusBadgeSetting
+                initialEnabled={data.cardStatusBadge}
+                isAuthed={isAuthed}
+              />
             </ThemeForm>
             <SettingsSection
               title="显示"
-              description="卡片与 Widget 横条的显示开关（与工具栏同步）"
+              description={
+                isAuthed
+                  ? '卡片与 Widget 横条的显示开关（与工具栏同步）'
+                  : '卡片显示密度与简洁模式设置'
+              }
             >
               <ViewDisplaySetting
                 initialCardSimpleMode={cardSimpleMode}
                 initialCardDensity={data.cardDensity}
+                isAuthed={isAuthed}
               />
             </SettingsSection>
             <WallpaperManager
               wallpapers={data.wallpapers}
               preferences={data.wallpaperPreferences}
               initialScrim={data.wallpaperScrim}
+              isAuthed={isAuthed}
             />
+
+            {/* 访客模式静音底栏：克制无框，平滑融入面板 */}
+            {!isAuthed && (
+              <div className="pt-3 mt-1 border-t border-border flex items-center justify-between text-xs text-tertiary">
+                <span className="truncate">访客模式 · 仅保存在本机</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await clearAllGuestPreferences();
+                    window.location.reload();
+                  }}
+                  className="inline-flex items-center gap-1.5 py-1 px-2 rounded-control text-secondary hover:text-primary hover:bg-surface-hover transition-colors focus-ring cursor-pointer"
+                >
+                  <RotateCcw size={ICON_SIZE.xs} />
+                  <span>恢复默认外观</span>
+                </button>
+              </div>
+            )}
           </VStack>
         </div>
       </VStack>

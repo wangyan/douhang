@@ -507,7 +507,7 @@ export function FloatingToolbar({
           isAuthed={isAuthed}
           onOpenAbout={() => setAboutOpen(true)}
           onOpenAppearance={
-            isAuthed && appearance ? () => setAppearanceOpen(true) : undefined
+            appearance ? () => setAppearanceOpen(true) : undefined
           }
           manualUrl={manualUrl}
           adminGuideUrl={adminGuideUrl}
@@ -531,6 +531,7 @@ export function FloatingToolbar({
           onOpenChange={setAppearanceOpen}
           data={appearance}
           cardSimpleMode={simpleMode}
+          isAuthed={isAuthed}
         />
       )}
       {isAuthed && activeUpdate && (
@@ -618,6 +619,14 @@ function ToolbarUserMenu({
         </>
       ) : (
         <>
+          {onOpenAppearance && (
+            <DropdownMenuItem
+              icon={<Palette size={ICON_SIZE.md} />}
+              label="外观"
+              style={{ paddingInline: 12 }}
+              onClick={onOpenAppearance}
+            />
+          )}
           <DropdownMenuItem
             icon={<LogIn size={ICON_SIZE.md} />}
             label="登录后台"

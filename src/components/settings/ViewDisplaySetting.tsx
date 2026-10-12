@@ -10,6 +10,11 @@ import {
 } from '@/components/layout/card-view-events';
 import { SwitchSettingRow } from '@/components/settings/SwitchSettingRow';
 import { useWidgetBarVisibility } from '@/hooks/useWidgetBarVisibility';
+import {
+  GUEST_PREF_KEYS,
+  getGuestPreference,
+  setGuestPreference,
+} from '@/lib/guest-preferences';
 import { preferencesApi } from '@/services';
 import type { CardDensity } from '@/types';
 
@@ -18,6 +23,8 @@ interface ViewDisplaySettingProps {
   initialCardSimpleMode: boolean;
   /** 卡片显示密度（SSR 初始值） */
   initialCardDensity?: CardDensity;
+  /** 是否已登录（未登录游客隐藏 Widget 横条开关且不调服务端接口） */
+  isAuthed?: boolean;
 }
 
 const DENSITY_OPTIONS: {
@@ -35,18 +42,32 @@ const DENSITY_OPTIONS: {
  * 视图显示开关（外观快捷面板与设置页「显示」分区）
  *
  * - 显示密度：四档切换（自动 / 紧凑 / 标准 / 宽松），事件同步主页即时重排
- * - 卡片简洁模式：乐观更新 + 持久化失败回滚，事件同步主页与工具栏
- * - Widget 横条显隐：localStorage 共享 store，工具栏与 WidgetBar 即时同步
+ * - 卡片简洁模式：管理员即时落库；游客双层偏好仅写入本地 localStorage
+ * - Widget 横条显隐：仅管理员可见与控制；未登录游客彻底隐藏开关行
  */
 export function ViewDisplaySetting({
   initialCardSimpleMode,
   initialCardDensity = 'auto',
+  isAuthed = true,
 }: ViewDisplaySettingProps) {
   const showToast = useToast();
   const [simpleMode, setSimpleMode] = useState(initialCardSimpleMode);
   const [density, setDensity] = useState<CardDensity>(initialCardDensity);
   const { visible: widgetBarVisible, setVisible: setWidgetBarVisible } =
     useWidgetBarVisibility();
+
+  // 挂载后若本地有游客密度偏好则采信
+  useEffect(() => {
+    if (!isAuthed) {
+      const guestDensity = getGuestPreference<CardDensity | null>(
+        GUEST_PREF_KEYS.CARD_DENSITY,
+        null,
+      );
+      if (guestDensity) {
+        setDensity(guestDensity);
+      }
+    }
+  }, [isAuthed]);
 
   // 外部（如工具栏按钮）切换后保持开关同步：与 HomeContent/工具栏共用同一事件总线
   useEffect(() => {
@@ -78,14 +99,19 @@ export function ViewDisplaySetting({
 
   const handleSimpleModeChange = async (checked: boolean) => {
     setSimpleMode(checked);
+    setGuestPreference(GUEST_PREF_KEYS.CARD_SIMPLE_MODE, checked);
     window.dispatchEvent(
       new CustomEvent(CARD_SIMPLE_MODE_EVENT, { detail: checked }),
     );
+
+    if (!isAuthed) return;
+
     try {
       await preferencesApi.update('cardSimpleMode', checked);
     } catch {
       // 回滚到本次请求的严格反值：prev 可能已被后续请求覆盖
       setSimpleMode(!checked);
+      setGuestPreference(GUEST_PREF_KEYS.CARD_SIMPLE_MODE, !checked);
       window.dispatchEvent(
         new CustomEvent(CARD_SIMPLE_MODE_EVENT, { detail: !checked }),
       );
@@ -96,11 +122,16 @@ export function ViewDisplaySetting({
   const handleDensityChange = async (next: CardDensity) => {
     const prev = density;
     setDensity(next);
+    setGuestPreference(GUEST_PREF_KEYS.CARD_DENSITY, next);
     window.dispatchEvent(new CustomEvent(CARD_DENSITY_EVENT, { detail: next }));
+
+    if (!isAuthed) return;
+
     try {
       await preferencesApi.update('cardDensity', next);
     } catch {
       setDensity(prev);
+      setGuestPreference(GUEST_PREF_KEYS.CARD_DENSITY, prev);
       window.dispatchEvent(
         new CustomEvent(CARD_DENSITY_EVENT, { detail: prev }),
       );
@@ -160,13 +191,16 @@ export function ViewDisplaySetting({
         checked={simpleMode}
         onChange={handleSimpleModeChange}
       />
-      <SwitchSettingRow
-        label="Widget 横条"
-        description="显示时钟下方的 widget 状态横条"
-        switchLabel="显示 Widget 横条"
-        checked={widgetBarVisible}
-        onChange={setWidgetBarVisible}
-      />
+      {/* Widget 横条仅管理员可开启与控制；游客端彻底隐藏 */}
+      {isAuthed && (
+        <SwitchSettingRow
+          label="Widget 横条"
+          description="显示时钟下方的 widget 状态横条"
+          switchLabel="显示 Widget 横条"
+          checked={widgetBarVisible}
+          onChange={setWidgetBarVisible}
+        />
+      )}
     </VStack>
   );
 }

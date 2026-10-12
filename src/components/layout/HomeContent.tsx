@@ -169,6 +169,16 @@ export function HomeContent({
     } catch {}
   }, []);
 
+  // 挂载后同步浏览器本地持久化的可达状态徽章偏好
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('douhang-card-status-badge');
+      if (stored !== null) {
+        setShowStatusBadge(stored === 'true');
+      }
+    } catch {}
+  }, []);
+
   // 卡片简洁模式开关（FloatingToolbar 切换后即时生效）
   useEffect(() => {
     const handler = (e: Event) => {

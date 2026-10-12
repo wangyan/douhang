@@ -152,7 +152,7 @@ function useSyncHtmlTheme(resolved: ResolvedTheme) {
 
 /** hydration 前主题初始化 inline script 的字符串内容（供 RootLayout 使用）
  *
- * SSR 已输出数据库显式主题（light/dark），此时保留该首帧；
- * 同时把显式主题写入 localStorage，保证 hydration 后 useTheme 不回落到 system。
+ * 优先采信客户端已保存的个性化主题（localStorage）；
+ * 若客户端无存储，采信 SSR 输出的数据库显式主题（light/dark），并写入 localStorage 保证一致性。
  */
-export const THEME_SCRIPT_CODE = `(function(){try{var el=document.documentElement;var s=el.getAttribute('data-theme');if(s==='dark'||s==='light'){localStorage.setItem('${STORAGE_KEY}',s);el.style.colorScheme=s;el.style.backgroundColor=s==='dark'?'#1b1b1b':'#f1f1f1';return;}var t=localStorage.getItem('${STORAGE_KEY}');var m=t==='dark'||t==='light'||t==='system'?t:'system';var r=m;if(m==='system'){r=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}el.setAttribute('data-theme',r);el.style.colorScheme=r;el.style.backgroundColor=r==='dark'?'#1b1b1b':'#f1f1f1';}catch(e){}})();`;
+export const THEME_SCRIPT_CODE = `(function(){try{var el=document.documentElement;var t=localStorage.getItem('${STORAGE_KEY}');var s=el.getAttribute('data-theme');var m=t==='dark'||t==='light'||t==='system'?t:((s==='dark'||s==='light')?s:'system');if(!t&&(s==='dark'||s==='light')){localStorage.setItem('${STORAGE_KEY}',s);}var r=m;if(m==='system'){r=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}el.setAttribute('data-theme',r);el.style.colorScheme=r;el.style.backgroundColor=r==='dark'?'#1b1b1b':'#f1f1f1';}catch(e){}})();`;

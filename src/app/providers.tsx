@@ -48,7 +48,16 @@ export function Providers({
   }, [mode, prefs?.theme, setMode]);
 
   useEffect(() => {
-    document.documentElement.style.fontSize = `${prefs?.fontSize ?? initialFontSize}%`;
+    // 挂载后若本地有游客定制的字号偏好，优先采用本地偏好
+    let effective = prefs?.fontSize ?? initialFontSize;
+    try {
+      const stored = localStorage.getItem('douhang-font-size');
+      if (stored !== null) {
+        const num = Number(stored);
+        if (Number.isFinite(num) && num > 0) effective = num;
+      }
+    } catch {}
+    document.documentElement.style.fontSize = `${effective}%`;
   }, [initialFontSize, prefs?.fontSize]);
 
   // 老内核浏览器（如 360 极速）不支持 CSS anchor positioning，
