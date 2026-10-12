@@ -6,7 +6,11 @@ import { getCardUrl } from '@/components/cards/card-url';
 import { EngineSwitcher } from '@/components/search/EngineSwitcher';
 import { useEffectiveDensity } from '@/hooks/useEffectiveDensity';
 import { ICON_SIZE } from '@/lib/design-tokens';
-import { NETWORK_MODE_CHANGE_EVENT } from '@/lib/network-mode';
+import {
+  isNetworkMode,
+  NETWORK_MODE_CHANGE_EVENT,
+  NETWORK_MODE_STORAGE_KEY,
+} from '@/lib/network-mode';
 import { preferencesApi, searchApi } from '@/services';
 import type {
   CardDensity,
@@ -66,23 +70,45 @@ export function SearchBox({
     if (/Mac|iPhone|iPad/i.test(navigator.platform)) setModKey('⌘');
   }, []);
 
-  // 网络模式：挂载时读取偏好，并监听工具栏/设置页的切换事件保持同步
+  // 网络模式：挂载时优先读取本地持久化，无本地记录时回退服务端偏好，并监听切换事件
   useEffect(() => {
     let cancelled = false;
-    preferencesApi
-      .get()
-      .then((prefs) => {
-        if (!cancelled) setNetworkMode(prefs.networkMode);
-      })
-      .catch(() => {});
+    try {
+      const stored = localStorage.getItem(NETWORK_MODE_STORAGE_KEY);
+      if (isNetworkMode(stored)) {
+        setNetworkMode(stored);
+      } else {
+        preferencesApi
+          .get()
+          .then((prefs) => {
+            if (!cancelled) setNetworkMode(prefs.networkMode);
+          })
+          .catch(() => {});
+      }
+    } catch {
+      preferencesApi
+        .get()
+        .then((prefs) => {
+          if (!cancelled) setNetworkMode(prefs.networkMode);
+        })
+        .catch(() => {});
+    }
+
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<NetworkMode>).detail;
-      if (detail) setNetworkMode(detail);
+      if (isNetworkMode(detail)) setNetworkMode(detail);
+    };
+    const storageHandler = (e: StorageEvent) => {
+      if (e.key === NETWORK_MODE_STORAGE_KEY && isNetworkMode(e.newValue)) {
+        setNetworkMode(e.newValue);
+      }
     };
     window.addEventListener(NETWORK_MODE_CHANGE_EVENT, handler);
+    window.addEventListener('storage', storageHandler);
     return () => {
       cancelled = true;
       window.removeEventListener(NETWORK_MODE_CHANGE_EVENT, handler);
+      window.removeEventListener('storage', storageHandler);
     };
   }, []);
 

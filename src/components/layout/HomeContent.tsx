@@ -34,6 +34,11 @@ import { useExternalPaste } from '@/hooks/useExternalPaste';
 import { useUndoableDelete } from '@/hooks/useUndoableDelete';
 import { isCategoryDroppableId } from '@/lib/category-droppable';
 import { ICON_SIZE } from '@/lib/design-tokens';
+import {
+  isNetworkMode,
+  NETWORK_MODE_CHANGE_EVENT,
+  NETWORK_MODE_STORAGE_KEY,
+} from '@/lib/network-mode';
 import { cardsApi } from '@/services/cards';
 import type { Card, CardDensity, Category, NetworkMode } from '@/types';
 
@@ -131,6 +136,9 @@ export function HomeContent({
   const [simpleMode, setSimpleMode] = useState(cardSimpleMode);
   // 卡片状态徽章显隐（FloatingToolbar 切换，事件同步；SSR 初始值避免闪烁）
   const [showStatusBadge, setShowStatusBadge] = useState(cardStatusBadge);
+  // 当前网络模式（FloatingToolbar / NetworkForm 切换，事件同步；SSR 初始值避免闪烁）
+  const [currentNetworkMode, setCurrentNetworkMode] =
+    useState<NetworkMode>(networkMode);
   const showToast = useToast();
   const router = useRouter();
 
@@ -146,7 +154,7 @@ export function HomeContent({
   } = useCardReorder(categories, unclassifiedCards);
 
   // 状态灯批量探测 + 网络模式切换重探测
-  const { statuses, refreshOne } = useCardStatuses();
+  const { statuses, refreshOne } = useCardStatuses(currentNetworkMode);
 
   // 监听 FloatingToolbar 统一编辑模式开关（同时管控卡片排序态 + widget 编辑态）
   // ESC 退出由 FloatingToolbar 统一处理，此处只同步状态
@@ -184,8 +192,17 @@ export function HomeContent({
     const handler = (e: Event) => {
       setSimpleMode((e as CustomEvent<boolean>).detail);
     };
+    const storageHandler = (e: StorageEvent) => {
+      if (e.key === 'douhang-card-simple-mode' && e.newValue !== null) {
+        setSimpleMode(e.newValue === 'true');
+      }
+    };
     window.addEventListener(CARD_SIMPLE_MODE_EVENT, handler);
-    return () => window.removeEventListener(CARD_SIMPLE_MODE_EVENT, handler);
+    window.addEventListener('storage', storageHandler);
+    return () => {
+      window.removeEventListener(CARD_SIMPLE_MODE_EVENT, handler);
+      window.removeEventListener('storage', storageHandler);
+    };
   }, []);
 
   // 卡片状态徽章显隐开关（FloatingToolbar 切换后即时生效）
@@ -193,8 +210,48 @@ export function HomeContent({
     const handler = (e: Event) => {
       setShowStatusBadge((e as CustomEvent<boolean>).detail);
     };
+    const storageHandler = (e: StorageEvent) => {
+      if (e.key === 'douhang-card-status-badge' && e.newValue !== null) {
+        setShowStatusBadge(e.newValue === 'true');
+      }
+    };
     window.addEventListener(CARD_STATUS_BADGE_EVENT, handler);
-    return () => window.removeEventListener(CARD_STATUS_BADGE_EVENT, handler);
+    window.addEventListener('storage', storageHandler);
+    return () => {
+      window.removeEventListener(CARD_STATUS_BADGE_EVENT, handler);
+      window.removeEventListener('storage', storageHandler);
+    };
+  }, []);
+
+  // 挂载后同步浏览器本地持久化的网络模式偏好（游客与离线优先采信本地）
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(NETWORK_MODE_STORAGE_KEY);
+      if (isNetworkMode(stored)) {
+        setCurrentNetworkMode(stored);
+      }
+    } catch {}
+  }, []);
+
+  // 监听 FloatingToolbar / NetworkForm / 跨标签页广播的网络模式变更，即时响应
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const mode = (e as CustomEvent<NetworkMode>).detail;
+      if (isNetworkMode(mode)) {
+        setCurrentNetworkMode(mode);
+      }
+    };
+    const storageHandler = (e: StorageEvent) => {
+      if (e.key === NETWORK_MODE_STORAGE_KEY && isNetworkMode(e.newValue)) {
+        setCurrentNetworkMode(e.newValue);
+      }
+    };
+    window.addEventListener(NETWORK_MODE_CHANGE_EVENT, handler);
+    window.addEventListener('storage', storageHandler);
+    return () => {
+      window.removeEventListener(NETWORK_MODE_CHANGE_EVENT, handler);
+      window.removeEventListener('storage', storageHandler);
+    };
   }, []);
 
   const { scheduleDelete } = useUndoableDelete();
@@ -305,7 +362,7 @@ export function HomeContent({
               categoryId={category.id}
               cards={category.cards ?? []}
               statuses={statuses}
-              networkMode={networkMode}
+              networkMode={currentNetworkMode}
               onCardClick={refreshOne}
               onEditCard={isAuthed ? handleEditCard : undefined}
               onDeleteCard={isAuthed ? handleDeleteCard : undefined}
@@ -334,7 +391,7 @@ export function HomeContent({
               categoryId={null}
               cards={localUnclassified}
               statuses={statuses}
-              networkMode={networkMode}
+              networkMode={currentNetworkMode}
               onCardClick={refreshOne}
               onEditCard={isAuthed ? handleEditCard : undefined}
               onDeleteCard={isAuthed ? handleDeleteCard : undefined}
@@ -408,7 +465,7 @@ export function HomeContent({
             <CardItem
               card={activeCard}
               status={statuses[activeCard.id]}
-              href={getCardUrl(activeCard, networkMode)}
+              href={getCardUrl(activeCard, currentNetworkMode)}
               simple={simpleMode}
               density={density}
               showStatus={showStatusBadge}

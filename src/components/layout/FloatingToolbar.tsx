@@ -49,9 +49,11 @@ import { useTheme } from '@/hooks/useTheme';
 import { useWidgetBarVisibility } from '@/hooks/useWidgetBarVisibility';
 import { ICON_SIZE } from '@/lib/design-tokens';
 import {
+  isNetworkMode,
   NETWORK_MODE_CHANGE_EVENT,
   NETWORK_MODE_META,
   NETWORK_MODE_ORDER,
+  NETWORK_MODE_STORAGE_KEY,
 } from '@/lib/network-mode';
 import { ADMIN_GUIDE_URL, MANUAL_URL, REPO_URL } from '@/lib/version';
 import { preferencesApi, versionApi } from '@/services';
@@ -366,14 +368,39 @@ export function FloatingToolbar({
     dispatchBatchModeChange,
   );
 
-  // 监听设置页触发的网络模式变更，保持工具栏同步
+  // 监听设置页或跨标签页触发的网络模式变更，保持工具栏同步
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<NetworkMode>).detail;
-      if (detail) setNetMode(detail);
+      if (isNetworkMode(detail)) setNetMode(detail);
+    };
+    const storageHandler = (e: StorageEvent) => {
+      if (e.key === NETWORK_MODE_STORAGE_KEY && isNetworkMode(e.newValue)) {
+        setNetMode(e.newValue);
+        window.dispatchEvent(
+          new CustomEvent(NETWORK_MODE_CHANGE_EVENT, { detail: e.newValue }),
+        );
+      }
     };
     window.addEventListener(NETWORK_MODE_CHANGE_EVENT, handler);
-    return () => window.removeEventListener(NETWORK_MODE_CHANGE_EVENT, handler);
+    window.addEventListener('storage', storageHandler);
+    return () => {
+      window.removeEventListener(NETWORK_MODE_CHANGE_EVENT, handler);
+      window.removeEventListener('storage', storageHandler);
+    };
+  }, []);
+
+  // 挂载后同步浏览器本地持久化的网络模式偏好（游客与未登录状态优先采信本地）
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(NETWORK_MODE_STORAGE_KEY);
+      if (isNetworkMode(stored)) {
+        setNetMode(stored);
+        window.dispatchEvent(
+          new CustomEvent(NETWORK_MODE_CHANGE_EVENT, { detail: stored }),
+        );
+      }
+    } catch {}
   }, []);
 
   // 挂载后同步浏览器本地持久化的简洁模式偏好
@@ -425,8 +452,12 @@ export function FloatingToolbar({
     const next = NETWORK_MODE_ORDER[(idx + 1) % NETWORK_MODE_ORDER.length];
     setNetMode(next);
     try {
-      localStorage.setItem('douhang-network-mode', next);
+      localStorage.setItem(NETWORK_MODE_STORAGE_KEY, next);
     } catch {}
+    // 乐观立即向全页面广播事件，使得卡片跳转 URL 和状态探测立即更新，无需等待接口返回
+    window.dispatchEvent(
+      new CustomEvent(NETWORK_MODE_CHANGE_EVENT, { detail: next }),
+    );
     if (isAuthed) {
       try {
         await preferencesApi.update('networkMode', next);
@@ -434,10 +465,6 @@ export function FloatingToolbar({
         console.error('保存网络模式失败', e);
       }
     }
-    // 通知主页重新探测状态灯
-    window.dispatchEvent(
-      new CustomEvent(NETWORK_MODE_CHANGE_EVENT, { detail: next }),
-    );
   };
 
   // 主题三态循环：明亮 → 暗黑 → 跟随系统（已登录同步服务端，未登录仅本地存储）

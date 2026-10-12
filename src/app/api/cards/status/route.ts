@@ -16,7 +16,7 @@ export const maxDuration = 30;
  *   - external: 只探测 externalUrl
  *   - auto: 同时探测两个，外网优先
  */
-export const GET = async () => {
+export const GET = async (request: Request) => {
   const cards = await prisma.card.findMany({
     select: { id: true, internalUrl: true, externalUrl: true },
   });
@@ -25,7 +25,12 @@ export const GET = async () => {
     return NextResponse.json({ items: [] satisfies CardStatusResult[] });
   }
 
-  const mode = await getUserPreference<NetworkMode>('networkMode', 'auto');
+  const { searchParams } = new URL(request.url);
+  const queryMode = searchParams.get('mode');
+  const mode: NetworkMode =
+    queryMode === 'internal' || queryMode === 'external' || queryMode === 'auto'
+      ? queryMode
+      : await getUserPreference<NetworkMode>('networkMode', 'auto');
 
   // 构建探测任务列表
   type ProbeTask = {

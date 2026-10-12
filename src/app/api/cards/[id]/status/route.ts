@@ -13,7 +13,7 @@ export const maxDuration = 10;
  * - GET /api/cards/[id]/status: 探测单个卡片，返回最新状态
  */
 export const GET = async (
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ id: string }> },
 ) => {
   const { id } = await ctx.params;
@@ -26,7 +26,12 @@ export const GET = async (
     return NextResponse.json({ error: '卡片不存在' }, { status: 404 });
   }
 
-  const mode = await getUserPreference<NetworkMode>('networkMode', 'auto');
+  const { searchParams } = new URL(req.url);
+  const queryMode = searchParams.get('mode');
+  const mode: NetworkMode =
+    queryMode === 'internal' || queryMode === 'external' || queryMode === 'auto'
+      ? queryMode
+      : await getUserPreference<NetworkMode>('networkMode', 'auto');
 
   let status: CardStatus;
 

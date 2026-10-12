@@ -1,7 +1,7 @@
 import type { EmbedCheckStatus } from '@/lib/embedding';
 import { request } from '@/lib/request/request';
 import type { CardFormValues } from '@/lib/validation';
-import type { Card, CardStatusResult } from '@/types';
+import type { Card, CardStatusResult, NetworkMode } from '@/types';
 
 /**
  * 卡片 API service
@@ -32,15 +32,17 @@ export const cardsApi = {
   /** SWR key：卡片状态批量探测 */
   statusKey: '/api/cards/status' as const,
 
-  /** 卡片状态批量探测 */
-  listStatuses: (_key?: string, opts: { signal?: AbortSignal } = {}) =>
-    request<{ items: CardStatusResult[] }>('/api/cards/status', {
+  /** 卡片状态批量探测（支持指定 key / query 参数） */
+  listStatuses: (key?: string, opts: { signal?: AbortSignal } = {}) =>
+    request<{ items: CardStatusResult[] }>(key || '/api/cards/status', {
       signal: opts?.signal,
     }),
 
-  /** 单卡片状态探测 */
-  getStatus: (id: string) =>
-    request<CardStatusResult>(`/api/cards/${id}/status`),
+  /** 单卡片状态探测（支持指定网络模式） */
+  getStatus: (id: string, mode?: NetworkMode) =>
+    request<CardStatusResult>(
+      mode ? `/api/cards/${id}/status?mode=${mode}` : `/api/cards/${id}/status`,
+    ),
 
   /** 弹框 iframe 嵌入预检 */
   checkEmbedding: (url: string, opts: { signal?: AbortSignal } = {}) => {

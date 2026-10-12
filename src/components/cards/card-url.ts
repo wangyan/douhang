@@ -4,10 +4,10 @@ import type { Card as CardType, NetworkMode } from '@/types';
 export function getCardUrl(card: CardType, mode: NetworkMode): string {
   switch (mode) {
     case 'internal':
-      return card.internalUrl;
+      return card.internalUrl || card.externalUrl || '';
     case 'external':
-      return card.externalUrl;
+      return card.externalUrl || card.internalUrl || '';
     default:
-      return card.externalUrl;
+      return card.externalUrl || card.internalUrl || '';
   }
 }

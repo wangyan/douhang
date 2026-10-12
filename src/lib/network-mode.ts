@@ -7,11 +7,21 @@ import type { NetworkMode } from '@/types';
  * 右上角工具栏切换按钮与设置页网络模式选择共用，
  * 避免图标 / 文案在两处各自维护产生漂移。
  */
+export const NETWORK_MODE_STORAGE_KEY = 'douhang-network-mode';
+
 export const NETWORK_MODE_ORDER: NetworkMode[] = [
   'auto',
   'internal',
   'external',
 ];
+
+/** 校验是否为合法的网络模式 */
+export function isNetworkMode(value: unknown): value is NetworkMode {
+  return (
+    typeof value === 'string' &&
+    NETWORK_MODE_ORDER.includes(value as NetworkMode)
+  );
+}
 
 export const NETWORK_MODE_META: Record<
   NetworkMode,

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import useSWR from 'swr';
 import { NETWORK_MODE_CHANGE_EVENT } from '@/lib/network-mode';
 import { cardsApi } from '@/services/cards';
-import type { CardStatus, CardStatusResult } from '@/types';
+import type { CardStatus, CardStatusResult, NetworkMode } from '@/types';
 
 interface UseCardStatusesResult {
   statuses: Record<string, CardStatus>;
@@ -17,16 +17,17 @@ interface UseCardStatusesResult {
 /**
  * 卡片状态灯 hook
  *
- * - useSWR 拉取批量状态
+ * - useSWR 拉取批量状态（按网络模式独立缓存）
  * - 监听 'network-mode-change' 事件触发 mutate
  * - refreshOne 用乐观更新（局部 mutate）
  */
-export function useCardStatuses(): UseCardStatusesResult {
+export function useCardStatuses(mode?: NetworkMode): UseCardStatusesResult {
+  const swrKey = mode ? `/api/cards/status?mode=${mode}` : cardsApi.statusKey;
   const {
     data,
     isLoading,
     mutate: swrMutate,
-  } = useSWR(cardsApi.statusKey, cardsApi.listStatuses, {
+  } = useSWR(swrKey, cardsApi.listStatuses, {
     // 服务端真实探测，60 秒轮询让「服务挂了」能被持续发现
     refreshInterval: 60_000,
   });
@@ -48,7 +49,7 @@ export function useCardStatuses(): UseCardStatusesResult {
   const refreshOne = useCallback(
     async (cardId: string) => {
       try {
-        const result = await cardsApi.getStatus(cardId);
+        const result = await cardsApi.getStatus(cardId, mode);
         // 局部 mutate：只更新单卡片状态，不重新请求
         await swrMutate(
           (prev) => {
@@ -65,7 +66,7 @@ export function useCardStatuses(): UseCardStatusesResult {
         console.error('单卡片探测失败', e);
       }
     },
-    [swrMutate],
+    [swrMutate, mode],
   );
 
   // 网络模式切换时重新探测

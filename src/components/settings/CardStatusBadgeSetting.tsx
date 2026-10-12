@@ -36,6 +36,16 @@ export function CardStatusBadgeSetting({
       if (guestBadge !== null) {
         setEnabled(guestBadge);
       }
+      const storageHandler = (e: StorageEvent) => {
+        if (
+          e.key === GUEST_PREF_KEYS.CARD_STATUS_BADGE &&
+          e.newValue !== null
+        ) {
+          setEnabled(e.newValue === 'true');
+        }
+      };
+      window.addEventListener('storage', storageHandler);
+      return () => window.removeEventListener('storage', storageHandler);
     }
   }, [isAuthed]);
 

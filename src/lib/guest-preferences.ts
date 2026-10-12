@@ -30,6 +30,8 @@ export function getGuestPreference<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
     if (raw === null) return fallback;
+    if (raw === 'true') return true as unknown as T;
+    if (raw === 'false') return false as unknown as T;
     if (typeof fallback === 'boolean') {
       return (raw === 'true') as unknown as T;
     }

@@ -11,9 +11,11 @@ import { useEffect, useState } from 'react';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { ICON_SIZE } from '@/lib/design-tokens';
 import {
+  isNetworkMode,
   NETWORK_MODE_CHANGE_EVENT,
   NETWORK_MODE_META,
   NETWORK_MODE_ORDER,
+  NETWORK_MODE_STORAGE_KEY,
 } from '@/lib/network-mode';
 import { ApiError } from '@/lib/request/ApiError';
 import { preferencesApi } from '@/services';
@@ -46,6 +48,7 @@ export function NetworkForm({ initialMode }: NetworkFormProps) {
     setMsg(null);
 
     try {
+      localStorage.setItem(NETWORK_MODE_STORAGE_KEY, newMode);
       await preferencesApi.update('networkMode', newMode);
       setMsg({ type: 'success', text: '已保存' });
 
@@ -66,14 +69,31 @@ export function NetworkForm({ initialMode }: NetworkFormProps) {
     }
   };
 
-  // 监听右上角工具栏触发的网络模式变更，保持设置页同步
+  // 挂载后同步浏览器本地持久化的网络模式
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(NETWORK_MODE_STORAGE_KEY);
+      if (isNetworkMode(stored)) setMode(stored);
+    } catch {}
+  }, []);
+
+  // 监听右上角工具栏触发或跨标签页触发的网络模式变更，保持设置页同步
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<NetworkMode>).detail;
-      if (detail) setMode(detail);
+      if (isNetworkMode(detail)) setMode(detail);
+    };
+    const storageHandler = (e: StorageEvent) => {
+      if (e.key === NETWORK_MODE_STORAGE_KEY && isNetworkMode(e.newValue)) {
+        setMode(e.newValue);
+      }
     };
     window.addEventListener(NETWORK_MODE_CHANGE_EVENT, handler);
-    return () => window.removeEventListener(NETWORK_MODE_CHANGE_EVENT, handler);
+    window.addEventListener('storage', storageHandler);
+    return () => {
+      window.removeEventListener(NETWORK_MODE_CHANGE_EVENT, handler);
+      window.removeEventListener('storage', storageHandler);
+    };
   }, []);
 
   const meta = NETWORK_MODE_META[mode];

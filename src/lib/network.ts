@@ -11,8 +11,22 @@ import type { Card, ResolvedUrl } from '@/types';
  */
 
 function isReachable(status: number): boolean {
-  return (status >= 200 && status < 400) || status === 401 || status === 403;
+  return (
+    (status >= 200 && status < 400) ||
+    status === 401 ||
+    status === 403 ||
+    status === 405 ||
+    status === 412 ||
+    status === 449
+  );
 }
+
+/** 探测请求通用请求头：携带真实浏览器 UA 避免被安全网关 / WAF 拦截或返回 412/449 */
+const PROBE_HEADERS: Record<string, string> = {
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+};
 
 /** 发起单次探测请求（独立 AbortController + 超时） */
 async function probeFetch(
@@ -25,6 +39,7 @@ async function probeFetch(
   try {
     return await fetch(url, {
       method,
+      headers: PROBE_HEADERS,
       signal: controller.signal,
       redirect: 'follow',
     });
@@ -33,14 +48,21 @@ async function probeFetch(
   }
 }
 
-/** 探测单个 URL 是否可达（3 秒超时，优先 HEAD 方法，未响应或不支持时使用 GET） */
+/** 探测单个 URL 是否可达（3 秒超时，优先 HEAD 方法，未响应或被 WAF 限制时回退 GET） */
 export async function probeUrl(
   url: string,
   timeoutMs = 3000,
 ): Promise<boolean> {
+  if (!url || !/^https?:\/\//i.test(url)) return false;
   try {
     let res = await probeFetch(url, 'HEAD', timeoutMs);
-    if (res.status === 405 || res.status === 404) {
+    if (
+      !isReachable(res.status) ||
+      res.status === 405 ||
+      res.status === 404 ||
+      res.status === 412 ||
+      res.status === 449
+    ) {
       res = await probeFetch(url, 'GET', timeoutMs);
       await res.body?.cancel();
     }
