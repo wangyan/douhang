@@ -9,6 +9,7 @@ import { FloatingToolbar } from '@/components/layout/FloatingToolbar';
 import { HomeContent } from '@/components/layout/HomeContent';
 import { HomeHeaderSection } from '@/components/layout/HomeHeaderSection';
 import { WidgetBar } from '@/components/layout/WidgetBar';
+import { ContentAxisColumnsProvider } from '@/hooks/useContentAxis';
 import { auth } from '@/lib/auth';
 import { getBrandConfig } from '@/lib/brand';
 import { prisma } from '@/lib/db';
@@ -139,6 +140,13 @@ export default async function HomePage() {
     updatedAt: c.updatedAt.toISOString(),
   }));
 
+  // 首屏内容轴列数取自「单分区最大卡片数」：服务端先算好，首帧宽度即与客户端一致
+  const maxCardsPerSection = Math.max(
+    0,
+    ...categories.map((c) => c.cards.length),
+    unclassifiedCards.length,
+  );
+
   return (
     <>
       <BackgroundLayer
@@ -174,39 +182,42 @@ export default async function HomePage() {
         />
         <EditModeBanner />
 
-        {/* 首屏分三段：时钟/搜索聚焦入口、widget 状态横条、图标内容区。采用视口高度自适应留白与间距。 */}
-        <VStack
-          className="mx-auto w-full max-w-[1360px]"
-          style={{
-            paddingTop: 'clamp(3.5rem, 15vh, 15rem)',
-            gap: 'clamp(2rem, 4.5vh, 4.5rem)',
-          }}
-        >
-          {isAuthed && usingDefaultPassword && <DefaultPasswordBanner />}
-          <HomeHeaderSection
-            initialDensity={cardDensity ?? CARD_DENSITY_DEFAULT}
-            initialEngine={searchEngine}
-            engines={engines}
-          />
-
-          {isAuthed && (
-            <WidgetBar
-              initialInstances={initialInstances}
-              isAuthed={isAuthed}
+        {/* 首屏分三段：时钟/搜索聚焦入口、widget 状态横条、图标内容区。采用视口高度自适应留白与间距。
+         * 内容轴上下文为卡片网格与 widget 栏提供共同的列数依据，两者宽度与左右边界对齐。 */}
+        <ContentAxisColumnsProvider initialMaxCards={maxCardsPerSection}>
+          <VStack
+            className="mx-auto w-full max-w-[1360px]"
+            style={{
+              paddingTop: 'clamp(3.5rem, 15vh, 15rem)',
+              gap: 'clamp(2rem, 4.5vh, 4.5rem)',
+            }}
+          >
+            {isAuthed && usingDefaultPassword && <DefaultPasswordBanner />}
+            <HomeHeaderSection
               initialDensity={cardDensity ?? CARD_DENSITY_DEFAULT}
+              initialEngine={searchEngine}
+              engines={engines}
             />
-          )}
 
-          <HomeContent
-            categories={serializedCategories}
-            unclassifiedCards={serializedUnclassified}
-            networkMode={networkMode}
-            cardDensity={cardDensity ?? CARD_DENSITY_DEFAULT}
-            cardSimpleMode={cardSimpleMode}
-            cardStatusBadge={cardStatusBadge}
-            isAuthed={isAuthed}
-          />
-        </VStack>
+            {isAuthed && (
+              <WidgetBar
+                initialInstances={initialInstances}
+                isAuthed={isAuthed}
+                initialDensity={cardDensity ?? CARD_DENSITY_DEFAULT}
+              />
+            )}
+
+            <HomeContent
+              categories={serializedCategories}
+              unclassifiedCards={serializedUnclassified}
+              networkMode={networkMode}
+              cardDensity={cardDensity ?? CARD_DENSITY_DEFAULT}
+              cardSimpleMode={cardSimpleMode}
+              cardStatusBadge={cardStatusBadge}
+              isAuthed={isAuthed}
+            />
+          </VStack>
+        </ContentAxisColumnsProvider>
       </AppShell>
     </>
   );

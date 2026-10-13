@@ -12,7 +12,7 @@ import {
 } from '@dnd-kit/core';
 import { Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useState } from 'react';
 import { CardEditModal } from '@/components/cards/CardEditModal';
 import { CardItem } from '@/components/cards/CardItem';
 import { getCardUrl } from '@/components/cards/card-url';
@@ -28,6 +28,10 @@ import { useBatchDeleteCards } from '@/hooks/useBatchDeleteCards';
 import { useCardReorder } from '@/hooks/useCardReorder';
 import { useCardStatuses } from '@/hooks/useCardStatuses';
 import { useCategoryDelete } from '@/hooks/useCategoryDelete';
+import {
+  useContentAxisWidth,
+  usePublishContentAxisMaxCards,
+} from '@/hooks/useContentAxis';
 import { useEffectiveDensity } from '@/hooks/useEffectiveDensity';
 import { useExternalDrop } from '@/hooks/useExternalDrop';
 import { useExternalPaste } from '@/hooks/useExternalPaste';
@@ -41,66 +45,11 @@ import {
 } from '@/lib/network-mode';
 import { cardsApi } from '@/services/cards';
 import {
-  CARD_DENSITY_CONFIGS,
   type Card,
   type CardDensity,
   type Category,
-  type ConcreteCardDensity,
   type NetworkMode,
 } from '@/types';
-
-/** 各密度档位在首屏展示时的保底最小列数（与搜索框视觉重心对齐） */
-const DENSITY_MIN_COLS: Record<ConcreteCardDensity, number> = {
-  compact: 6,
-  normal: 7,
-  cozy: 6,
-};
-
-/** 各密度档位在首屏展示时的最大列数上限（在 1360px 容器内舒展呈现） */
-const DENSITY_MAX_COLS: Record<ConcreteCardDensity, number> = {
-  compact: 13,
-  normal: 12,
-  cozy: 10,
-};
-
-/**
- * 计算分类卡片网格的生效列数：
- * - 期望列数：至少对齐上方搜索框宽度，当卡片较多时随最大分类卡片数展开，最高不超过上限
- * - 实际列数：受容器测宽物理限制，窗口拖拉缩放时自动阶梯收拢并保持中轴居中
- */
-function computeEffectiveCols({
-  density,
-  maxCards,
-  availableWidth,
-}: {
-  density: ConcreteCardDensity;
-  maxCards: number;
-  availableWidth: number | null;
-}): number {
-  const config = CARD_DENSITY_CONFIGS[density];
-  const colStep = config.cardWidth + config.gapPx;
-
-  const desiredCols = Math.max(
-    DENSITY_MIN_COLS[density],
-    Math.min(DENSITY_MAX_COLS[density], maxCards),
-  );
-
-  if (availableWidth === null || availableWidth <= 0) {
-    return desiredCols;
-  }
-
-  const maxPossibleCols = Math.max(
-    1,
-    Math.floor((availableWidth + config.gapPx) / colStep),
-  );
-
-  return Math.max(1, Math.min(maxPossibleCols, desiredCols));
-}
-
-function computeGridWidth(cols: number, density: ConcreteCardDensity): number {
-  const config = CARD_DENSITY_CONFIGS[density];
-  return cols * (config.cardWidth + config.gapPx) - config.gapPx;
-}
 
 /**
  * 卡片拖拽碰撞检测：指针命中优先
@@ -320,34 +269,7 @@ export function HomeContent({
     localCategories.some((c) => c.cards && c.cards.length > 0) ||
     localUnclassified.length > 0;
 
-  // 容器实测可用宽度（信赖容器实测宽，ResizeObserver 监听自适应窗口拖拉）
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState<number | null>(null);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const updateWidth = () => {
-      const w = el.getBoundingClientRect().width;
-      if (w > 0) setContainerWidth(w);
-    };
-
-    updateWidth();
-
-    const observer = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (entry) {
-        const w = entry.contentRect.width;
-        if (w > 0) setContainerWidth(w);
-      }
-    });
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  // 各分类中单分区卡片数量的最大值（决定大屏下展开列数的期望值）
+  // 各分类中单分区卡片数量的最大值（决定内容轴列数与卡片网格的展开程度）
   const maxCards = useMemo(() => {
     const counts = [
       ...localCategories.map((c) => c.cards?.length ?? 0),
@@ -356,18 +278,11 @@ export function HomeContent({
     return Math.max(0, ...counts);
   }, [localCategories, localUnclassified]);
 
-  // 综合密度、卡片总数、容器实测宽度推导出的生效列数与目标最大宽度
-  const effectiveCols = useMemo(() => {
-    return computeEffectiveCols({
-      density,
-      maxCards,
-      availableWidth: containerWidth,
-    });
-  }, [density, maxCards, containerWidth]);
+  // 上报给首屏内容轴：widget 栏据此与卡片网格保持同宽同轴
+  usePublishContentAxisMaxCards(maxCards);
 
-  const targetMaxWidth = useMemo(() => {
-    return computeGridWidth(effectiveCols, density);
-  }, [effectiveCols, density]);
+  // 卡片网格宽度来自首屏内容轴，由密度、最大卡片数与容器实测宽度推导
+  const { containerRef, width: axisWidth } = useContentAxisWidth(density);
 
   // 全部卡片 id（批量删除「全选」用）
   const allCardIds = [
@@ -460,7 +375,7 @@ export function HomeContent({
               display: 'flex',
               flexDirection: 'column',
               gap: 'clamp(0.5rem, 1.5vh, 1.5rem)',
-              maxWidth: `${targetMaxWidth}px`,
+              maxWidth: `${axisWidth}px`,
             }}
           >
             {/* 分类分区纵向铺开，保持所有分区共用同一条左边界（启用拖拽）

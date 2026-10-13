@@ -10,6 +10,7 @@ import { SectionHeader } from '@/components/layout/SectionHeader';
 import { AddWidgetDialog } from '@/components/widgets/AddWidgetDialog';
 import { WidgetGrid } from '@/components/widgets/WidgetGrid';
 import { WIDGET_INSTANCE_REMOVE_EVENT } from '@/components/widgets/widget-events';
+import { useContentAxisWidth } from '@/hooks/useContentAxis';
 import { useEffectiveDensity } from '@/hooks/useEffectiveDensity';
 import { useUndoableDelete } from '@/hooks/useUndoableDelete';
 import { useWidgetBarVisibility } from '@/hooks/useWidgetBarVisibility';
@@ -54,6 +55,8 @@ export function WidgetBar({
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const density = useEffectiveDensity(initialDensity);
+  // widget 栏与卡片网格共用同一条内容轴：宽度一致并整体居中
+  const { containerRef, width: axisWidth } = useContentAxisWidth(density);
   const { visible: isVisible } = useWidgetBarVisibility();
   const { scheduleDelete } = useUndoableDelete();
 
@@ -145,93 +148,99 @@ export function WidgetBar({
   const emptyIconSize = isCompact ? ICON_SIZE.md : ICON_SIZE.lg;
 
   return (
-    <VStack gap={outerGap} className="group/widget-bar">
-      <SectionHeader
-        icon={
-          <span
-            aria-hidden
-            className={`inline-flex shrink-0 items-center justify-center rounded-control border border-border bg-surface/70 text-secondary backdrop-blur-sm ${headerBoxClass}`}
-          >
-            <Grid2x2 size={headerIconSize} />
-          </span>
-        }
-        title={<span className="widget-bar-title">WIDGETS</span>}
-        actionsAlign="end"
-        actions={
-          isAuthed ? (
-            <div
-              className={`flex items-center gap-1 transition-opacity duration-200 ${
-                isEditMode
-                  ? 'invisible opacity-0'
-                  : 'opacity-0 group-hover/widget-bar:opacity-100 max-md:pointer-coarse:opacity-100'
-              }`}
+    <div ref={containerRef} className="w-full">
+      <VStack
+        gap={outerGap}
+        className="group/widget-bar mx-auto w-full transition-[max-width] duration-150 ease-out"
+        style={{ maxWidth: `${axisWidth}px` }}
+      >
+        <SectionHeader
+          icon={
+            <span
+              aria-hidden
+              className={`inline-flex shrink-0 items-center justify-center rounded-control border border-border bg-surface/70 text-secondary backdrop-blur-sm ${headerBoxClass}`}
             >
-              <IconButton
-                label="添加 widget"
-                icon={<Plus size={addIconSize} />}
-                variant="ghost"
-                tooltip="添加 widget"
-                onClick={() => setLibraryOpen(true)}
-              />
-            </div>
-          ) : undefined
-        }
-      />
-
-      {effectiveInstances.length > 0 ? (
-        <WidgetGrid
-          instances={effectiveInstances}
-          isEditMode={isEditMode}
-          onMove={setInstancePositions}
-          onReorder={setInstanceOrder}
-          onResize={setInstanceSize}
-          onRemove={handleRemove}
+              <Grid2x2 size={headerIconSize} />
+            </span>
+          }
+          title={<span className="widget-bar-title">WIDGETS</span>}
+          actionsAlign="end"
+          actions={
+            isAuthed ? (
+              <div
+                className={`flex items-center gap-1 transition-opacity duration-200 ${
+                  isEditMode
+                    ? 'invisible opacity-0'
+                    : 'opacity-0 group-hover/widget-bar:opacity-100 max-md:pointer-coarse:opacity-100'
+                }`}
+              >
+                <IconButton
+                  label="添加 widget"
+                  icon={<Plus size={addIconSize} />}
+                  variant="ghost"
+                  tooltip="添加 widget"
+                  onClick={() => setLibraryOpen(true)}
+                />
+              </div>
+            ) : undefined
+          }
         />
-      ) : (
-        <button
-          type="button"
-          data-density={density}
-          onClick={() => setLibraryOpen(true)}
-          className="widget-bar-empty"
-        >
-          <span className="widget-bar-empty-icon">
-            <Blocks size={emptyIconSize} />
-          </span>
-          <span
-            className={
-              isCompact ? 'text-xs font-medium' : 'text-sm font-medium'
-            }
-          >
-            还没有 widget
-          </span>
-          <span
-            className={
-              isCompact
-                ? 'text-[11px] text-secondary'
-                : 'text-xs text-secondary'
-            }
-          >
-            点击添加倒数日、NAS 状态等卡片
-          </span>
-        </button>
-      )}
 
-      {isAuthed && (
-        <AddWidgetDialog
-          isOpen={libraryOpen}
-          onOpenChange={setLibraryOpen}
-          onAddInstance={async (key) => {
-            const created = await addInstance(key);
-            if (created) {
-              showToast({
-                body: `已添加「${WIDGET_REGISTRY[key].label}」`,
-                type: 'info',
-              });
-            }
-          }}
-          onCreateDate={handleCreateSubmit}
-        />
-      )}
-    </VStack>
+        {effectiveInstances.length > 0 ? (
+          <WidgetGrid
+            instances={effectiveInstances}
+            isEditMode={isEditMode}
+            onMove={setInstancePositions}
+            onReorder={setInstanceOrder}
+            onResize={setInstanceSize}
+            onRemove={handleRemove}
+          />
+        ) : (
+          <button
+            type="button"
+            data-density={density}
+            onClick={() => setLibraryOpen(true)}
+            className="widget-bar-empty"
+          >
+            <span className="widget-bar-empty-icon">
+              <Blocks size={emptyIconSize} />
+            </span>
+            <span
+              className={
+                isCompact ? 'text-xs font-medium' : 'text-sm font-medium'
+              }
+            >
+              还没有 widget
+            </span>
+            <span
+              className={
+                isCompact
+                  ? 'text-[11px] text-secondary'
+                  : 'text-xs text-secondary'
+              }
+            >
+              点击添加倒数日、NAS 状态等卡片
+            </span>
+          </button>
+        )}
+
+        {isAuthed && (
+          <AddWidgetDialog
+            isOpen={libraryOpen}
+            onOpenChange={setLibraryOpen}
+            onAddInstance={async (key) => {
+              const created = await addInstance(key);
+              if (created) {
+                showToast({
+                  body: `已添加「${WIDGET_REGISTRY[key].label}」`,
+                  type: 'info',
+                });
+              }
+            }}
+            onCreateDate={handleCreateSubmit}
+          />
+        )}
+      </VStack>
+    </div>
   );
 }
