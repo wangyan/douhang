@@ -71,6 +71,18 @@ docker run -d \
 - **首次登录后，建议前往「设置 → 通用」修改管理员密码**。修改后系统会重置会话，需重新登录。
 - **离线与内网环境**：系统自带字体、图标与内置壁纸，默认不依赖任何外部 CDN。系统运行期间唯一的出站网络请求为版本检测（每 24 小时检查一次官方 Release）。纯内网或离线部署时，可在系统「设置 → 通用」中关闭版本更新检测，关闭后系统将不再发起任何外部网络请求。
 
+### 1.4 浏览器要求与离线安装包配置
+
+- **建议内核**：Chromium 123+ · Safari 17.5+ · Firefox 128+。未达到要求的访问会被重定向至 `/outdated.html` 引导页。
+- **拉取离线安装包**：在联网环境执行以下脚本，将主流浏览器离线安装包下载至 `public/downloads/browsers`：
+  ```bash
+  bash scripts/download-browsers.sh
+  ```
+- **离线部署挂载**：使用 Docker 部署时，可通过挂载离线包目录供客户端直接下载：
+  ```bash
+  -v $(pwd)/public/downloads/browsers:/app/public/downloads/browsers:ro
+  ```
+
 ---
 
 ## 2. 源码构建与容器化部署
@@ -438,3 +450,11 @@ server {
   ```bash
   docker compose exec douhang npx prisma migrate deploy
   ```
+
+### 11.6 访问提示「浏览器内核版本较低」
+
+- **原因**：客户端浏览器版本低于建议标准（Chromium 123+ · Safari 17.5+ · Firefox 128+）。
+- **处理方式**：
+  1. 升级浏览器，或在引导页下载对应的离线安装包；
+  2. 内网环境可运行 `bash scripts/download-browsers.sh` 并挂载离线包目录；
+  3. 点击引导页底部的「暂不升级，继续访问」临时进入系统。

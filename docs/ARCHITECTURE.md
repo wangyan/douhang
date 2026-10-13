@@ -26,6 +26,7 @@
 | **数据流与表单** | SWR + React Hook Form + Zod | 声明式数据缓存、Schema 模式校验与响应式表单 |
 | **容器监控** | Docker Engine API 直连 | 基于 Node.js 原生 `node:http` 通过 UNIX 套接字直接采集指标，无第三方 SDK 运行时负担 |
 | **质量工具** | Biome + react-doctor | Biome 统一格式化与静态检查；react-doctor 扫描 React 反模式 |
+| **客户端环境** | Chromium 123+ · Safari 17.5+ · Firefox 128+ | 基于现代原生 CSS 标准，内置特性探针与静态离线引导页 |
 
 ---
 
@@ -94,9 +95,9 @@ src/lib/db.ts       数据库操作：Prisma Client + LibSQL Adapter 读写 SQLi
 
 小组件的元数据定义与视图渲染分发严格解耦，共同形成唯一事实源：
 
-1. **元数据注册表**（[`src/lib/widgets/registry.ts`](file:///Users/wangyan/projects.localized/douhang/src/lib/widgets/registry.ts)）：
+1. **元数据注册表**（[`src/lib/widgets/registry.ts`](../src/lib/widgets/registry.ts)）：
    负责组件键名、名称描述、是否具备日期实体属性等元数据，派生 TypeScript 强类型约束；
-2. **渲染分发注册表**（[`src/components/widgets/registry.tsx`](file:///Users/wangyan/projects.localized/douhang/src/components/widgets/registry.tsx)）：
+2. **渲染分发注册表**（[`src/components/widgets/registry.tsx`](../src/components/widgets/registry.tsx)）：
    负责根据实例类型动态分发具体的 React 渲染组件。
 
 ### 5.2 主题初始化与首屏防闪跳机制
@@ -109,11 +110,11 @@ src/lib/db.ts       数据库操作：Prisma Client + LibSQL Adapter 读写 SQLi
 
 ### 5.3 路由安全拦截代理
 
-Next.js 16 采用根目录下的 [`src/proxy.ts`](file:///Users/wangyan/projects.localized/douhang/src/proxy.ts) 作为请求代理与鉴权拦截器。对管理后台路由（`/settings/*`）与敏感写操作接口进行会话有效性拦截，未授权请求将被重定向至登录页。
+Next.js 16 采用根目录下的 [`src/proxy.ts`](../src/proxy.ts) 作为请求代理与鉴权拦截器。对管理后台路由（`/settings/*`）与敏感写操作接口进行会话有效性拦截，未授权请求将被重定向至登录页。
 
 ### 5.4 设计 Token 约束体系
 
-设计规范的唯一事实源为 [`src/app/globals.css`](file:///Users/wangyan/projects.localized/douhang/src/app/globals.css) 与 [`src/lib/design-tokens.ts`](file:///Users/wangyan/projects.localized/douhang/src/lib/design-tokens.ts)：
+设计规范的唯一事实源为 [`src/app/globals.css`](../src/app/globals.css) 与 [`src/lib/design-tokens.ts`](../src/lib/design-tokens.ts)：
 
 - **语义色彩**：危险操作统一使用 `--color-error`（`text-error` / `bg-error`）；
 - **统一圆角**：控件统一 `rounded-control`(8px)，面板统一 `rounded-panel`(12px)，小组件统一 `rounded-widget`(18px)；
@@ -123,16 +124,29 @@ Next.js 16 采用根目录下的 [`src/proxy.ts`](file:///Users/wangyan/projects
 
 ### 5.5 Docker Engine API 直连监控
 
-为避免引入臃肿庞大的第三方 Docker SDK 导致依赖膨胀，[`src/lib/docker.ts`](file:///Users/wangyan/projects.localized/douhang/src/lib/docker.ts) 直接通过 Node 原生 `node:http` 与宿主机 Docker 套接字通信：
+为避免引入臃肿庞大的第三方 Docker SDK 导致依赖膨胀，[`src/lib/docker.ts`](../src/lib/docker.ts) 直接通过 Node 原生 `node:http` 与宿主机 Docker 套接字通信：
 - 仅使用四个精简只读接口：`/_ping`、`/containers/json`、`/info` 以及 `/containers/{id}/stats`；
 - 资源占用率采用增量算法：结合容器 CPU 增量与系统总 CPU 增量计算真实利用率；
 - 全流程具备降级容错机制：连接超时或权限缺失时自动返回降级占位数据，不阻塞其他业务。
 
 ### 5.6 版本检测与更新日志解析
 
-[`src/lib/version-check.ts`](file:///Users/wangyan/projects.localized/douhang/src/lib/version-check.ts) 负责向远端 Releases 接口查询最新发布版本，并与本地 `package.json` 中的 `APP_VERSION` 做语义化对比：
+[`src/lib/version-check.ts`](../src/lib/version-check.ts) 负责向远端 Releases 接口查询最新发布版本，并与本地 `package.json` 中的 `APP_VERSION` 做语义化对比：
 - 查询结果本地缓存 24 小时，避免频繁请求远端 API；离线环境下可完全关闭检测；
-- 前端更新弹窗与提醒浮层共享 [`src/lib/changelog.ts`](file:///Users/wangyan/projects.localized/douhang/src/lib/changelog.ts) 解析引擎，且**仅提取面向使用者的「亮点」段落**展示，技术细节仅留存文档。
+- 前端更新弹窗与提醒浮层共享 [`src/lib/changelog.ts`](../src/lib/changelog.ts) 解析引擎，且**仅提取面向使用者的「亮点」段落**展示，技术细节仅留存文档。
+
+### 5.7 浏览器检测探针与离线引导
+
+系统通过原生特性探针与静态引导页处理低版本内核访问：
+
+1. **特性探针**（[`src/app/layout.tsx`](../src/app/layout.tsx)）：
+   根布局内联轻量探针脚本，基于 `CSS.supports` 检测 `light-dark()` 与 `registerProperty` 支持。未通过检测且无忽略标记时，重定向至 `/outdated.html`。
+2. **离线引导页**（[`public/outdated.html`](../public/outdated.html)）：
+   独立静态单页，无外部网络依赖。根据客户端操作系统提供对应的离线安装包下载入口，并支持通过 `sessionStorage` 记录跳过状态后临时访问。
+3. **路由放行**（[`src/proxy.ts`](../src/proxy.ts)）：
+   在代理层放行 `outdated.html`、`download.html` 及 `downloads` 目录，无需登录鉴权即可访问。
+4. **离线包脚本**（[`scripts/download-browsers.sh`](../scripts/download-browsers.sh)）：
+   提供一键拉取跨平台安装包脚本，产物保存于 `public/downloads/browsers` 供内网分发。
 
 ---
 

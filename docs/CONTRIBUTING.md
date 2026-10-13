@@ -45,7 +45,7 @@ fix(搜索): 修复拼音首字母匹配在包含数字的卡片上失效的问�
 
 ## 2. 变更日志规范 (CHANGELOG)
 
-根目录的 [`CHANGELOG.md`](file:///Users/wangyan/projects.localized/douhang/CHANGELOG.md) 是版本发布说明的唯一事实源，同时也是应用前台「关于」弹窗与更新通知的数据来源。
+根目录的 [`CHANGELOG.md`](../CHANGELOG.md) 是版本发布说明的唯一事实源，同时也是应用前台「关于」弹窗与更新通知的数据来源。
 
 ### 2.1 日志段落格式
 
@@ -82,7 +82,7 @@ fix(搜索): 修复拼音首字母匹配在包含数字的卡片上失效的问�
 
 ## 3. 正式版本发布流程
 
-版本的唯一事实源由 `package.json` 的 `version` 与 `CHANGELOG.md` 共同承载。全流程必须通过自动化脚本 [`scripts/release.sh`](file:///Users/wangyan/projects.localized/douhang/scripts/release.sh) 执行，**严禁手动修改版本号或手动创建 Git Tag**。
+版本的唯一事实源由 `package.json` 的 `version` 与 `CHANGELOG.md` 共同承载。全流程必须通过自动化脚本 [`scripts/release.sh`](../scripts/release.sh) 执行，**严禁手动修改版本号或手动创建 Git Tag**。
 
 ### 3.1 版本号规则（SemVer）
 
