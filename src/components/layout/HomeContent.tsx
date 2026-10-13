@@ -12,7 +12,7 @@ import {
 } from '@dnd-kit/core';
 import { Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { CardEditModal } from '@/components/cards/CardEditModal';
 import { CardItem } from '@/components/cards/CardItem';
 import { getCardUrl } from '@/components/cards/card-url';
@@ -40,7 +40,67 @@ import {
   NETWORK_MODE_STORAGE_KEY,
 } from '@/lib/network-mode';
 import { cardsApi } from '@/services/cards';
-import type { Card, CardDensity, Category, NetworkMode } from '@/types';
+import {
+  CARD_DENSITY_CONFIGS,
+  type Card,
+  type CardDensity,
+  type Category,
+  type ConcreteCardDensity,
+  type NetworkMode,
+} from '@/types';
+
+/** 各密度档位在首屏展示时的保底最小列数（与搜索框视觉重心对齐） */
+const DENSITY_MIN_COLS: Record<ConcreteCardDensity, number> = {
+  compact: 6,
+  normal: 7,
+  cozy: 6,
+};
+
+/** 各密度档位在首屏展示时的最大列数上限（在 1360px 容器内舒展呈现） */
+const DENSITY_MAX_COLS: Record<ConcreteCardDensity, number> = {
+  compact: 13,
+  normal: 12,
+  cozy: 10,
+};
+
+/**
+ * 计算分类卡片网格的生效列数：
+ * - 期望列数：至少对齐上方搜索框宽度，当卡片较多时随最大分类卡片数展开，最高不超过上限
+ * - 实际列数：受容器测宽物理限制，窗口拖拉缩放时自动阶梯收拢并保持中轴居中
+ */
+function computeEffectiveCols({
+  density,
+  maxCards,
+  availableWidth,
+}: {
+  density: ConcreteCardDensity;
+  maxCards: number;
+  availableWidth: number | null;
+}): number {
+  const config = CARD_DENSITY_CONFIGS[density];
+  const colStep = config.cardWidth + config.gapPx;
+
+  const desiredCols = Math.max(
+    DENSITY_MIN_COLS[density],
+    Math.min(DENSITY_MAX_COLS[density], maxCards),
+  );
+
+  if (availableWidth === null || availableWidth <= 0) {
+    return desiredCols;
+  }
+
+  const maxPossibleCols = Math.max(
+    1,
+    Math.floor((availableWidth + config.gapPx) / colStep),
+  );
+
+  return Math.max(1, Math.min(maxPossibleCols, desiredCols));
+}
+
+function computeGridWidth(cols: number, density: ConcreteCardDensity): number {
+  const config = CARD_DENSITY_CONFIGS[density];
+  return cols * (config.cardWidth + config.gapPx) - config.gapPx;
+}
 
 /**
  * 卡片拖拽碰撞检测：指针命中优先
@@ -260,6 +320,55 @@ export function HomeContent({
     localCategories.some((c) => c.cards && c.cards.length > 0) ||
     localUnclassified.length > 0;
 
+  // 容器实测可用宽度（信赖容器实测宽，ResizeObserver 监听自适应窗口拖拉）
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number | null>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const updateWidth = () => {
+      const w = el.getBoundingClientRect().width;
+      if (w > 0) setContainerWidth(w);
+    };
+
+    updateWidth();
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        const w = entry.contentRect.width;
+        if (w > 0) setContainerWidth(w);
+      }
+    });
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // 各分类中单分区卡片数量的最大值（决定大屏下展开列数的期望值）
+  const maxCards = useMemo(() => {
+    const counts = [
+      ...localCategories.map((c) => c.cards?.length ?? 0),
+      localUnclassified.length,
+    ];
+    return Math.max(0, ...counts);
+  }, [localCategories, localUnclassified]);
+
+  // 综合密度、卡片总数、容器实测宽度推导出的生效列数与目标最大宽度
+  const effectiveCols = useMemo(() => {
+    return computeEffectiveCols({
+      density,
+      maxCards,
+      availableWidth: containerWidth,
+    });
+  }, [density, maxCards, containerWidth]);
+
+  const targetMaxWidth = useMemo(() => {
+    return computeGridWidth(effectiveCols, density);
+  }, [effectiveCols, density]);
+
   // 全部卡片 id（批量删除「全选」用）
   const allCardIds = [
     ...localCategories.flatMap((c) => c.cards ?? []),
@@ -343,88 +452,92 @@ export function HomeContent({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      {hasCards || reorderMode ? (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'clamp(0.5rem, 1.5vh, 1.5rem)',
-          }}
-        >
-          {/* 分类分区纵向铺开，保持所有分区共用同一条左边界（启用拖拽）
-           * 编辑模式下标题右侧 hover 显示 新建卡片 / 删除分类 操作。 */}
-          {localCategories.map((category) => (
-            <CategorySection
-              key={category.id}
-              title={category.name}
-              icon={category.icon}
-              color={category.color}
-              categoryId={category.id}
-              cards={category.cards ?? []}
-              statuses={statuses}
-              networkMode={currentNetworkMode}
-              onCardClick={refreshOne}
-              onEditCard={isAuthed ? handleEditCard : undefined}
-              onDeleteCard={isAuthed ? handleDeleteCard : undefined}
-              onAddCard={
-                isAuthed ? () => handleNewCard(category.id) : undefined
-              }
-              onDeleteCategory={
-                isAuthed ? () => handleDeleteCategory(category.id) : undefined
-              }
-              simple={simpleMode}
-              density={density}
-              showStatus={showStatusBadge}
-              selectionMode={batch.active}
-              selectedIds={batch.selectedIds}
-              onToggleSelect={batch.toggle}
-              sortable={isAuthed}
-              reorderMode={isAuthed && reorderMode}
-              activeCard={activeCard}
-            />
-          ))}
-
-          {/* 未分类排在最后 */}
-          {(localUnclassified.length > 0 || reorderMode) && (
-            <CategorySection
-              title={null}
-              categoryId={null}
-              cards={localUnclassified}
-              statuses={statuses}
-              networkMode={currentNetworkMode}
-              onCardClick={refreshOne}
-              onEditCard={isAuthed ? handleEditCard : undefined}
-              onDeleteCard={isAuthed ? handleDeleteCard : undefined}
-              onAddCard={isAuthed ? () => handleNewCard(null) : undefined}
-              simple={simpleMode}
-              density={density}
-              showStatus={showStatusBadge}
-              selectionMode={batch.active}
-              selectedIds={batch.selectedIds}
-              onToggleSelect={batch.toggle}
-              sortable={isAuthed}
-              reorderMode={isAuthed && reorderMode}
-              activeCard={activeCard}
-            />
-          )}
-        </div>
-      ) : (
-        <EmptyState
-          title="开始搭建你的导航台"
-          description="手动添加服务卡片，也可以把浏览器里的链接直接拖进页面"
-          icon={<EmptyCardsIllustration />}
-          actions={
-            isAuthed ? (
-              <Button
-                label="创建卡片"
-                variant="primary"
-                icon={<Plus size={ICON_SIZE.md} />}
-                onClick={() => handleNewCard(null)}
+      <div ref={containerRef} className="w-full">
+        {hasCards || reorderMode ? (
+          <div
+            className="mx-auto w-full transition-[max-width] duration-150 ease-out"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'clamp(0.5rem, 1.5vh, 1.5rem)',
+              maxWidth: `${targetMaxWidth}px`,
+            }}
+          >
+            {/* 分类分区纵向铺开，保持所有分区共用同一条左边界（启用拖拽）
+             * 编辑模式下标题右侧 hover 显示 新建卡片 / 删除分类 操作。 */}
+            {localCategories.map((category) => (
+              <CategorySection
+                key={category.id}
+                title={category.name}
+                icon={category.icon}
+                color={category.color}
+                categoryId={category.id}
+                cards={category.cards ?? []}
+                statuses={statuses}
+                networkMode={currentNetworkMode}
+                onCardClick={refreshOne}
+                onEditCard={isAuthed ? handleEditCard : undefined}
+                onDeleteCard={isAuthed ? handleDeleteCard : undefined}
+                onAddCard={
+                  isAuthed ? () => handleNewCard(category.id) : undefined
+                }
+                onDeleteCategory={
+                  isAuthed ? () => handleDeleteCategory(category.id) : undefined
+                }
+                simple={simpleMode}
+                density={density}
+                showStatus={showStatusBadge}
+                selectionMode={batch.active}
+                selectedIds={batch.selectedIds}
+                onToggleSelect={batch.toggle}
+                sortable={isAuthed}
+                reorderMode={isAuthed && reorderMode}
+                activeCard={activeCard}
               />
-            ) : undefined
-          }
-        />
-      )}
+            ))}
+
+            {/* 未分类排在最后 */}
+            {(localUnclassified.length > 0 || reorderMode) && (
+              <CategorySection
+                title={null}
+                categoryId={null}
+                cards={localUnclassified}
+                statuses={statuses}
+                networkMode={currentNetworkMode}
+                onCardClick={refreshOne}
+                onEditCard={isAuthed ? handleEditCard : undefined}
+                onDeleteCard={isAuthed ? handleDeleteCard : undefined}
+                onAddCard={isAuthed ? () => handleNewCard(null) : undefined}
+                simple={simpleMode}
+                density={density}
+                showStatus={showStatusBadge}
+                selectionMode={batch.active}
+                selectedIds={batch.selectedIds}
+                onToggleSelect={batch.toggle}
+                sortable={isAuthed}
+                reorderMode={isAuthed && reorderMode}
+                activeCard={activeCard}
+              />
+            )}
+          </div>
+        ) : (
+          <EmptyState
+            title="开始搭建你的导航台"
+            description="手动添加服务卡片，也可以把浏览器里的链接直接拖进页面"
+            icon={<EmptyCardsIllustration />}
+            actions={
+              isAuthed ? (
+                <Button
+                  label="创建卡片"
+                  variant="primary"
+                  icon={<Plus size={ICON_SIZE.md} />}
+                  onClick={() => handleNewCard(null)}
+                />
+              ) : undefined
+            }
+          />
+        )}
+      </div>
 
       <DeleteCategoryDialog
         pending={pendingCategory !== null}
