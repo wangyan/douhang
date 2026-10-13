@@ -59,10 +59,15 @@ export interface CardDensityConfig {
   titleTextClass: string;
 }
 
+/**
+ * 各档位的 iconSize 与 cardWidth 维持约 0.70 的固定比例（图标占卡片七成，
+ * 四周留白约 15%），卡片本体是 flex 居中的，图标越小留白越大。调整
+ * cardWidth 时须同步按此比例调整 iconSize，否则会出现图标偏小、留白过大的观感。
+ */
 export const CARD_DENSITY_CONFIGS: Record<CardDensity, CardDensityConfig> = {
   auto: {
     cardWidth: 88,
-    iconSize: 44,
+    iconSize: 62,
     gapClass: 'gap-4',
     gapPx: 16,
     titleHeightClass: 'min-h-[2rem]',
@@ -70,7 +75,7 @@ export const CARD_DENSITY_CONFIGS: Record<CardDensity, CardDensityConfig> = {
   },
   compact: {
     cardWidth: 80,
-    iconSize: 40,
+    iconSize: 56,
     gapClass: 'gap-3',
     gapPx: 12,
     titleHeightClass: 'min-h-[1.75rem]',
@@ -78,7 +83,7 @@ export const CARD_DENSITY_CONFIGS: Record<CardDensity, CardDensityConfig> = {
   },
   normal: {
     cardWidth: 88,
-    iconSize: 44,
+    iconSize: 62,
     gapClass: 'gap-4',
     gapPx: 16,
     titleHeightClass: 'min-h-[2rem]',
@@ -86,7 +91,7 @@ export const CARD_DENSITY_CONFIGS: Record<CardDensity, CardDensityConfig> = {
   },
   cozy: {
     cardWidth: 100,
-    iconSize: 52,
+    iconSize: 70,
     gapClass: 'gap-5',
     gapPx: 20,
     titleHeightClass: 'min-h-[2.25rem]',
