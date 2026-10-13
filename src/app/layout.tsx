@@ -41,6 +41,24 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const ENTRANCE_GATE_SCRIPT = `(function(){try{if(sessionStorage.getItem('douhang-launched')==='1'){document.documentElement.dataset.entered='1';}sessionStorage.setItem('douhang-launched','1');}catch(e){}})();`;
 
+/** 现代浏览器特性探针：仅凭原生特性支持判定（Chrome 123+ / Firefox 128+ / Safari 17.5+），零 UA 解析负担 */
+const BROWSER_PROBE_SCRIPT = `(function(){
+  try {
+    if (window.location && window.location.pathname && window.location.pathname.indexOf('/outdated.html') !== -1) return;
+    try {
+      if (window.sessionStorage && window.sessionStorage.getItem('douhang-ignore-browser-check') === '1') return;
+    } catch (e) {}
+
+    var c = window.CSS;
+    var ok = c && c.supports && c.supports('color', 'light-dark(red,blue)') && ('registerProperty' in c);
+    if (!ok) {
+      var p = (window.location && window.location.pathname) || '/';
+      var s = (window.location && window.location.search) || '';
+      window.location.replace('/outdated.html?from=' + encodeURIComponent(p + s));
+    }
+  } catch (err) {}
+})();`.replace(/\\s+/g, ' ');
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -82,6 +100,11 @@ export default async function RootLayout({
       className="h-full antialiased"
     >
       <head>
+        {/* 现代浏览器特性探针：首帧前同步阻断不合格旧内核浏览器 */}
+        <script
+          id="browser-probe"
+          dangerouslySetInnerHTML={{ __html: BROWSER_PROBE_SCRIPT }}
+        />
         {/* 主题初始化必须是普通同步脚本；next/script 会推入 __next_s 队列。 */}
         <script
           id="theme-init"

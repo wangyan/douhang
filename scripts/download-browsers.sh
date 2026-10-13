@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+set -e
+
+# 创建下载目标目录（集中存放在 public/downloads/browsers）
+DEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/public/downloads/browsers"
+mkdir -p "$DEST_DIR"
+
+echo "=== 开始拉取离线浏览器安装包至本地目录: $DEST_DIR ==="
+
+# 1. Chrome for macOS (Universal / arm64 & x86_64)
+CHROME_MAC_URL="https://dl.google.com/chrome/mac/stable/GGRO/googlechrome.dmg"
+CHROME_MAC_FILE="$DEST_DIR/googlechrome.dmg"
+if [ ! -s "$CHROME_MAC_FILE" ]; then
+  echo "--> 正在下载 Chrome for Mac..."
+  curl -L -f --progress-bar "$CHROME_MAC_URL" -o "$CHROME_MAC_FILE"
+else
+  echo "--> Chrome for Mac 已存在 ($(du -h "$CHROME_MAC_FILE" | cut -f1))，跳过。"
+fi
+
+# 2. Chrome Standalone for Windows 64-bit
+CHROME_WIN_URL="https://dl.google.com/tag/s/appguid%3D%7B8A69D345-D564-463C-AFF1-A69D9E530F96%7D%26iid%3D%7B00000000-0000-0000-0000-000000000000%7D%26lang%3Dzh-CN%26browser%3D4%26usagestats%3D0%26appname%3DGoogle%2520Chrome%26needsadmin%3Dprefers%26ap%3Dx64-stable-statsdef_1%26installdataindex%3Dempty/update2/installers/ChromeStandaloneSetup64.exe"
+CHROME_WIN_FILE="$DEST_DIR/ChromeStandaloneSetup64.exe"
+if [ ! -s "$CHROME_WIN_FILE" ]; then
+  echo "--> 正在下载 Chrome for Windows 64位独立完整安装包..."
+  curl -L -f --progress-bar "$CHROME_WIN_URL" -o "$CHROME_WIN_FILE"
+else
+  echo "--> Chrome for Windows 已存在 ($(du -h "$CHROME_WIN_FILE" | cut -f1))，跳过。"
+fi
+
+# 3. Chrome for Linux (deb & rpm)
+CHROME_DEB_URL="https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
+CHROME_DEB_FILE="$DEST_DIR/google-chrome-stable_current_amd64.deb"
+if [ ! -s "$CHROME_DEB_FILE" ]; then
+  echo "--> 正在下载 Chrome for Linux (.deb)..."
+  curl -L -f --progress-bar "$CHROME_DEB_URL" -o "$CHROME_DEB_FILE"
+else
+  echo "--> Chrome for Linux (.deb) 已存在 ($(du -h "$CHROME_DEB_FILE" | cut -f1))，跳过。"
+fi
+
+CHROME_RPM_URL="https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm"
+CHROME_RPM_FILE="$DEST_DIR/google-chrome-stable_current_x86_64.rpm"
+if [ ! -s "$CHROME_RPM_FILE" ]; then
+  echo "--> 正在下载 Chrome for Linux (.rpm)..."
+  curl -L -f --progress-bar "$CHROME_RPM_URL" -o "$CHROME_RPM_FILE"
+else
+  echo "--> Chrome for Linux (.rpm) 已存在 ($(du -h "$CHROME_RPM_FILE" | cut -f1))，跳过。"
+fi
+
+# 4. Microsoft Edge for Windows
+EDGE_WIN_URL="https://c2rsetup.officeapps.live.com/c2r/downloadEdge.aspx?platform=Default&Channel=Stable&language=zh-cn"
+EDGE_WIN_FILE="$DEST_DIR/MicrosoftEdgeSetup.exe"
+if [ ! -s "$EDGE_WIN_FILE" ]; then
+  echo "--> 正在下载 Microsoft Edge for Windows 安装包..."
+  curl -L -f --progress-bar "$EDGE_WIN_URL" -o "$EDGE_WIN_FILE"
+else
+  echo "--> Edge for Windows 已存在 ($(du -h "$EDGE_WIN_FILE" | cut -f1))，跳过。"
+fi
+
+# 5. Microsoft Edge for Mac
+EDGE_MAC_URL="https://c2rsetup.officeapps.live.com/c2r/downloadEdge.aspx?platform=Mac&Channel=Stable&language=zh-cn"
+EDGE_MAC_FILE="$DEST_DIR/MicrosoftEdge.pkg"
+if [ ! -s "$EDGE_MAC_FILE" ]; then
+  echo "--> 正在下载 Microsoft Edge for Mac 安装包..."
+  curl -L -f --progress-bar "$EDGE_MAC_URL" -o "$EDGE_MAC_FILE"
+else
+  echo "--> Edge for Mac 已存在 ($(du -h "$EDGE_MAC_FILE" | cut -f1))，跳过。"
+fi
+
+# 6. Firefox for Windows 64-bit
+FIREFOX_WIN_URL="https://download.mozilla.org/?product=firefox-latest-ssl&os=win64&lang=zh-CN"
+FIREFOX_WIN_FILE="$DEST_DIR/Firefox-Setup.exe"
+if [ ! -s "$FIREFOX_WIN_FILE" ]; then
+  echo "--> 正在下载 Firefox for Windows 64位安装包..."
+  curl -L -f --progress-bar "$FIREFOX_WIN_URL" -o "$FIREFOX_WIN_FILE"
+else
+  echo "--> Firefox for Windows 已存在 ($(du -h "$FIREFOX_WIN_FILE" | cut -f1))，跳过。"
+fi
+
+# 7. Firefox for Mac
+FIREFOX_MAC_URL="https://download.mozilla.org/?product=firefox-latest-ssl&os=osx&lang=zh-CN"
+FIREFOX_MAC_FILE="$DEST_DIR/Firefox.dmg"
+if [ ! -s "$FIREFOX_MAC_FILE" ]; then
+  echo "--> 正在下载 Firefox for Mac 安装包..."
+  curl -L -f --progress-bar "$FIREFOX_MAC_URL" -o "$FIREFOX_MAC_FILE"
+else
+  echo "--> Firefox for Mac 已存在 ($(du -h "$FIREFOX_MAC_FILE" | cut -f1))，跳过。"
+fi
+
+echo "=== 下载与检查完成！当前 public/downloads/browsers 列表: ==="
+ls -lh "$DEST_DIR"

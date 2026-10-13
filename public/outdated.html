@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>浏览器内核版本较低</title>
+  <style>
+    /* 纯静态离线样式：兼容 Chrome 80+ / Safari 13+ / 移动端，零外部网络依赖 */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.25rem 0.75rem;
+      background: #f8fafc;
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #edf7f2 100%);
+      color: #334155;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .card {
+      width: 100%;
+      max-width: 42rem;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05), 0 1px 4px rgba(15, 23, 42, 0.02);
+      overflow: hidden;
+    }
+    /* 头部重新设计：清爽克制、一体化，去除突兀的黄色环境提示药丸 */
+    .card-header {
+      padding: 1.5rem 1.5rem 1.25rem;
+      text-align: center;
+      background: #ffffff;
+      background: linear-gradient(to bottom, #ffffff, #fafbfd);
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .brand-mark {
+      width: 2.75rem;
+      height: 2.75rem;
+      background: #d45134;
+      border-radius: 12px;
+      padding: 0.375rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 10px rgba(212, 81, 52, 0.18);
+      margin-bottom: 0.625rem;
+    }
+    .brand-mark svg {
+      width: 100%;
+      height: 100%;
+    }
+    .title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.35rem;
+    }
+    .subtitle {
+      max-width: 30rem;
+      font-size: 0.8125rem;
+      color: #64748b;
+      line-height: 1.55;
+    }
+    /* 紧凑精致的环境诊断卡片 */
+    .env-card {
+      margin-top: 0.875rem;
+      width: 100%;
+      max-width: 34rem;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 0.5rem 0.875rem;
+      font-size: 0.75rem;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    .env-item {
+      display: inline-block;
+      padding: 0.15rem 0;
+      margin-right: 0.75rem;
+    }
+    .env-item:last-child {
+      margin-right: 0;
+    }
+    .env-val {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: #1e293b;
+      font-weight: 600;
+    }
+    /* 情境提示条 */
+    .notices-wrapper {
+      padding: 0.875rem 1.5rem 0;
+    }
+    .notice {
+      padding: 0.55rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      margin-bottom: 0.5rem;
+      line-height: 1.5;
+    }
+    .notice:last-child {
+      margin-bottom: 0;
+    }
+    .notice-mac {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      color: #0369a1;
+    }
+    .notice-dual {
+      background: #faf5ff;
+      border: 1px solid #e9d5ff;
+      color: #6b21a8;
+    }
+    .notice-mobile {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #92400e;
+    }
+    .notice-icon {
+      float: left;
+      width: 1rem;
+      height: 1rem;
+      margin-right: 0.5rem;
+      margin-top: 0.125rem;
+    }
+    /* 内容区域：紧凑、利落 */
+    .content-body {
+      padding: 1.125rem 1.5rem 1.25rem;
+    }
+    .section-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.625rem;
+    }
+    .section-title {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .section-badge {
+      display: inline-block;
+      font-size: 0.625rem;
+      font-weight: 600;
+      padding: 0.1rem 0.4rem;
+      border-radius: 9999px;
+      background: #e8f5e9;
+      color: #1b5e20;
+      margin-left: 0.35rem;
+      vertical-align: middle;
+    }
+    .section-desc {
+      font-size: 0.6875rem;
+      color: #94a3b8;
+    }
+    /* 紧凑型切换标签 */
+    .browser-tabs {
+      padding: 0.2rem;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      display: flex;
+      margin-bottom: 0.75rem;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 0.4rem 0.25rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #64748b;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.15s ease, color 0.15s ease;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .tab-btn svg {
+      margin-right: 0.35rem;
+      flex-shrink: 0;
+    }
+    .tab-btn.active {
+      background: #ffffff;
+      color: #0f172a;
+      font-weight: 600;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+    /* 紧凑型平台手风琴 */
+    .accordion-wrap {
+      margin-bottom: 1rem;
+    }
+    .platform-item {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+      transition: border-color 0.15s ease;
+    }
+    .platform-item:last-child {
+      margin-bottom: 0;
+    }
+    .platform-header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.65rem 0.875rem;
+      background: #ffffff;
+      border: none;
+      color: #1e293b;
+      cursor: pointer;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      text-align: left;
+      transition: background-color 0.15s ease, color 0.15s ease;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .platform-header:hover {
+      background: #f8fafc;
+    }
+    .platform-header.active {
+      background: #1e4635;
+      color: #ffffff;
+    }
+    .platform-header.active .os-sub {
+      color: rgba(255, 255, 255, 0.85);
+    }
+    .platform-header.active .chevron-icon {
+      color: #ffffff;
+      transform: rotate(180deg);
+      -webkit-transform: rotate(180deg);
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+    }
+    .header-left svg {
+      margin-right: 0.45rem;
+      flex-shrink: 0;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+    }
+    .os-sub {
+      font-size: 0.6875rem;
+      font-weight: normal;
+      color: #64748b;
+      margin-right: 0.45rem;
+    }
+    .chevron-icon {
+      width: 0.875rem;
+      height: 0.875rem;
+      color: #94a3b8;
+      transition: transform 0.2s ease;
+      -webkit-transition: -webkit-transform 0.2s ease;
+      flex-shrink: 0;
+    }
+    .platform-content {
+      background: #ffffff;
+      padding: 0 0.875rem;
+      border-top: 1px solid #f1f5f9;
+    }
+    .download-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #f8fafc;
+    }
+    .download-row:last-child {
+      border-bottom: none;
+    }
+    .arch-left {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .arch-name {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #1e293b;
+      margin-right: 0.35rem;
+    }
+    .arch-badge {
+      display: inline-block;
+      padding: 0.05rem 0.35rem;
+      border-radius: 9999px;
+      background: #e8f5e9;
+      color: #1b5e20;
+      font-size: 0.625rem;
+      font-weight: 600;
+    }
+    .btn-download-tray {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      min-width: 2rem;
+      min-height: 2rem;
+      border-radius: 6px;
+      color: #475569;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      text-decoration: none;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .btn-download-tray:hover {
+      background: #f1f5f9;
+      color: #0f172a;
+      border-color: #cbd5e1;
+    }
+    .btn-download-tray svg {
+      width: 15px;
+      height: 15px;
+    }
+    /* 官方在线入口（紧凑辅助） */
+    .official-sites-wrap {
+      border-top: 1px solid #f1f5f9;
+      padding-top: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .official-sites-label {
+      font-size: 0.6875rem;
+      color: #94a3b8;
+    }
+    .official-sites-links {
+      display: flex;
+      align-items: center;
+    }
+    .official-link-pill {
+      font-size: 0.6875rem;
+      color: #475569;
+      text-decoration: none;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      margin-left: 0.35rem;
+      transition: all 0.15s ease;
+    }
+    .official-link-pill:first-child {
+      margin-left: 0;
+    }
+    .official-link-pill:hover {
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+    /* 页脚 */
+    .footer {
+      padding: 0.75rem 1.5rem;
+      background: #f8fafc;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.6875rem;
+      color: #64748b;
+    }
+    .footer-left {
+      display: flex;
+      align-items: center;
+    }
+    .footer-left svg {
+      margin-right: 0.3rem;
+      flex-shrink: 0;
+    }
+    .btn-escape {
+      background: none;
+      border: none;
+      color: #64748b;
+      text-decoration: underline;
+      cursor: pointer;
+      font-size: 0.6875rem;
+      padding: 0.2rem 0;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .btn-escape:hover {
+      color: #0f172a;
+    }
+    .hidden {
+      display: none !important;
+    }
+    /* 移动端排版优化 */
+    @media (max-width: 640px) {
+      body {
+        padding: 0.75rem 0.375rem;
+      }
+      .card {
+        border-radius: 14px;
+      }
+      .card-header, .content-body, .notices-wrapper, .footer {
+        padding-left: 0.875rem;
+        padding-right: 0.875rem;
+      }
+      .title {
+        font-size: 1.0625rem;
+      }
+      .subtitle {
+        font-size: 0.75rem;
+      }
+      .env-card {
+        flex-direction: column;
+        align-items: flex-start;
+        font-size: 0.6875rem;
+      }
+      .env-item {
+        margin-right: 0;
+        margin-bottom: 0.2rem;
+      }
+      .browser-tabs {
+        padding: 0.15rem;
+      }
+      .tab-btn {
+        font-size: 0.6875rem;
+        padding: 0.35rem 0.15rem;
+      }
+      .official-sites-wrap {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .official-sites-links {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .official-link-pill {
+        flex: 1;
+        text-align: center;
+      }
+      .footer {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 0.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <main class="card">
+    <!-- 头部区域：一体化清爽设计，去除碍眼标签 -->
+    <div class="card-header">
+      <div class="brand-mark" aria-label="斗法领航">
+        <!-- 斗法领航官方品牌标识 (珊瑚红底板 + 白标) -->
+        <svg viewBox="0 0 1022.64 1022.64" aria-hidden="true">
+          <rect fill="#d45134" width="1022.64" height="1022.64" rx="225" ry="225" />
+          <path fill="#ffffff" d="M488.04,812.17c.1.62.31,1.72-.03,1.98l-1.51,1.16-28.37-.55c-60.86-2.28-125.89-9-184.41-26.21-19.97-5.88-42.01-15-59.51-26.01-19.6-12.34-38.02-28.9-44.16-51.73-5.42-20.18,4.01-39.1,18.36-53.22,12.07-11.87,25.17-19.41,40.37-26.67l9.12-3.38c.24-.09,1.62.47,1.47.63l-.69.78c-23.17,15.34-46.11,40.84-32.27,69.05,5.44,11.09,13.76,19.97,23.82,27.27,39.93,28.95,106.96,41.84,155.92,47.13l79.62,5.1c2.44.16,3.89,1.07,4.65,3.25l17.59,31.44Z" />
+          <path fill="#ffffff" d="M564.36,814.27l13-34.49c.51-1.36,1.9-2.62,3.44-2.69,25.09-1.12,49.6-3.52,74.54-7.11,30.75-4.44,60.81-11.17,90.06-21.48,15.96-5.63,30.87-12.77,44.78-22.14,9.9-6.67,18.14-14.55,24.4-24.62,7.37-11.86,8.13-26.06,2.08-38.74-4.68-9.81-11.65-18.12-20.23-24.8l-12.99-10.11c2.14-.39,3.91-.18,5.63.56,22.02,9.53,46.44,24.99,58.49,46.04,13.26,23.15,5.19,47.96-12.79,66.31-11.13,11.35-24.09,20.19-38.26,27.55-29.93,15.53-64.97,25.02-98.18,31.46-41.04,7.97-82.31,12.31-123.99,14.37-3.47.17-5.74.51-9.98-.12Z" />
+          <path fill="#ffffff" stroke="#ffffff" stroke-width="0.96px" d="M461.11,689.05l-4.23-14.97-11.46-40.43-4.7-16.47-5.9-20.48c-1.72-5.97-3.28-11.7-5.71-17.31-2.89-6.66-6.4-12.71-11.45-17.51l-9.67-7.65-19.89-14.69-92.02-64.54-48.9-34.7c-6.89-4.89-12.66-10.37-17.24-17.89-6.18-10.17-8.94-22.96-6.63-35.21,1.81-9.61,6.52-17.69,12.84-24.35,5.79-6.1,12.67-9.73,20.3-12.58l205-54.92,69.05-18.77,221.38-59.84,25.03-6.69c4.65-1.24,9-2.3,13.86-2.23,13,.18,25.75,8.1,32.05,20.48,6.89,13.55,7.26,30.03.19,43.92l-19.8,38.89-17.91,34.82-42.45,82.78-44.01,85.73-32.84,63.54-19.9,38.33-80.1,152.29c-4.16,7.91-8.45,15.24-14.76,21.12-8.52,7.94-18.9,12.61-29.95,11.95-18.59-1.11-32.22-15.82-37.64-34.53l-5.25-18.12-6.82-23.53-4.49-15.79-5.96-20.65Z" />
+        </svg>
+      </div>
+
+      <h1 class="title">当前浏览器内核版本较低</h1>
+      <p class="subtitle">
+        为保障系统的正常浏览与功能完整，请升级当前浏览器或安装现代浏览器。
+      </p>
+
+      <!-- 诊断与建议环境轻卡片 -->
+      <div class="env-card">
+        <div class="env-item">
+          <span>当前环境：</span>
+          <span id="detected-env" class="env-val">正在识别...</span>
+        </div>
+        <div class="env-item">
+          <span>建议内核：</span>
+          <span class="env-val">Chromium 123+ · Safari 17.5+ · Firefox 128+</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 情境特定提示 -->
+    <div class="notices-wrapper">
+      <!-- Mac Safari 提示 -->
+      <div id="notice-mac" class="notice notice-mac hidden">
+        <svg class="notice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="16" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+        <div>
+          <strong>Mac Safari 用户提示：</strong>
+          Safari 随 macOS 系统更新。可通过「系统设置 → 通用 → 软件更新」升级系统，或直接在下方安装 Chrome、Firefox 等独立浏览器。
+        </div>
+      </div>
+
+      <!-- 国产双核提示 -->
+      <div id="notice-dual" class="notice notice-dual hidden">
+        <svg class="notice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        <div>
+          <strong>双核浏览器提示：</strong>
+          若当前处于兼容模式，请点击地址栏右侧图标切换为「极速模式」。若仍提示版本较低，请升级浏览器至最新版本。
+        </div>
+      </div>
+
+      <!-- 移动端提示 -->
+      <div id="notice-mobile" class="notice notice-mobile hidden">
+        <svg class="notice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+          <line x1="12" y1="18" x2="12.01" y2="18"/>
+        </svg>
+        <div>
+          <strong>内置浏览器提示：</strong>
+          建议点击右上角菜单，选择「在系统默认浏览器中打开」。
+        </div>
+      </div>
+    </div>
+
+    <!-- 离线安装包紧凑下载区域 -->
+    <div class="content-body">
+      <div class="section-bar">
+        <div>
+          <span class="section-title">离线安装包下载</span>
+          <span class="section-badge">本地极速</span>
+        </div>
+        <div class="section-desc">已内置完整安装包 · 纯内网免代理下载</div>
+      </div>
+
+      <!-- 浏览器切换标签 (Tabs) -->
+      <div class="browser-tabs">
+        <button type="button" onclick="switchBrowser('chrome')" id="tab-chrome" class="tab-btn active">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="#ea4335">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c2.32 0 4.39 1.12 5.69 2.85l-4.91 8.5C12.53 16.32 12.27 16.33 12 16.33c-2.39 0-4.33-1.94-4.33-4.33 0-.69.17-1.34.46-1.92L4.35 9.17C5.82 5.56 9.38 3 12 3zm-6.9 8.27l4.9 2.83c-.07.28-.1.58-.1.9 0 2.39 1.94 4.33 4.33 4.33.6 0 1.16-.13 1.67-.35l2.45 4.25C16.48 20.35 14.33 21 12 21c-4.41 0-8.08-3.18-8.9-7.73z"/>
+          </svg>
+          <span>Chrome</span>
+        </button>
+        <button type="button" onclick="switchBrowser('edge')" id="tab-edge" class="tab-btn">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="#0078d4">
+            <path d="M21.996 15.35c-.173 3.633-3.15 6.65-6.846 6.65-3.834 0-6.945-3.111-6.945-6.945 0-.75.122-1.472.348-2.148C4.544 13.907 2 17.525 2 21.75h2.25c0-3.375 2.125-6.25 5.125-7.375.485 1.95 2.247 3.375 4.375 3.375 2.485 0 4.5-2.015 4.5-4.5 0-.847-.234-1.64-.642-2.316 2.457.778 4.238 2.879 4.388 5.416zM13.25 2C7.589 2 3 6.589 3 12.25c0 .341.018.679.052 1.012 1.547-2.31 4.152-3.887 7.123-4.004.025-.568.175-1.11.433-1.603-2.115.114-3.864 1.341-4.717 3.125C7.033 6.942 9.873 4.25 13.25 4.25c3.216 0 5.928 2.44 6.333 5.583.567-.408 1.258-.658 2.01-.683-.824-4.14-4.464-7.15-8.343-7.15z"/>
+          </svg>
+          <span>Edge</span>
+        </button>
+        <button type="button" onclick="switchBrowser('firefox')" id="tab-firefox" class="tab-btn">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="#ff7139">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm6.73 7.82c-.17 1.48-.82 2.82-1.84 3.82-.41.4-.87.73-1.37.99-.07.04-.15.07-.22.1-.21.09-.43.16-.65.21-.18.04-.37.07-.56.08-.22.01-.44.01-.66 0-.31-.02-.61-.06-.9-.13-.24-.06-.47-.14-.69-.24-.2-.09-.39-.2-.57-.33-.31-.22-.59-.48-.82-.78-.29-.38-.51-.81-.66-1.27-.13-.41-.19-.84-.18-1.27.02-.54.14-1.07.36-1.57.17-.38.39-.73.65-1.05.23-.28.5-.52.8-.72.33-.22.69-.39 1.07-.51.41-.13.84-.19 1.27-.18.52.01 1.03.12 1.51.32.42.17.8.4 1.14.69.31.26.58.57.79.92.24.4.41.84.51 1.3.09.43.11.87.06 1.31z"/>
+          </svg>
+          <span>Firefox</span>
+        </button>
+      </div>
+
+      <!-- 平台手风琴下载区（自动识别当前系统展开，且支持点击折叠收起） -->
+      <div class="accordion-wrap">
+
+        <!-- 1. macOS 胶囊条 -->
+        <div class="platform-item">
+          <button type="button" onclick="togglePlatform('mac')" id="header-mac" class="platform-header">
+            <div class="header-left">
+              <svg viewBox="0 0 170 170" width="15" height="15" fill="currentColor">
+                <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.7-3.08-7.69-7.85-11.96-14.31-7.08-10.74-12.63-23.75-16.66-39.04-4.03-15.29-6.04-29.58-6.04-42.86 0-16.92 4.1-30.82 12.3-41.7 8.2-10.88 18.59-16.48 31.18-16.8 4.8 0 10.37 1.34 16.71 4.02 6.34 2.68 10.15 4.08 11.44 4.2 1.9-.34 5.92-1.85 12.06-4.54 6.14-2.69 11.75-3.9 16.82-3.63 12.42.66 22.42 5.09 29.98 13.29 7.56 8.2 12.14 18.23 13.74 30.1-10.97 6.64-16.32 15.82-16.05 27.54.27 9.87 4.06 18.17 11.37 24.89 7.31 6.72 16.14 10.72 26.5 12-2.15 6.63-4.73 13.5-7.75 20.61zM119.22 33.15c0-7.29 2.58-14.19 7.74-20.7 5.16-6.51 11.76-10.82 19.8-12.93.3 2.1.45 4.1.45 6 .12 7.29-2.53 14.34-7.95 21.15-5.42 6.81-12.1 11.16-20.04 13.05-.12-2.13-.18-4.32-.18-6.57z"/>
+              </svg>
+              <span>macOS</span>
+            </div>
+            <div class="header-right">
+              <span class="os-sub">macOS 12+</span>
+              <svg id="chevron-mac" class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
+          </button>
+
+          <div id="content-mac" class="platform-content hidden">
+            <!-- X64 (Intel) -->
+            <div class="download-row">
+              <div class="arch-left">
+                <span class="arch-name">X64 (Intel 芯片)</span>
+                <span id="badge-mac-intel" class="arch-badge hidden">当前系统</span>
+              </div>
+              <a id="link-mac-x64" href="/downloads/browsers/googlechrome.dmg" class="btn-download-tray" title="下载安装包">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </a>
+            </div>
+
+            <!-- ARM64 (Apple Silicon) -->
+            <div class="download-row">
+              <div class="arch-left">
+                <span class="arch-name">ARM64 (Apple Silicon M系列)</span>
+                <span id="badge-mac-arm" class="arch-badge hidden">当前系统</span>
+              </div>
+              <a id="link-mac-arm" href="/downloads/browsers/googlechrome.dmg" class="btn-download-tray" title="下载安装包">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Windows 胶囊条 -->
+        <div class="platform-item">
+          <button type="button" onclick="togglePlatform('win')" id="header-win" class="platform-header">
+            <div class="header-left">
+              <svg viewBox="0 0 88 88" width="15" height="15" fill="currentColor">
+                <path d="M0 12.402l35.689-4.86.016 34.423-35.67.202L0 12.402zm35.67 33.529l.029 34.452-35.67-4.9-.029-29.754 35.67.202zM40.167 5.867L87.89 0v41.424l-47.723.277V5.867zm47.747 40.093L87.9 88l-47.733-6.73-.016-35.495 47.763.185z"/>
+              </svg>
+              <span>Windows</span>
+            </div>
+            <div class="header-right">
+              <span class="os-sub">Windows 10+</span>
+              <svg id="chevron-win" class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
+          </button>
+
+          <div id="content-win" class="platform-content hidden">
+            <!-- 64 位 (X64) -->
+            <div class="download-row">
+              <div class="arch-left">
+                <span class="arch-name">64 位 (X64 常用)</span>
+                <span id="badge-win-x64" class="arch-badge hidden">当前系统</span>
+              </div>
+              <a id="link-win-x64" href="/downloads/browsers/ChromeStandaloneSetup64.exe" class="btn-download-tray" title="下载安装包">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </a>
+            </div>
+
+            <!-- ARM64 -->
+            <div class="download-row">
+              <div class="arch-left">
+                <span class="arch-name">ARM64 (移动设备)</span>
+                <span id="badge-win-arm" class="arch-badge hidden">当前系统</span>
+              </div>
+              <a id="link-win-arm" href="/downloads/browsers/ChromeStandaloneSetup64.exe" class="btn-download-tray" title="下载安装包">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Linux 胶囊条 -->
+        <div class="platform-item">
+          <button type="button" onclick="togglePlatform('linux')" id="header-linux" class="platform-header">
+            <div class="header-left">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                <path d="M12 2a4 4 0 0 0-4 4v2.5c0 .83-.67 1.5-1.5 1.5H5a2 2 0 0 0-2 2v2a5 5 0 0 0 5 5h.5c.28 0 .5.22.5.5V21a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-1.5c0-.28.22-.5.5-.5H16a5 5 0 0 0 5-5v-2a2 2 0 0 0-2-2h-1.5c-.83 0-1.5-.67-1.5-1.5V6a4 4 0 0 0-4-4z"/>
+              </svg>
+              <span>Linux</span>
+            </div>
+            <div class="header-right">
+              <span class="os-sub">.deb / .rpm</span>
+              <svg id="chevron-linux" class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
+          </button>
+
+          <div id="content-linux" class="platform-content hidden">
+            <!-- .deb -->
+            <div class="download-row">
+              <div class="arch-left">
+                <span class="arch-name">Debian / Ubuntu (.deb 64位)</span>
+                <span id="badge-linux-deb" class="arch-badge hidden">当前系统</span>
+              </div>
+              <a id="link-linux-deb" href="/downloads/browsers/google-chrome-stable_current_amd64.deb" class="btn-download-tray" title="下载安装包">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </a>
+            </div>
+
+            <!-- .rpm -->
+            <div class="download-row">
+              <div class="arch-left">
+                <span class="arch-name">Fedora / RHEL (.rpm 64位)</span>
+                <span id="badge-linux-rpm" class="arch-badge hidden">当前系统</span>
+              </div>
+              <a id="link-linux-rpm" href="/downloads/browsers/google-chrome-stable_current_x86_64.rpm" class="btn-download-tray" title="下载安装包">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 官网在线入口（紧凑辅助行） -->
+      <div class="official-sites-wrap">
+        <div class="official-sites-label">具备外网连接时亦可访问官网：</div>
+        <div class="official-sites-links">
+          <a href="https://www.google.cn/chrome/" target="_blank" rel="noopener noreferrer" class="official-link-pill">Chrome 官网 ↗</a>
+          <a href="https://www.microsoft.com/edge" target="_blank" rel="noopener noreferrer" class="official-link-pill">Edge 官网 ↗</a>
+          <a href="https://www.firefox.com.cn/" target="_blank" rel="noopener noreferrer" class="official-link-pill">Firefox 官网 ↗</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部辅助说明与逃生通道 -->
+    <div class="footer">
+      <div class="footer-left">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <span>独立诊断与下载 · 零外部网络依赖</span>
+      </div>
+      <div>
+        <button type="button" onclick="bypassCheck()" class="btn-escape">
+          暂不升级，继续访问 →
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // 纯 ES5 语法规范，兼容 Chrome 80+ / Safari 13+ / 移动端
+
+    // 本地离线安装包直接映射表（彻底移除不可达的外部下载节点）
+    var DOWNLOAD_MAP = {
+      chrome: {
+        'mac-arm': '/downloads/browsers/googlechrome.dmg',
+        'mac-x64': '/downloads/browsers/googlechrome.dmg',
+        'win-x64': '/downloads/browsers/ChromeStandaloneSetup64.exe',
+        'win-arm': '/downloads/browsers/ChromeStandaloneSetup64.exe',
+        'linux-deb': '/downloads/browsers/google-chrome-stable_current_amd64.deb',
+        'linux-rpm': '/downloads/browsers/google-chrome-stable_current_x86_64.rpm'
+      },
+      edge: {
+        'mac-arm': '/downloads/browsers/MicrosoftEdge.pkg',
+        'mac-x64': '/downloads/browsers/MicrosoftEdge.pkg',
+        'win-x64': '/downloads/browsers/MicrosoftEdgeSetup.exe',
+        'win-arm': '/downloads/browsers/MicrosoftEdgeSetup.exe',
+        'linux-deb': '/downloads/browsers/microsoft-edge-stable.deb',
+        'linux-rpm': '/downloads/browsers/microsoft-edge-stable.rpm'
+      },
+      firefox: {
+        'mac-arm': '/downloads/browsers/Firefox.dmg',
+        'mac-x64': '/downloads/browsers/Firefox.dmg',
+        'win-x64': '/downloads/browsers/Firefox-Setup.exe',
+        'win-arm': '/downloads/browsers/Firefox-Setup.exe',
+        'linux-deb': '/downloads/browsers/firefox.tar.xz',
+        'linux-rpm': '/downloads/browsers/firefox.tar.xz'
+      }
+    };
+
+    var currentBrowser = 'chrome';
+
+    // 切换浏览器 Tab
+    function switchBrowser(name) {
+      currentBrowser = name;
+      var tabs = ['chrome', 'edge', 'firefox'];
+      for (var i = 0; i < tabs.length; i++) {
+        var el = document.getElementById('tab-' + tabs[i]);
+        if (el) {
+          if (tabs[i] === name) {
+            el.className = 'tab-btn active';
+          } else {
+            el.className = 'tab-btn';
+          }
+        }
+      }
+      updateDownloadLinks();
+    }
+
+    // 更新下载链接地址为本地离线包
+    function updateDownloadLinks() {
+      var cfg = DOWNLOAD_MAP[currentBrowser];
+      if (!cfg) return;
+      var keys = ['mac-arm', 'mac-x64', 'win-x64', 'win-arm', 'linux-deb', 'linux-rpm'];
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        var url = cfg[key];
+        var a = document.getElementById('link-' + key);
+        if (a && url) {
+          a.href = url;
+        }
+      }
+    }
+
+    // 手风琴折叠与展开（支持再次点击折叠收起）
+    function togglePlatform(platform) {
+      var header = document.getElementById('header-' + platform);
+      var content = document.getElementById('content-' + platform);
+      if (!header || !content) return;
+
+      var isCurrentlyOpen = header.className.indexOf('active') > -1;
+
+      if (isCurrentlyOpen) {
+        // 当前已展开，点击后折叠收起
+        header.className = 'platform-header';
+        content.className = 'platform-content hidden';
+      } else {
+        // 折叠其他平台，展开当前平台
+        var platforms = ['mac', 'win', 'linux'];
+        for (var i = 0; i < platforms.length; i++) {
+          var p = platforms[i];
+          var h = document.getElementById('header-' + p);
+          var c = document.getElementById('content-' + p);
+          if (h && c) {
+            if (p === platform) {
+              h.className = 'platform-header active';
+              c.className = 'platform-content';
+            } else {
+              h.className = 'platform-header';
+              c.className = 'platform-content hidden';
+            }
+          }
+        }
+      }
+    }
+
+    // 客户端环境嗅探与智能展开匹配
+    (function initClient() {
+      var ua = navigator.userAgent || '';
+      var isMac = /Macintosh|Mac OS X/i.test(ua);
+      var isWin = /Windows/i.test(ua);
+      var isLinux = /Linux/i.test(ua) && !/Android/i.test(ua);
+      var isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+      var isWeChat = /MicroMessenger/i.test(ua);
+      var isDualCore = /QIHU|360SE|360EE|QQBrowser|Sogou|2345Explorer|MetaSr/i.test(ua) || (window.external && 'liebao' in window.external);
+
+      var envEl = document.getElementById('detected-env');
+      if (envEl) {
+        var osName = isMac ? 'macOS' : (isWin ? 'Windows' : (isLinux ? 'Linux' : (isMobile ? '移动设备' : '通用客户端')));
+        envEl.textContent = osName + ' · 当前内核版本较低';
+      }
+
+      if (isMac) {
+        var macNotice = document.getElementById('notice-mac');
+        if (macNotice) macNotice.className = 'notice notice-mac';
+        
+        // 自动展开 macOS
+        togglePlatform('mac');
+
+        // 探测 ARM / Apple Silicon
+        var isArm = /ARM|Apple/i.test(navigator.platform || '') || (navigator.userAgentData && navigator.userAgentData.architecture === 'arm');
+        var badgeArm = document.getElementById('badge-mac-arm');
+        var badgeIntel = document.getElementById('badge-mac-intel');
+        if (isArm && badgeArm) {
+          badgeArm.className = 'arch-badge';
+        } else if (badgeIntel) {
+          badgeIntel.className = 'arch-badge';
+        }
+      } else if (isWin) {
+        // 自动展开 Windows
+        togglePlatform('win');
+        var badgeWin = document.getElementById('badge-win-x64');
+        if (badgeWin) badgeWin.className = 'arch-badge';
+      } else if (isLinux) {
+        // 自动展开 Linux
+        togglePlatform('linux');
+        var badgeDeb = document.getElementById('badge-linux-deb');
+        if (badgeDeb) badgeDeb.className = 'arch-badge';
+      } else {
+        // 默认展开 Windows 供查阅
+        togglePlatform('win');
+      }
+
+      if (isDualCore) {
+        var dualNotice = document.getElementById('notice-dual');
+        if (dualNotice) dualNotice.className = 'notice notice-dual';
+      }
+      if (isMobile || isWeChat) {
+        var mobileNotice = document.getElementById('notice-mobile');
+        if (mobileNotice) mobileNotice.className = 'notice notice-mobile';
+      }
+
+      updateDownloadLinks();
+    })();
+
+    // 逃生跳转
+    function bypassCheck() {
+      try {
+        sessionStorage.setItem('douhang-ignore-browser-check', '1');
+      } catch (e) {}
+      var search = window.location.search;
+      var from = '';
+      if (search) {
+        var match = search.match(/[?&]from=([^&]+)/);
+        if (match && match[1]) {
+          from = decodeURIComponent(match[1]);
+        }
+      }
+      window.location.replace(from ? from : '/');
+    }
+  </script>
+</body>
+</html>

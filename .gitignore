@@ -77,3 +77,4 @@ ssr.html
 .tmp/
 temp_refs/
 dev-server.log
+/public/downloads/
