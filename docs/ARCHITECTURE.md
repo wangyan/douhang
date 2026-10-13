@@ -1,6 +1,6 @@
-# 斗法领航架构文档
+# 斗航架构文档
 
-本文档详细描述斗法领航（DouHang）的系统构成、分层设计、核心运行机制与数据模型，面向系统维护者与二次开发者。
+本文档详细描述斗航（DouHang）的系统构成、分层设计、核心运行机制与数据模型，面向系统维护者与二次开发者。
 
 - **前台使用与访问**：请参阅[用户指南](./USER_GUIDE.md)
 - **后台管理与配置**：请参阅[管理指南](./ADMIN_GUIDE.md)
@@ -15,9 +15,9 @@
 
 | 分层 | 技术选型 | 说明 |
 |---|---|---|
-| **运行环境** | Node.js 22 | 容器基础镜像基于 `node:22-alpine`，支持 `.nvmrc` 对齐 |
+| **运行环境** | Node.js 24 | 容器基础镜像基于 `node:24-alpine`，支持 `.nvmrc` 对齐 |
 | **应用框架** | Next.js 16 (App Router) | 开启 Turbopack 与 `output: 'standalone'` 独立生产打包 |
-| **视图层** | React 19 / TypeScript 5.x | 基于 React Server Components (RSC) 与客户端组件分层协同 |
+| **视图层** | React 19 / TypeScript 7 | 基于 React Server Components (RSC) 与客户端组件分层协同 |
 | **组件库** | Astryx Design System | `@astryxdesign/core` 与主题包，提供无缝设计质感 |
 | **样式体系** | Tailwind CSS v4 + StyleX | 基础实用类结合 StyleX 承重样式隔离 |
 | **数据库** | SQLite + Prisma 7 | 采用 `@prisma/adapter-libsql` Driver Adapter 模式 |
@@ -62,6 +62,7 @@ prisma/           schema.prisma 与数据库迁移基线
 public/           静态资源：内置图标库、预设壁纸、字体与品牌 Mark
 scripts/          辅助脚本：种子写入、更新日志生成、发版流水线
 docs/             技术与使用文档集合
+  screenshots/    README 引用的界面截图（WebP）
 ```
 
 ---
@@ -144,9 +145,9 @@ Next.js 16 采用根目录下的 [`src/proxy.ts`](../src/proxy.ts) 作为请求�
 2. **离线引导页**（[`public/outdated.html`](../public/outdated.html)）：
    独立静态单页，无外部网络依赖。根据客户端操作系统提供对应的离线安装包下载入口，并支持通过 `sessionStorage` 记录跳过状态后临时访问。
 3. **路由放行**（[`src/proxy.ts`](../src/proxy.ts)）：
-   在代理层放行 `outdated.html`、`download.html` 及 `downloads` 目录，无需登录鉴权即可访问。
+   在代理层放行 `offline.html`、`outdated.html` 及 `browsers` 目录，无需登录鉴权即可访问。
 4. **离线包脚本**（[`scripts/download-browsers.sh`](../scripts/download-browsers.sh)）：
-   提供一键拉取跨平台安装包脚本，产物保存于 `public/downloads/browsers` 供内网分发。
+   提供一键拉取跨平台安装包脚本，产物保存于 `public/browsers` 供内网分发。该目录不进代码仓库、也不打进镜像，容器部署时经宿主机目录挂载提供给引导页。
 
 ---
 

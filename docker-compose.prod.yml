@@ -10,6 +10,10 @@ services:
       - "3000:3000"
     volumes:
       - ./data:/app/data
+      # 离线浏览器安装包（可选）：官方镜像不含安装包，纯内网分发时挂载；
+      # 先在联网环境执行 scripts/download-browsers.sh，或手动放好安装包再启动
+      - ./public/browsers:/app/public/browsers
+      # Docker socket：容器状态 Widget 经它读取引擎数据
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - AUTH_SECRET=${AUTH_SECRET:?请在 .env 中设置 AUTH_SECRET}

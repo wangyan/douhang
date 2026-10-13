@@ -34,7 +34,7 @@ function isDirectIconUrl(url: string): boolean {
  * 把 favicon 保存为站内文件。
  *
  * 内网 favicon 绝对链接只有浏览器在内网时能加载；保存副本后，
- * 外网访问斗法领航也能通过已登录的 /api/icons/file 正常显示。
+ * 外网访问斗航也能通过已登录的 /api/icons/file 正常显示。
  */
 async function cacheFavicon(url: string): Promise<string | null> {
   try {

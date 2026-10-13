@@ -1,4 +1,4 @@
-# 斗法领航部署指南
+# 斗航部署指南
 
 本文档面向部署运维人员与二次开发者，涵盖容器部署、源码构建、本地开发环境搭建、环境变量配置、容器镜像分发、版本发布与升级、反向代理、数据备份与故障排查。
 
@@ -74,14 +74,17 @@ docker run -d \
 ### 1.4 浏览器要求与离线安装包配置
 
 - **建议内核**：Chromium 123+ · Safari 17.5+ · Firefox 128+。未达到要求的访问会被重定向至 `/outdated.html` 引导页。
-- **拉取离线安装包**：在联网环境执行以下脚本，将主流浏览器离线安装包下载至 `public/downloads/browsers`：
+- **拉取离线安装包**：在联网环境执行以下脚本，将主流浏览器离线安装包下载至 `public/browsers`：
   ```bash
   bash scripts/download-browsers.sh
   ```
-- **离线部署挂载**：使用 Docker 部署时，可通过挂载离线包目录供客户端直接下载：
-  ```bash
-  -v $(pwd)/public/downloads/browsers:/app/public/downloads/browsers:ro
-  ```
+- **离线部署挂载**：安装包合计约 1 GB，既不进代码仓库也不打进镜像（见 `.dockerignore`），**必须将目录挂载进容器**，引导页的下载入口才可用；未挂载时访问 `/browsers/*` 会返回 404。
+  - 使用 `docker-compose.yml` 或 `docker-compose.prod.yml` 部署：编排文件中已预置该挂载，只需确认宿主机 `./public/browsers` 内已放置安装包。
+  - 使用 `docker run` 部署：在启动命令中追加一行挂载参数：
+    ```bash
+    -v $(pwd)/public/browsers:/app/public/browsers
+    ```
+  - 宿主机目录为空时 Docker 仅创建空目录，页面下载入口依旧不可用，请先放好安装包再启动容器。安装包更新后无需重建镜像。
 
 ---
 

@@ -6,6 +6,7 @@ node_modules
 coverage
 data
 uploads
+public/browsers
 *.md
 .agents
 .claude

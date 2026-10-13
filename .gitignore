@@ -74,7 +74,10 @@ screenshots/
 cookies.txt
 ssr.html
 
+# 例外：README 引用的界面截图属受管资产，需要入库
+!docs/screenshots/
+
 .tmp/
 temp_refs/
 dev-server.log
-/public/downloads/
+/public/browsers/

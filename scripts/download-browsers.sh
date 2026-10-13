@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-# 创建下载目标目录（集中存放在 public/downloads/browsers）
-DEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/public/downloads/browsers"
+# 创建下载目标目录（集中存放在 public/browsers）
+DEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/public/browsers"
 mkdir -p "$DEST_DIR"
 
 echo "=== 开始拉取离线浏览器安装包至本地目录: $DEST_DIR ==="
@@ -86,5 +86,46 @@ else
   echo "--> Firefox for Mac 已存在 ($(du -h "$FIREFOX_MAC_FILE" | cut -f1))，跳过。"
 fi
 
-echo "=== 下载与检查完成！当前 public/downloads/browsers 列表: ==="
+# 8. Firefox for Linux (tar.xz)
+FIREFOX_LINUX_URL="https://download.mozilla.org/?product=firefox-latest-ssl&os=linux64&lang=zh-CN"
+FIREFOX_LINUX_FILE="$DEST_DIR/firefox.tar.xz"
+if [ ! -s "$FIREFOX_LINUX_FILE" ]; then
+  echo "--> 正在下载 Firefox for Linux 压缩包..."
+  curl -L -f --progress-bar "$FIREFOX_LINUX_URL" -o "$FIREFOX_LINUX_FILE"
+else
+  echo "--> Firefox for Linux 已存在 ($(du -h "$FIREFOX_LINUX_FILE" | cut -f1))，跳过。"
+fi
+
+# 9. Microsoft Edge for Linux（.deb / .rpm）
+# 微软未提供固定文件名的直链，先从稳定版软件源目录解析当前版本号，再拼出两种包地址
+EDGE_POOL_URL="https://packages.microsoft.com/repos/edge/pool/main/m/microsoft-edge-stable/"
+EDGE_DEB_NAME="$(curl -fsSL -A 'Mozilla/5.0' "$EDGE_POOL_URL" \
+  | grep -oE 'microsoft-edge-stable_[0-9.]+-1_amd64\.deb' | sort -uV | tail -n 1)"
+
+if [ -z "$EDGE_DEB_NAME" ]; then
+  echo "!! 未能从微软软件源解析 Edge 当前版本，已跳过 Edge Linux 安装包（可稍后重跑本脚本）。" >&2
+else
+  EDGE_VER="${EDGE_DEB_NAME#microsoft-edge-stable_}"
+  EDGE_VER="${EDGE_VER%-1_amd64.deb}"
+
+  EDGE_DEB_FILE="$DEST_DIR/microsoft-edge-stable.deb"
+  if [ ! -s "$EDGE_DEB_FILE" ]; then
+    echo "--> 正在下载 Microsoft Edge for Linux (.deb, $EDGE_VER)..."
+    curl -L -f --progress-bar "${EDGE_POOL_URL}${EDGE_DEB_NAME}" -o "$EDGE_DEB_FILE"
+  else
+    echo "--> Microsoft Edge for Linux (.deb) 已存在 ($(du -h "$EDGE_DEB_FILE" | cut -f1))，跳过。"
+  fi
+
+  EDGE_RPM_FILE="$DEST_DIR/microsoft-edge-stable.rpm"
+  if [ ! -s "$EDGE_RPM_FILE" ]; then
+    echo "--> 正在下载 Microsoft Edge for Linux (.rpm, $EDGE_VER)..."
+    curl -L -f --progress-bar \
+      "https://packages.microsoft.com/yumrepos/edge/microsoft-edge-stable-${EDGE_VER}-1.x86_64.rpm" \
+      -o "$EDGE_RPM_FILE"
+  else
+    echo "--> Microsoft Edge for Linux (.rpm) 已存在 ($(du -h "$EDGE_RPM_FILE" | cut -f1))，跳过。"
+  fi
+fi
+
+echo "=== 下载与检查完成！当前 public/browsers 目录: ==="
 ls -lh "$DEST_DIR"
