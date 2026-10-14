@@ -980,6 +980,18 @@ html[data-theme="dark"]
   background: rgba(100, 116, 139, 0.9);
 }
 
+/* === scrollbar-hidden：完全隐藏滚动条，保留滚动能力 ===
+ * 用于设置区内容滚动容器：常驻或滚动时均不显示滚动条，
+ * 滚动仍由滚轮、键盘与触控完成。
+ */
+.scrollbar-hidden {
+  scrollbar-width: none;
+}
+.scrollbar-hidden::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 /* === card-fly-in：卡片错峰入场（会话内仅首访播放） ===
  * 每张卡从下方 16px + scale(0.96) 淡入归位。
  * 父容器加 .stagger-cards，每张卡由内联 style 设置 animation-delay 错峰。

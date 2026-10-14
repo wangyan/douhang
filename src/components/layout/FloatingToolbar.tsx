@@ -27,7 +27,7 @@ import {
   ShieldCheck,
   Sun,
 } from 'lucide-react';
-import { usePathname, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import { useCallback, useEffect, useState } from 'react';
 import { AboutDialog } from '@/components/layout/AboutDialog';
@@ -71,7 +71,7 @@ interface FloatingToolbarProps {
   manualUrl?: string;
   /** 管理指南文档地址（支持外部透传，回落至 ADMIN_GUIDE_URL） */
   adminGuideUrl?: string;
-  /** 当前用户是否已登录，默认 true（设置页等私有页默认为 true） */
+  /** 当前用户是否已登录，默认 true */
   isAuthed?: boolean;
   /** 外观快捷面板数据包（首页 SSR 取好传入；缺省时菜单不显示外观入口） */
   appearance?: AppearancePanelData;
@@ -196,7 +196,6 @@ function ToolbarModeCluster({
   onToggleWidgetBar,
   editMode,
   batchMode,
-  showBatch,
   dispatchEditModeChange,
   dispatchBatchModeChange,
 }: {
@@ -204,7 +203,6 @@ function ToolbarModeCluster({
   onToggleWidgetBar: () => void;
   editMode: boolean;
   batchMode: boolean;
-  showBatch: boolean;
   dispatchEditModeChange: (value: boolean) => void;
   dispatchBatchModeChange: (value: boolean) => void;
 }) {
@@ -238,16 +236,14 @@ function ToolbarModeCluster({
           dispatchEditModeChange(!editMode);
         }}
       />
-      {showBatch && (
-        <IconButton
-          label={batchMode ? '退出批量删除' : '批量删除卡片'}
-          icon={<ListChecks size={ICON_SIZE.md} />}
-          variant={batchMode ? 'secondary' : 'ghost'}
-          tooltip={batchMode ? '退出批量删除（ESC）' : '批量删除卡片'}
-          aria-pressed={batchMode}
-          onClick={() => dispatchBatchModeChange(!batchMode)}
-        />
-      )}
+      <IconButton
+        label={batchMode ? '退出批量删除' : '批量删除卡片'}
+        icon={<ListChecks size={ICON_SIZE.md} />}
+        variant={batchMode ? 'secondary' : 'ghost'}
+        tooltip={batchMode ? '退出批量删除（ESC）' : '批量删除卡片'}
+        aria-pressed={batchMode}
+        onClick={() => dispatchBatchModeChange(!batchMode)}
+      />
     </>
   );
 }
@@ -277,8 +273,6 @@ export function FloatingToolbar({
     update: VersionUpdateInfo;
     dismissed: boolean;
   } | null>(null);
-  // 批量删除仅作用于主页卡片，设置页不显示入口
-  const pathname = usePathname();
 
   // 挂载时检查更新（仅登录态）：服务端 24h 节流，命中缓存无额外开销；失败静默
   useEffect(() => {
@@ -368,7 +362,7 @@ export function FloatingToolbar({
     dispatchBatchModeChange,
   );
 
-  // 监听设置页或跨标签页触发的网络模式变更，保持工具栏同步
+  // 监听页面内或跨标签页触发的网络模式变更，保持工具栏同步
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<NetworkMode>).detail;
@@ -509,7 +503,6 @@ export function FloatingToolbar({
             onToggleWidgetBar={() => setWidgetBarVisible(!widgetBarVisible)}
             editMode={editMode}
             batchMode={batchMode}
-            showBatch={pathname === '/'}
             dispatchEditModeChange={dispatchEditModeChange}
             dispatchBatchModeChange={dispatchBatchModeChange}
           />
