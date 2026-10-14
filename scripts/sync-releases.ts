@@ -32,7 +32,8 @@ interface ParsedRelease {
 }
 
 interface RemoteRelease {
-  id: number | string;
+  /** AtomGit 不返回 id，其更新接口以 tag 定位 */
+  id?: number | string;
   tag_name: string;
   name?: string;
   body?: string;
@@ -144,6 +145,26 @@ function getPrimaryConfig(): PlatformConfig {
   };
 }
 
+/** 获取官方国内镜像仓平台配置（AtomGit） */
+function getAtomGitConfig(): PlatformConfig {
+  const host = 'atomgit.com';
+  const repo = 'wang_yan/douhang';
+  const token = process.env.ATOMGIT_TOKEN?.trim() || '';
+
+  const apiUrl = `https://api.atomgit.com/api/v5/repos/${repo}/releases`;
+  const authHeader = token ? `Bearer ${token}` : '';
+
+  return {
+    name: 'AtomGit 官方国内仓',
+    host,
+    repo,
+    token,
+    apiUrl,
+    authHeader,
+    isGitHub: false,
+  };
+}
+
 /** 获取镜像仓库平台配置（从 MIRROR_REPO_URL 智能提取，支持可选显式覆盖） */
 function getMirrorConfig(): PlatformConfig | null {
   const mirrorUrl = process.env.MIRROR_REPO_URL?.trim();
@@ -171,7 +192,7 @@ function getMirrorConfig(): PlatformConfig | null {
   const authHeader = isGitHub ? `Bearer ${token}` : `token ${token}`;
 
   return {
-    name: `镜像仓 (${host})`,
+    name: `私有镜像仓 (${host})`,
     host,
     repo,
     token,
@@ -333,18 +354,18 @@ async function createRemoteRelease(
 /** 更新远端已有 Release 的内容正文 */
 async function updateRemoteRelease(
   config: PlatformConfig,
-  releaseId: number | string,
+  releaseRef: number | string,
   release: ParsedRelease,
   dryRun: boolean,
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   if (dryRun) {
     return {
       success: true,
-      url: `[DRY-RUN] 将更新 https://${config.host}/${config.repo}/releases/${releaseId} (${release.tag})`,
+      url: `[DRY-RUN] 将更新 https://${config.host}/${config.repo}/releases/${releaseRef} (${release.tag})`,
     };
   }
 
-  const updateUrl = `${config.apiUrl}/${releaseId}`;
+  const updateUrl = `${config.apiUrl}/${releaseRef}`;
   try {
     const payload = {
       name: release.name,
@@ -422,13 +443,12 @@ async function main() {
   }
 
   const primary = getPrimaryConfig();
+  const atomgit = getAtomGitConfig();
   const mirror = getMirrorConfig();
 
-  const platforms: PlatformConfig[] = [primary];
+  const platforms: PlatformConfig[] = [primary, atomgit];
   if (mirror) {
     platforms.push(mirror);
-  } else {
-    console.log('未检测到镜像平台配置（MIRROR_REPO_URL），仅处理主平台。\n');
   }
 
   let totalPendingMissing = 0;
@@ -482,7 +502,7 @@ async function main() {
             );
             const updateRes = await updateRemoteRelease(
               platform,
-              remote.id,
+              remote.id ?? remote.tag_name,
               release,
               false,
             );

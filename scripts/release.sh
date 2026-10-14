@@ -51,6 +51,9 @@ if [ -f .env ]; then
   # 官方 GitHub 发版凭据
   [ -z "${GITHUB_TOKEN:-}" ] && GITHUB_TOKEN=$(grep -E '^[[:space:]]*GITHUB_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
 
+  # 官方国内镜像仓 (AtomGit) 发版凭据
+  [ -z "${ATOMGIT_TOKEN:-}" ] && ATOMGIT_TOKEN=$(grep -E '^[[:space:]]*ATOMGIT_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
+
   # 官方 GHCR 镜像库推送凭据（仅本地编译直推备选模式需要）
   [ -z "${GHCR_TOKEN:-}" ] && GHCR_TOKEN=$(grep -E '^[[:space:]]*GHCR_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
 
@@ -62,10 +65,16 @@ if [ -f .env ]; then
   [ -z "${MIRROR_REGISTRY_TOKEN:-}" ] && MIRROR_REGISTRY_TOKEN=$(grep -E '^[[:space:]]*MIRROR_REGISTRY_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
 fi
 
-# 官方公开主仓库常量
+# 官方公开主仓库常量 (GitHub)
 REPO_HOST="github.com"
 REPO_NAME="wangyan/douhang"
 REPO_URL="https://${REPO_HOST}/${REPO_NAME}"
+
+# 官方公开国内镜像仓常量 (AtomGit - 内置无需额外配置 URL)
+ATOMGIT_HOST="atomgit.com"
+ATOMGIT_REPO="wang_yan/douhang"
+ATOMGIT_URL="https://${ATOMGIT_HOST}/${ATOMGIT_REPO}"
+ATOMGIT_API_URL="https://api.atomgit.com/api/v5/repos/${ATOMGIT_REPO}/releases"
 
 # 从 MIRROR_REPO_URL 智能提取 Host 与 Repo（若配置）
 MIRROR_GIT_HOST=""
@@ -216,10 +225,22 @@ fi
 printf '==> 发布 %s：推送 Git\n' "$tag"
 git push origin main "$tag"
 
+if [ -n "${ATOMGIT_TOKEN:-}" ]; then
+  printf '==> 发布 %s：推送 AtomGit 官方国内镜像仓\n' "$tag"
+  GIT_TERMINAL_PROMPT=0 git \
+    -c "http.extraheader=Authorization: Bearer ${ATOMGIT_TOKEN}" \
+    push "https://${ATOMGIT_HOST}/${ATOMGIT_REPO}.git" main "$tag" 2>/dev/null || \
+  GIT_TERMINAL_PROMPT=0 git \
+    -c "http.extraheader=Authorization: Basic $(printf "oauth2:%s" "$ATOMGIT_TOKEN" | base64 | tr -d '\n')" \
+    push "https://${ATOMGIT_HOST}/${ATOMGIT_REPO}.git" main "$tag" || {
+    echo "警告：AtomGit Git 仓库推送失败" >&2
+  }
+fi
+
 if [ -n "${MIRROR_REPO_URL:-}" ]; then
-  printf '==> 发布 %s：同步推送镜像 Git 仓库\n' "$tag"
+  printf '==> 发布 %s：同步推送私有镜像 Git 仓库\n' "$tag"
   git push "$MIRROR_REPO_URL" main "$tag" || {
-    echo "警告：镜像 Git 仓库推送失败，但主仓库已推送" >&2
+    echo "警告：私有镜像 Git 仓库推送失败，但主仓库已推送" >&2
   }
 fi
 
@@ -245,9 +266,29 @@ fi
 rm -f "$resp_file"
 echo "GitHub Release 已创建：https://${REPO_HOST}/${REPO_NAME}/releases/tag/$tag"
 
+# 同步创建官方 AtomGit Release
+if [ -n "${ATOMGIT_TOKEN:-}" ]; then
+  printf '==> 发布 %s：创建 AtomGit Release\n' "$tag"
+  atomgit_resp=$(mktemp)
+  atomgit_code=$(curl --silent --show-error -o "$atomgit_resp" -w '%{http_code}' \
+    -X POST \
+    -H "Authorization: Bearer $ATOMGIT_TOKEN" \
+    -H "Content-Type: application/json" \
+    -H "Accept: application/json" \
+    "$ATOMGIT_API_URL" \
+    --data-binary "$payload") || true
+
+  if [[ $atomgit_code == 200 || $atomgit_code == 201 ]]; then
+    echo "AtomGit Release 已创建：${ATOMGIT_URL}/releases"
+  else
+    echo "警告：AtomGit Release 创建失败（HTTP $atomgit_code）" >&2
+  fi
+  rm -f "$atomgit_resp"
+fi
+
 # 同步创建镜像平台 Release（若已配置镜像平台凭据）
 if [ -n "${MIRROR_GIT_HOST:-}" ] && [ -n "${MIRROR_REPO_TOKEN:-}" ]; then
-  printf '==> 发布 %s：同步创建镜像平台 Release\n' "$tag"
+  printf '==> 发布 %s：同步创建私有平台 Release\n' "$tag"
   mirror_api_url="https://$MIRROR_GIT_HOST/api/v1/repos/$MIRROR_REPO_NAME/releases"
   mirror_resp_file=$(mktemp)
   mirror_http_code=$(curl --silent --show-error -o "$mirror_resp_file" -w '%{http_code}' \
@@ -259,9 +300,9 @@ if [ -n "${MIRROR_GIT_HOST:-}" ] && [ -n "${MIRROR_REPO_TOKEN:-}" ]; then
     --data-binary "$payload") || true
 
   if [[ $mirror_http_code == 200 || $mirror_http_code == 201 ]]; then
-    echo "镜像平台 Release 已创建：https://$MIRROR_GIT_HOST/$MIRROR_REPO_NAME/releases/tag/$tag"
+    echo "私有平台 Release 已创建：https://$MIRROR_GIT_HOST/$MIRROR_REPO_NAME/releases/tag/$tag"
   else
-    echo "警告：镜像平台 Release 创建失败（HTTP $mirror_http_code）" >&2
+    echo "警告：私有平台 Release 创建失败（HTTP $mirror_http_code）" >&2
   fi
   rm -f "$mirror_resp_file"
 fi
@@ -269,7 +310,7 @@ fi
 rm -f "$release_notes"
 
 printf '==> %s 发布完成！\n' "$tag"
-printf '    • 代码已推送并已在主仓与镜像仓库创建 Release\n'
+printf '    • 代码已推送并已在各代码平台创建 Release\n'
 printf '    • GitHub Actions 正在云端构建并发布 GHCR 多架构镜像\n'
 printf '    • 如需同步至 Docker Hub 或私有镜像库，可运行：npm run image:sync\n'
 printf '    • 全量同步所有历史版本镜像可运行：npm run image:sync full\n'

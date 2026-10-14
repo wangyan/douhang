@@ -433,8 +433,17 @@ const PREFERENCE_VALUE_SCHEMAS: Record<string, z.ZodSchema> = {
   cardStatusBadge: z.boolean(),
   /** 版本更新检测开关（关闭后不再请求远端） */
   versionCheckEnabled: z.boolean(),
-  /** 版本更新检测授权令牌（用于私有仓库鉴权，可为空） */
-  versionCheckToken: z.string().max(255),
+  /** 国内环境加速（开启后优先走 AtomGit） */
+  cnMirrorEnabled: z.boolean(),
+  /** 版本更新检测缓存结果 */
+  versionCheckCache: z
+    .object({
+      tag: z.string(),
+      notes: z.string(),
+      url: z.string(),
+      checkedAt: z.string(),
+    })
+    .nullable(),
   brand: z.object({
     title: z.string().trim().min(1, '标题必填').max(30, '标题最多 30 个字符'),
     logo: z

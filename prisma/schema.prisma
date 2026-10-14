@@ -108,7 +108,7 @@ model UserPreference {
   id    String @id @default(cuid())
   key   String @unique
   value String
-  // 存储项：networkMode | theme | fontSize | searchEngine | brand | wallpaper | wallpaperScrim | cardSimpleMode | cardStatusBadge | qbittorrent | versionCheckEnabled | versionCheckToken | versionCheckCache 等
+  // 存储项：networkMode | theme | fontSize | searchEngine | brand | wallpaper | wallpaperScrim | cardSimpleMode | cardStatusBadge | qbittorrent | versionCheckEnabled | cnMirrorEnabled | versionCheckCache 等
 
   @@map("user_preferences")
 }

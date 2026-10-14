@@ -1,6 +1,7 @@
 import {
   FolderTree,
   Image as ImageIcon,
+  Info,
   Palette,
   Search,
   Settings,
@@ -37,6 +38,11 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
     href: '/settings/assets',
     label: '素材',
     icon: ImageIcon,
+  },
+  {
+    href: '/settings/about',
+    label: '关于',
+    icon: Info,
   },
 ];
 

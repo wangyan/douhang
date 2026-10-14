@@ -133,7 +133,8 @@ Next.js 16 采用根目录下的 [`src/proxy.ts`](../src/proxy.ts) 作为请求�
 ### 5.6 版本检测与更新日志解析
 
 [`src/lib/version-check.ts`](../src/lib/version-check.ts) 负责向远端 Releases 接口查询最新发布版本，并与本地 `package.json` 中的 `APP_VERSION` 做语义化对比：
-- 查询结果本地缓存 24 小时，避免频繁请求远端 API；离线环境下可完全关闭检测；
+- 查询结果缓存于偏好表（无更新 1 小时、已发现更新 6 小时），避免频繁请求远端 API；离线环境下可关闭自动检查；
+- 检测源默认为 GitHub，开启「国内环境加速」（偏好键 `cnMirrorEnabled`）后改为 AtomGit 镜像仓的 v5 接口；
 - 前端更新弹窗与提醒浮层共享 [`src/lib/changelog.ts`](../src/lib/changelog.ts) 解析引擎，且**仅提取面向使用者的「亮点」段落**展示，技术细节仅留存文档。
 
 ### 5.7 浏览器检测探针与离线引导

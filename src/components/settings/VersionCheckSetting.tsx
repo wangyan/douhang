@@ -4,41 +4,43 @@ import { Button } from '@astryxdesign/core/Button';
 import { HStack } from '@astryxdesign/core/HStack';
 import { Switch } from '@astryxdesign/core/Switch';
 import { Text } from '@astryxdesign/core/Text';
-import { TextInput } from '@astryxdesign/core/TextInput';
 import { VStack } from '@astryxdesign/core/VStack';
+import { Check, Copy, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { SettingsSection } from '@/components/settings/SettingsSection';
-import { APP_VERSION } from '@/lib/version';
+import { ICON_SIZE } from '@/lib/design-tokens';
+import { APP_VERSION, isNewerVersion } from '@/lib/version';
 import { preferencesApi, versionApi } from '@/services';
 import type { VersionUpdateInfo } from '@/types';
 
 interface VersionCheckSettingProps {
   initialEnabled: boolean;
+  initialCnMirror?: boolean;
   /** SSR 读取的最近一次检查缓存（null = 从未检查过） */
   initialUpdate: VersionUpdateInfo | null;
-  /** SSR 读取的自定义授权令牌（可为空，空时回落环境变量） */
-  initialToken?: string;
 }
+
+const UPGRADE_COMMAND =
+  'docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d';
 
 /**
  * 版本更新检测设置
  *
  * - Switch 即时保存，失败回滚
- * - 「立即检查」强制请求远端 Releases（跳过 24h 节流）
- * - 访问令牌输入框支持覆写私有仓库授权令牌
- * - 明确说明出站请求用途，自托管用户对联网行为敏感
+ * - 支持国内线路 (AtomGit) 一键免代理直连加速
+ * - 「立即检查」强制请求远端 Releases（跳过节流）
+ * - 发现新版时展示官方推荐升级指令与一键复制
  */
 export function VersionCheckSetting({
   initialEnabled,
+  initialCnMirror = false,
   initialUpdate,
-  initialToken = '',
 }: VersionCheckSettingProps) {
   const [enabled, setEnabled] = useState(initialEnabled);
+  const [cnMirror, setCnMirror] = useState(initialCnMirror);
   const [update, setUpdate] = useState<VersionUpdateInfo | null>(initialUpdate);
   const [checking, setChecking] = useState(false);
-  const [token, setToken] = useState(initialToken);
-  const [savedToken, setSavedToken] = useState(initialToken);
-  const [tokenSaving, setTokenSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -54,18 +56,20 @@ export function VersionCheckSetting({
     }
   };
 
-  const handleSaveToken = async () => {
-    setTokenSaving(true);
-    setMessage(null);
-    const trimmed = token.trim();
+  const handleToggleCnMirror = async (checked: boolean) => {
+    const prev = cnMirror;
+    setCnMirror(checked);
     try {
-      await preferencesApi.update('versionCheckToken', trimmed);
-      setSavedToken(trimmed);
-      setMessage({ type: 'success', text: '访问令牌已保存' });
+      await preferencesApi.update('cnMirrorEnabled', checked);
+      setMessage({
+        type: 'success',
+        text: checked
+          ? '已切换至国内线路 (AtomGit)'
+          : '已切换回海外线路 (GitHub)',
+      });
     } catch {
-      setMessage({ type: 'error', text: '保存令牌失败，请稍后重试' });
-    } finally {
-      setTokenSaving(false);
+      setCnMirror(prev);
+      setMessage({ type: 'error', text: '切换线路失败，请稍后重试' });
     }
   };
 
@@ -92,7 +96,18 @@ export function VersionCheckSetting({
     }
   };
 
-  const isTokenDirty = token.trim() !== savedToken.trim();
+  const handleCopyCommand = async () => {
+    try {
+      await navigator.clipboard.writeText(UPGRADE_COMMAND);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // 忽略剪贴板写入异常
+    }
+  };
+
+  const hasNewerVersion =
+    update !== null && isNewerVersion(`v${APP_VERSION}`, update.tag);
 
   return (
     <SettingsSection
@@ -103,59 +118,106 @@ export function VersionCheckSetting({
           label={checking ? '检查中…' : '立即检查'}
           variant="secondary"
           size="sm"
-          isDisabled={checking || !enabled}
+          isDisabled={checking}
           onClick={() => void handleCheck()}
         />
       }
     >
+      {/* 自动检查更新开关 */}
       <HStack justify="between" align="center" width="100%">
         <VStack gap={1} align="start">
           <Text size="sm" weight="medium">
-            自动检测新版本
+            自动检查更新
           </Text>
           <Text type="supporting" textWrap="pretty">
-            每 24 小时请求一次远端 Releases，关闭后不再发起该请求
+            定期检测远端 Releases；关闭后不再自动发起请求，仍可手动检查
           </Text>
         </VStack>
         <Switch
-          label="自动检测新版本"
+          label="自动检查更新"
           isLabelHidden
           value={enabled}
           onChange={handleToggle}
         />
       </HStack>
-      <VStack gap={2} width="100%" className="border-t border-border/60 pt-3">
-        <HStack justify="between" align="end" width="100%" gap={3}>
-          <div className="flex-1">
-            <TextInput
-              label="访问令牌 (Token)"
-              description="私有仓库检测新版本需配置具备读取权限的访问令牌，留空则默认使用系统环境变量"
-              value={token}
-              onChange={setToken}
-              width="100%"
-              hasClear
-              type="password"
-              placeholder="留空默认使用 GITHUB_TOKEN 或匿名配额"
-            />
-          </div>
-          {isTokenDirty && (
-            <Button
-              label={tokenSaving ? '保存中…' : '保存令牌'}
-              variant="secondary"
-              size="sm"
-              isDisabled={tokenSaving}
-              onClick={() => void handleSaveToken()}
-            />
-          )}
-        </HStack>
-      </VStack>
-      <VStack gap={1}>
-        {update && (
-          <Text size="sm" color="secondary">
-            上次检查：{update.checkedAt.slice(0, 10)} · 远端最新 {update.tag}
-            {update.tag !== `v${APP_VERSION}` && '（非当前运行版本）'}
+
+      {/* 国内环境加速开关 */}
+      <HStack
+        justify="between"
+        align="center"
+        width="100%"
+        className="border-t border-border/60 pt-3"
+      >
+        <VStack gap={1} align="start">
+          <Text size="sm" weight="medium">
+            国内环境加速
           </Text>
+          <Text type="supporting" textWrap="pretty">
+            使用国内线路 (AtomGit) 直连拉取 Release 信息，免代理加速
+          </Text>
+        </VStack>
+        <Switch
+          label="国内环境加速"
+          isLabelHidden
+          value={cnMirror}
+          onChange={handleToggleCnMirror}
+        />
+      </HStack>
+
+      {/* 状态与升级指引 */}
+      <VStack gap={2} width="100%" className="pt-1">
+        {update && (
+          <HStack justify="between" align="center" width="100%">
+            <Text size="sm" color="secondary">
+              上次检查：{update.checkedAt.slice(0, 10)} · 远端最新 {update.tag}
+              {!hasNewerVersion && '（已是最新版本）'}
+            </Text>
+            {update.url && (
+              <Button
+                label="查看更新日志"
+                icon={<ExternalLink size={ICON_SIZE.xs} />}
+                variant="ghost"
+                size="sm"
+                onClick={() => window.open(update.url, '_blank', 'noopener')}
+              />
+            )}
+          </HStack>
         )}
+
+        {/* 发现新版本时的升级指引卡片 */}
+        {hasNewerVersion && (
+          <VStack
+            gap={2}
+            width="100%"
+            className="rounded-panel bg-surface/60 border border-border/80 p-3 mt-1"
+          >
+            <HStack justify="between" align="center" width="100%">
+              <Text size="sm" weight="semibold" className="text-primary">
+                推荐容器升级命令
+              </Text>
+              <Button
+                label={copied ? '已复制' : '复制命令'}
+                icon={
+                  copied ? (
+                    <Check size={ICON_SIZE.xs} className="text-success" />
+                  ) : (
+                    <Copy size={ICON_SIZE.xs} />
+                  )
+                }
+                variant="secondary"
+                size="sm"
+                onClick={() => void handleCopyCommand()}
+              />
+            </HStack>
+            <div className="overflow-x-auto rounded-control bg-muted p-2 font-mono text-xs text-secondary select-all">
+              {UPGRADE_COMMAND}
+            </div>
+            <Text type="supporting" size="sm">
+              在部署目录执行上述命令即可完成升级，数据目录（./data）保持不变。
+            </Text>
+          </VStack>
+        )}
+
         {message && (
           <Text
             size="sm"

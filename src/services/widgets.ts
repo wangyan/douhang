@@ -40,8 +40,8 @@ export interface Preferences {
   cardStatusBadge: boolean;
   /** 版本更新检测开关（关闭后不再请求远端 Releases） */
   versionCheckEnabled: boolean;
-  /** 版本更新检测授权令牌（用于私有仓库鉴权） */
-  versionCheckToken?: string;
+  /** 国内镜像源开关（开启后使用 AtomGit） */
+  cnMirrorEnabled?: boolean;
 }
 
 /**
