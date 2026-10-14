@@ -142,6 +142,7 @@ docker run -d \
 
 3. **初始化数据库**：
    ```bash
+   npm run db:generate      # 生成 Prisma 客户端代码
    npm run db:migrate:dev   # 应用开发数据库迁移
    npm run db:seed          # 写入初始管理员账号与预设搜索引擎
    ```

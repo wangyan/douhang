@@ -99,6 +99,7 @@ npm ci
 cp .env.example .env
 
 # 3. 初始化本地 SQLite 数据库与种子数据
+npm run db:generate
 npm run db:migrate:dev
 npm run db:seed
 
