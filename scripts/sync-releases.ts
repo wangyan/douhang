@@ -423,8 +423,8 @@ async function main() {
   console.log('======================================================');
   console.log(
     isDryRun
-      ? '斗航 Release 记录一致性检查工具 (只读模式)'
-      : '斗航 Release 记录全量同步工具 (自动对齐)',
+      ? 'DouHang Release 记录一致性检查工具 (只读模式)'
+      : 'DouHang Release 记录全量同步工具 (自动对齐)',
   );
   console.log('======================================================\n');
 

@@ -8,7 +8,7 @@ import type { BrandConfig } from '@/types';
  * Prisma / libsql 依赖拖进浏览器包。
  */
 export const DEFAULT_BRAND_CONFIG: BrandConfig = {
-  title: '斗航',
+  title: 'DouHang',
   logo: '',
   showLogo: true,
   showTitle: true,

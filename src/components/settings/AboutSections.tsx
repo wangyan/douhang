@@ -37,7 +37,7 @@ export function AboutHero() {
       <VStack gap={5}>
         <HStack gap={5} align="center">
           <div className="shrink-0 overflow-hidden rounded-widget ring-1 ring-border/80 shadow-sm">
-            <BrandMark size="xl" aria-label="斗航 (DouHang)" />
+            <BrandMark size="xl" aria-label="斗航（DouHang）" />
           </div>
           <VStack gap={1.5} className="min-w-0 flex-1">
             <HStack gap={2} align="center" className="flex-wrap">
@@ -50,7 +50,7 @@ export function AboutHero() {
                 }}
                 className="text-primary tracking-tight"
               >
-                斗航 (DouHang)
+                斗航（DouHang）
               </Text>
               <span className="rounded-full bg-accent/10 px-2.5 py-0.5 font-mono text-xs font-semibold text-accent border border-accent/20">
                 v{APP_VERSION}
