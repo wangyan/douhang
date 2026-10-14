@@ -4,7 +4,7 @@
 services:
   douhang:
     # 官方默认镜像（GitHub Packages）；若网络受限可直接替换为官方 Docker Hub 镜像：wangyan/douhang:latest
-    image: ghcr.io/wangyan/douhang:latest   # 锁定版本可改为具体 tag（如 :v1.0.0）
+    image: ghcr.io/wangyan/douhang:latest   # 锁定版本可改为具体 tag（如 :v1.1.0）
     container_name: douhang
     ports:
       - "3000:3000"
