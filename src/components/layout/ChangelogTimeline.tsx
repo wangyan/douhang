@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { type ChangelogRelease, changelogDisplayItems } from '@/lib/changelog';
 import changelog from '@/lib/changelog.generated.json';
 import { ICON_SIZE } from '@/lib/design-tokens';
+import { APP_VERSION, isNewerVersion } from '@/lib/version';
 
 interface ChangelogHighlightListProps {
   release: ChangelogRelease;
@@ -62,6 +63,7 @@ const INITIAL_VISIBLE_COUNT = 8;
  * 每个版本只展示「亮点」条目——面向使用者的能力描述，
  * 完整变更（含部署、开发等技术分类）见发布页。
  * 各版本默认折叠，点击标题行展开。
+ * 本地列表按 package.json 版本标注：相同标「当前」，更新的预写段落标「未发布」。
  * 数据来自 CHANGELOG.md 构建期解析结果。
  */
 export function ChangelogTimeline({
@@ -69,6 +71,9 @@ export function ChangelogTimeline({
   defaultExpandedVersion,
 }: ChangelogTimelineProps = {}) {
   const list = releases ?? changelog.releases;
+  // 徽标只标本地构建产物列表；远端更新说明列表的语义由所在区块标题交代
+  const isLocalList = !releases;
+  const currentTag = `v${APP_VERSION}`;
   // 版本越积越多，默认只渲染最近若干个，避免弹窗被历史版本撑长
   const [showAll, setShowAll] = useState(false);
   const visibleList = showAll ? list : list.slice(0, INITIAL_VISIBLE_COUNT);
@@ -91,8 +96,7 @@ export function ChangelogTimeline({
 
   return (
     <VStack gap={1}>
-      {visibleList.map((release, index) => {
-        const isLatest = index === 0;
+      {visibleList.map((release) => {
         const isOpen = expanded.has(release.version);
         const rowId = `changelog-${release.version}`;
 
@@ -116,9 +120,14 @@ export function ChangelogTimeline({
               <Text size="sm" weight="semibold" className="text-primary">
                 {release.version}
               </Text>
-              {isLatest && (
+              {isLocalList && release.version === currentTag && (
                 <span className="rounded-full bg-neutral px-2 py-0.5 text-xs font-medium text-accent">
-                  最新
+                  当前
+                </span>
+              )}
+              {isLocalList && isNewerVersion(currentTag, release.version) && (
+                <span className="rounded-full bg-neutral px-2 py-0.5 text-xs font-medium text-secondary">
+                  未发布
                 </span>
               )}
               {release.date && (

@@ -16,7 +16,9 @@
 [![Build](https://img.shields.io/github/actions/workflow/status/wangyan/douhang/docker-publish.yml?label=build)](https://github.com/wangyan/douhang/actions/workflows/docker-publish.yml)
 [![License](https://img.shields.io/github/license/wangyan/douhang)](LICENSE)
 
-<a href="https://github.com/wangyan/douhang"><img src="./docs/screenshots/home.webp" width="820" alt="douhang"></a>
+| [![首页](./screenshots/home.webp)](./screenshots/home.png) | [![管理](./screenshots/settings.webp)](./screenshots/settings.png) |
+| :---: | :---: |
+| 首页 | 管理 |
 
 </div>
 

@@ -70,12 +70,10 @@ CLAUDE.md
 GEMINI.md
 
 # transient debug artifacts
-screenshots/
 cookies.txt
 ssr.html
 
-# 例外：README 引用的界面截图属受管资产，需要入库
-!docs/screenshots/
+# 注：README 引用的界面截图位于根目录 screenshots/，属受管资产，不纳入忽略
 
 .tmp/
 temp_refs/
