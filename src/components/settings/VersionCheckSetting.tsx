@@ -1,13 +1,18 @@
 'use client';
 
 import { Button } from '@astryxdesign/core/Button';
-import { HStack } from '@astryxdesign/core/HStack';
+import {
+  MetadataList,
+  MetadataListItem,
+} from '@astryxdesign/core/MetadataList';
 import { Switch } from '@astryxdesign/core/Switch';
 import { Text } from '@astryxdesign/core/Text';
-import { VStack } from '@astryxdesign/core/VStack';
-import { Check, Copy, ExternalLink } from 'lucide-react';
-import { useState } from 'react';
+import { Copy } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useRef, useState } from 'react';
+import { SettingRow } from '@/components/settings/SettingRow';
 import { SettingsSection } from '@/components/settings/SettingsSection';
+import { useSaveFeedback } from '@/components/settings/useSaveFeedback';
 import { ICON_SIZE } from '@/lib/design-tokens';
 import { APP_VERSION, isNewerVersion } from '@/lib/version';
 import { preferencesApi, versionApi } from '@/services';
@@ -23,212 +28,220 @@ interface VersionCheckSettingProps {
 const UPGRADE_COMMAND =
   'docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d';
 
-/**
- * 版本更新检测设置
- *
- * - Switch 即时保存，失败回滚
- * - 支持国内线路 (AtomGit) 一键免代理直连加速
- * - 「立即检查」强制请求远端 Releases（跳过节流）
- * - 发现新版时展示官方推荐升级指令与一键复制
- */
+/** 版本检查偏好、远端发布信息与容器升级指引。 */
 export function VersionCheckSetting({
   initialEnabled,
   initialCnMirror = false,
   initialUpdate,
 }: VersionCheckSettingProps) {
+  const router = useRouter();
   const [enabled, setEnabled] = useState(initialEnabled);
   const [cnMirror, setCnMirror] = useState(initialCnMirror);
   const [update, setUpdate] = useState<VersionUpdateInfo | null>(initialUpdate);
   const [checking, setChecking] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [message, setMessage] = useState<{
-    type: 'success' | 'error';
-    text: string;
-  } | null>(null);
+  const [saving, setSaving] = useState<'enabled' | 'mirror' | null>(null);
+  const [copying, setCopying] = useState(false);
+  const requestPending = useRef(false);
+  const copyPending = useRef(false);
+  const { success, error } = useSaveFeedback();
 
   const handleToggle = async (checked: boolean) => {
-    const prev = enabled;
+    if (requestPending.current) return;
+    requestPending.current = true;
+    const previous = enabled;
     setEnabled(checked);
+    setSaving('enabled');
     try {
       await preferencesApi.update('versionCheckEnabled', checked);
+      success(checked ? '已开启自动检查更新' : '已关闭自动检查更新');
     } catch {
-      setEnabled(prev);
+      setEnabled(previous);
+      error('保存自动检查设置失败，请稍后重试');
+    } finally {
+      requestPending.current = false;
+      setSaving(null);
     }
   };
 
   const handleToggleCnMirror = async (checked: boolean) => {
-    const prev = cnMirror;
+    if (requestPending.current) return;
+    requestPending.current = true;
+    const previous = cnMirror;
     setCnMirror(checked);
+    setSaving('mirror');
     try {
       await preferencesApi.update('cnMirrorEnabled', checked);
-      setMessage({
-        type: 'success',
-        text: checked
-          ? '已切换至国内线路 (AtomGit)'
-          : '已切换回海外线路 (GitHub)',
-      });
+      success(
+        checked
+          ? '已切换至国内线路，请点击「立即检查」刷新发布信息'
+          : '已切换至海外线路，请点击「立即检查」刷新发布信息',
+      );
+      router.refresh();
     } catch {
-      setCnMirror(prev);
-      setMessage({ type: 'error', text: '切换线路失败，请稍后重试' });
+      setCnMirror(previous);
+      error('切换发布源失败，请稍后重试');
+    } finally {
+      requestPending.current = false;
+      setSaving(null);
     }
   };
 
   const handleCheck = async () => {
+    if (requestPending.current) return;
+    requestPending.current = true;
     setChecking(true);
-    setMessage(null);
     try {
       const result = await versionApi.check(true);
-      setUpdate(result.update ?? null);
       if (result.error) {
-        setMessage({ type: 'error', text: result.error });
+        if (result.update) setUpdate(result.update);
+        error(result.error);
       } else {
-        setMessage({
-          type: 'success',
-          text: result.updateAvailable
+        setUpdate(result.update ?? null);
+        success(
+          result.updateAvailable
             ? `发现新版本 ${result.update?.tag ?? ''}`
             : '当前已是最新版本',
-        });
+        );
       }
     } catch {
-      setMessage({ type: 'error', text: '检查失败，请稍后重试' });
+      error('检查失败，请稍后重试');
     } finally {
+      requestPending.current = false;
       setChecking(false);
     }
   };
 
   const handleCopyCommand = async () => {
+    if (copyPending.current) return;
+    if (!navigator.clipboard?.writeText) {
+      error('当前浏览器无法访问剪贴板，请手动选择并复制命令');
+      return;
+    }
+    copyPending.current = true;
+    setCopying(true);
     try {
       await navigator.clipboard.writeText(UPGRADE_COMMAND);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      success('升级命令已复制');
     } catch {
-      // 忽略剪贴板写入异常
+      error('复制失败，请手动选择并复制命令');
+    } finally {
+      copyPending.current = false;
+      setCopying(false);
     }
   };
 
   const hasNewerVersion =
     update !== null && isNewerVersion(`v${APP_VERSION}`, update.tag);
+  const busy = checking || saving !== null;
+  const checkedAt = update ? new Date(update.checkedAt) : null;
+  const checkedAtText =
+    checkedAt && Number.isFinite(checkedAt.getTime())
+      ? `${checkedAt.toISOString().replace('T', ' ').slice(0, 19)} UTC`
+      : '未知';
 
   return (
     <SettingsSection
       title="版本更新"
       description={`当前版本 v${APP_VERSION}`}
+      layout="rows"
       actions={
         <Button
-          label={checking ? '检查中…' : '立即检查'}
+          label="立即检查"
           variant="secondary"
           size="sm"
-          isDisabled={checking}
+          isLoading={checking}
+          isDisabled={busy}
           onClick={() => void handleCheck()}
         />
       }
     >
-      {/* 自动检查更新开关 */}
-      <HStack justify="between" align="center" width="100%">
-        <VStack gap={1} align="start">
-          <Text size="sm" weight="medium">
-            自动检查更新
-          </Text>
-          <Text type="supporting" textWrap="pretty">
-            定期检测远端 Releases；关闭后不再自动发起请求，仍可手动检查
-          </Text>
-        </VStack>
+      <SettingRow
+        label="自动检查更新"
+        description="自动查询远端发布信息；关闭后仍可手动检查"
+        isSwitch
+      >
         <Switch
           label="自动检查更新"
           isLabelHidden
           value={enabled}
-          onChange={handleToggle}
+          isDisabled={busy}
+          isLoading={saving === 'enabled'}
+          onChange={(checked) => void handleToggle(checked)}
         />
-      </HStack>
-
-      {/* 国内环境加速开关 */}
-      <HStack
-        justify="between"
-        align="center"
-        width="100%"
-        className="border-t border-border/60 pt-3"
+      </SettingRow>
+      <SettingRow
+        label="国内镜像加速"
+        description="使用国内线路检查更新；切换后需重新检查"
+        isSwitch
       >
-        <VStack gap={1} align="start">
-          <Text size="sm" weight="medium">
-            国内环境加速
-          </Text>
-          <Text type="supporting" textWrap="pretty">
-            使用国内线路 (AtomGit) 直连拉取 Release 信息，免代理加速
-          </Text>
-        </VStack>
         <Switch
-          label="国内环境加速"
+          label="国内镜像加速"
           isLabelHidden
           value={cnMirror}
-          onChange={handleToggleCnMirror}
+          isDisabled={busy}
+          isLoading={saving === 'mirror'}
+          onChange={(checked) => void handleToggleCnMirror(checked)}
         />
-      </HStack>
-
-      {/* 状态与升级指引 */}
-      <VStack gap={2} width="100%" className="pt-1">
-        {update && (
-          <HStack justify="between" align="center" width="100%">
-            <Text size="sm" color="secondary">
-              上次检查：{update.checkedAt.slice(0, 10)} · 远端最新 {update.tag}
-              {!hasNewerVersion && '（已是最新版本）'}
-            </Text>
-            {update.url && (
-              <Button
-                label="查看更新日志"
-                icon={<ExternalLink size={ICON_SIZE.xs} />}
-                variant="ghost"
-                size="sm"
-                onClick={() => window.open(update.url, '_blank', 'noopener')}
-              />
-            )}
-          </HStack>
-        )}
-
-        {/* 发现新版本时的升级指引卡片 */}
-        {hasNewerVersion && (
-          <VStack
-            gap={2}
-            width="100%"
-            className="rounded-panel bg-surface/60 border border-border/80 p-3 mt-1"
+      </SettingRow>
+      <SettingRow
+        label="检查结果"
+        description={
+          update
+            ? hasNewerVersion
+              ? '发现可用更新'
+              : '当前无可用更新'
+            : '尚未检查'
+        }
+        stacked
+      >
+        {update ? (
+          <MetadataList
+            columns="single"
+            label={{ position: 'start', width: '6rem' }}
           >
-            <HStack justify="between" align="center" width="100%">
-              <Text size="sm" weight="semibold" className="text-primary">
+            <MetadataListItem label="远端最新">
+              <Text size="sm" className="font-mono break-words">
+                {update.tag}
+              </Text>
+            </MetadataListItem>
+            <MetadataListItem label="检查时间">
+              <Text size="sm" className="font-mono break-words">
+                {checkedAtText}
+              </Text>
+            </MetadataListItem>
+          </MetadataList>
+        ) : (
+          <Text size="sm" color="secondary">
+            点击「立即检查」获取远端最新版本与发布信息。
+          </Text>
+        )}
+      </SettingRow>
+      {hasNewerVersion && (
+        <SettingRow label="容器升级" stacked>
+          <div className="min-w-0 rounded-panel border border-border bg-surface p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <Text size="sm" weight="semibold">
                 推荐容器升级命令
               </Text>
               <Button
-                label={copied ? '已复制' : '复制命令'}
-                icon={
-                  copied ? (
-                    <Check size={ICON_SIZE.xs} className="text-success" />
-                  ) : (
-                    <Copy size={ICON_SIZE.xs} />
-                  )
-                }
+                label="复制命令"
+                icon={<Copy size={ICON_SIZE.sm} />}
                 variant="secondary"
                 size="sm"
+                isLoading={copying}
+                isDisabled={copying}
                 onClick={() => void handleCopyCommand()}
               />
-            </HStack>
-            <div className="overflow-x-auto rounded-control bg-muted p-2 font-mono text-xs text-secondary select-all">
-              {UPGRADE_COMMAND}
             </div>
-            <Text type="supporting" size="sm">
-              在部署目录执行上述命令即可完成升级，数据目录（./data）保持不变。
+            <code className="block select-all whitespace-pre-wrap break-words rounded-control bg-muted p-3 font-mono text-sm text-secondary">
+              {UPGRADE_COMMAND}
+            </code>
+            <Text size="sm" color="secondary" className="mt-3">
+              在部署目录执行前请备份数据，并确认 ./data 挂载配置保持不变。
             </Text>
-          </VStack>
-        )}
-
-        {message && (
-          <Text
-            size="sm"
-            className={
-              message.type === 'success' ? 'text-success' : 'text-error'
-            }
-          >
-            {message.text}
-          </Text>
-        )}
-      </VStack>
+          </div>
+        </SettingRow>
+      )}
     </SettingsSection>
   );
 }

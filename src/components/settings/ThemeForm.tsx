@@ -2,18 +2,14 @@
 
 import { NumberInput } from '@astryxdesign/core/NumberInput';
 import { Slider } from '@astryxdesign/core/Slider';
-import { HStack, StackItem } from '@astryxdesign/core/Stack';
-import { Text } from '@astryxdesign/core/Text';
-import { VStack } from '@astryxdesign/core/VStack';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
+import { OptionTile } from '@/components/settings/OptionTile';
+import { SettingRow } from '@/components/settings/SettingRow';
 import { SettingsSection } from '@/components/settings/SettingsSection';
+import { useSaveFeedback } from '@/components/settings/useSaveFeedback';
 import { useTheme } from '@/hooks/useTheme';
-import {
-  GUEST_PREF_KEYS,
-  getGuestPreference,
-  setGuestPreference,
-} from '@/lib/guest-preferences';
+import { GUEST_PREF_KEYS } from '@/lib/guest-preferences';
 import { ApiError } from '@/lib/request/ApiError';
 import { preferencesApi } from '@/services';
 import {
@@ -24,19 +20,9 @@ import {
   type ThemeMode,
 } from '@/types';
 
-/**
- * 外观设置
- *
- * - 主题模式：视觉化预览瓦片，点击即时保存（游客仅写入本地）
- * - 字体大小：滑杆预览 + 数字输入，提交时保存（游客仅写入本地）
- */
 interface ThemeFormProps {
-  /** 分区标题（默认「外观」；快捷面板内传入别的标题避免与面板头重复） */
   title?: string;
   initialFontSize: FontSizePreference;
-  /** 外观卡片内的附加设置行（如可达状态开关），渲染在字体大小之后 */
-  children?: React.ReactNode;
-  /** 是否已登录（未登录游客仅在本地保存偏好） */
   isAuthed?: boolean;
 }
 
@@ -53,64 +39,77 @@ const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: 'system', label: '跟随系统' },
 ];
 
+/** 主题即时保存，字号在预览结束后保存。 */
 export function ThemeForm({
-  title = '外观',
+  title = '主题与字体',
   initialFontSize,
-  children,
   isAuthed = true,
 }: ThemeFormProps) {
   const { mode, setMode } = useTheme();
+  const feedback = useSaveFeedback();
+  const radioName = useId();
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{
-    type: 'success' | 'error';
-    text: string;
-  } | null>(null);
+  const savingRef = useRef(false);
   const [fontSize, setFontSize] = useState(initialFontSize);
   const savedFontSizeRef = useRef(initialFontSize);
   const { mutate } = useSWRConfig();
 
-  // 挂载后若本地有游客字号偏好则采信
   useEffect(() => {
-    if (!isAuthed) {
-      const guestFontSize = getGuestPreference<number | null>(
-        GUEST_PREF_KEYS.FONT_SIZE,
-        null,
-      );
-      if (guestFontSize !== null) {
-        setFontSize(guestFontSize);
-        savedFontSizeRef.current = guestFontSize;
-        document.documentElement.style.fontSize = `${guestFontSize}%`;
+    if (isAuthed) return;
+    try {
+      const raw = localStorage.getItem(GUEST_PREF_KEYS.FONT_SIZE);
+      if (raw === null) return;
+      const value = Number(raw);
+      if (
+        Number.isFinite(value) &&
+        value >= FONT_SIZE_MIN &&
+        value <= FONT_SIZE_MAX
+      ) {
+        setFontSize(value);
+        savedFontSizeRef.current = value;
+        document.documentElement.style.fontSize = `${value}%`;
       }
-    }
+    } catch {}
   }, [isAuthed]);
 
-  const savePreference = async (save: () => Promise<void>) => {
-    setSaving(true);
-    setMsg(null);
-
+  const restoreLocal = (key: string, previous: string | null) => {
     try {
-      await save();
-      setMsg({ type: 'success', text: '已保存' });
-      return true;
-    } catch (error) {
-      if (error instanceof ApiError && error.isNetworkError) {
-        setMsg({ type: 'error', text: '网络错误' });
-      } else {
-        setMsg({ type: 'error', text: '保存失败' });
-      }
-      return false;
-    } finally {
-      setSaving(false);
-    }
+      if (previous === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, previous);
+    } catch {}
   };
 
-  // 主题在本地即时生效并持久化；服务端保存失败时保留本地主题
-  const handleChange = (newMode: ThemeMode) => {
-    setMode(newMode);
-    if (isAuthed) {
-      void savePreference(() => preferencesApi.update('theme', newMode));
-    } else {
-      setMsg({ type: 'success', text: '已应用' });
+  const reportError = (error: unknown) => {
+    feedback.error(
+      error instanceof ApiError && error.isNetworkError
+        ? '网络错误，设置未保存'
+        : '保存失败，已恢复原设置',
+    );
+  };
+
+  const handleThemeChange = async (next: ThemeMode) => {
+    if (savingRef.current || next === mode) return;
+    savingRef.current = true;
+    setSaving(true);
+    const previous = mode;
+    let previousLocal: string | null = null;
+    let localWritten = false;
+    try {
+      previousLocal = localStorage.getItem(GUEST_PREF_KEYS.THEME);
+      localStorage.setItem(GUEST_PREF_KEYS.THEME, next);
+      localWritten = true;
+      setMode(next);
+      if (isAuthed) await preferencesApi.update('theme', next);
+      feedback.success(isAuthed ? '主题已保存' : '主题已保存在本机');
+    } catch (error) {
+      if (localWritten) {
+        restoreLocal(GUEST_PREF_KEYS.THEME, previousLocal);
+        setMode(previous);
+      }
+      reportError(error);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
@@ -120,195 +119,131 @@ export function ThemeForm({
   };
 
   const handleFontSizePreview = (value: number | [number, number]) => {
-    if (typeof value === 'number') applyFontSize(value);
+    if (!savingRef.current && typeof value === 'number') applyFontSize(value);
   };
 
   const handleFontSizeCommit = async (value: number) => {
-    const previousSize = savedFontSizeRef.current;
-    if (value === previousSize) {
-      applyFontSize(value);
+    if (savingRef.current) return;
+    const next = Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, value));
+    const previous = savedFontSizeRef.current;
+    if (next === previous) {
+      applyFontSize(next);
       return;
     }
-
-    savedFontSizeRef.current = value;
-    applyFontSize(value);
-    setGuestPreference(GUEST_PREF_KEYS.FONT_SIZE, value);
-
-    if (!isAuthed) {
-      setMsg({ type: 'success', text: '已应用' });
-      return;
-    }
-
-    const isSaved = await savePreference(async () => {
-      await preferencesApi.update('fontSize', value);
-      await mutate(preferencesApi.getKey);
-    });
-
-    if (!isSaved) {
-      savedFontSizeRef.current = previousSize;
-      applyFontSize(previousSize);
+    savingRef.current = true;
+    setSaving(true);
+    let previousLocal: string | null = null;
+    let localWritten = false;
+    try {
+      previousLocal = localStorage.getItem(GUEST_PREF_KEYS.FONT_SIZE);
+      localStorage.setItem(GUEST_PREF_KEYS.FONT_SIZE, String(next));
+      localWritten = true;
+      applyFontSize(next);
+      if (isAuthed) await preferencesApi.update('fontSize', next);
+      savedFontSizeRef.current = next;
+      if (isAuthed) void mutate(preferencesApi.getKey).catch(() => {});
+      feedback.success(isAuthed ? '字号已保存' : '字号已保存在本机');
+    } catch (error) {
+      applyFontSize(previous);
+      if (localWritten) restoreLocal(GUEST_PREF_KEYS.FONT_SIZE, previousLocal);
+      reportError(error);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
   return (
     <SettingsSection
       title={title}
-      description="选择主题模式、界面字体大小与卡片状态点显示"
+      description="设置主题模式与界面字体大小"
+      layout="rows"
     >
-      <VStack gap={5}>
-        {/* 主题模式：视觉化预览瓦片 */}
-        <VStack gap={2}>
-          <Text size="sm" weight="medium">
-            外观模式
-          </Text>
-          <div
-            role="radiogroup"
-            aria-label="外观模式"
-            className="grid grid-cols-3 gap-2"
-          >
-            {THEME_OPTIONS.map((option) => (
-              <ThemeModeTile
-                key={option.value}
-                mode={option.value}
-                label={option.label}
-                isSelected={mode === option.value}
-                onSelect={() => handleChange(option.value)}
-              />
-            ))}
-          </div>
-        </VStack>
-
-        {/* 字体大小 */}
-        <VStack gap={2}>
-          <Text size="sm" weight="medium">
-            字体大小
-          </Text>
-          <Text type="supporting" textWrap="pretty">
-            拖动滑杆快速预览，或输入精确百分比；范围 90%–150%。
-          </Text>
-          <HStack gap={4} width="100%" align="center">
-            <StackItem size="fill">
-              <Slider
-                label="字体大小"
-                isLabelHidden
-                value={fontSize}
-                onChange={handleFontSizePreview}
-                onChangeEnd={handleFontSizeCommit}
-                min={FONT_SIZE_MIN}
-                max={FONT_SIZE_MAX}
-                step={FONT_SIZE_STEP}
-                marks={FONT_SIZE_MARKS}
-                formatValue={(value) => `${value}%`}
-                valueDisplay="none"
-                width="100%"
-              />
-            </StackItem>
-            <StackItem size="static">
-              <NumberInput
-                label="字体大小百分比"
-                isLabelHidden
-                value={fontSize}
-                onChange={handleFontSizeCommit}
-                min={FONT_SIZE_MIN}
-                max={FONT_SIZE_MAX}
-                step={FONT_SIZE_STEP}
-                units="%"
-                isIntegerOnly
-                isWheelEnabled={false}
-                size="md"
-                width={112}
-              />
-            </StackItem>
-          </HStack>
-        </VStack>
-
-        {children}
-
-        <HStack gap={2} align="center">
-          {saving && (
-            <Text size="sm" color="secondary">
-              保存中…
-            </Text>
-          )}
-          {msg && (
-            <Text
-              size="sm"
-              className={msg.type === 'success' ? 'text-success' : 'text-error'}
+      <SettingRow
+        label="外观模式"
+        description="选择明亮、暗黑或跟随系统"
+        stacked
+      >
+        <div
+          role="radiogroup"
+          aria-label="外观模式"
+          className="grid w-full grid-cols-3 gap-2"
+        >
+          {THEME_OPTIONS.map((option) => (
+            <OptionTile
+              key={option.value}
+              name={radioName}
+              value={option.value}
+              label={option.label}
+              checked={mode === option.value}
+              disabled={saving}
+              onChange={() => void handleThemeChange(option.value)}
             >
-              {msg.text}
-            </Text>
-          )}
-        </HStack>
-      </VStack>
+              <span className="flex h-12 w-full overflow-hidden rounded-control border border-border">
+                {(option.value === 'light' || option.value === 'system') && (
+                  <MiniWindowScheme dark={false} />
+                )}
+                {(option.value === 'dark' || option.value === 'system') && (
+                  <MiniWindowScheme dark={true} />
+                )}
+              </span>
+            </OptionTile>
+          ))}
+        </div>
+      </SettingRow>
+      <SettingRow
+        label="字体大小"
+        description="拖动预览或输入百分比，范围 90%–150%"
+      >
+        <div className="flex w-full min-w-0 items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <Slider
+              label="字体大小"
+              isLabelHidden
+              value={fontSize}
+              onChange={handleFontSizePreview}
+              onChangeEnd={(value: number) => void handleFontSizeCommit(value)}
+              isDisabled={saving}
+              min={FONT_SIZE_MIN}
+              max={FONT_SIZE_MAX}
+              step={FONT_SIZE_STEP}
+              marks={FONT_SIZE_MARKS}
+              formatValue={(value) => `${value}%`}
+              valueDisplay="none"
+              width="100%"
+            />
+          </div>
+          <NumberInput
+            label="字体大小百分比"
+            isLabelHidden
+            value={fontSize}
+            onChange={(value) => void handleFontSizeCommit(value)}
+            isDisabled={saving}
+            min={FONT_SIZE_MIN}
+            max={FONT_SIZE_MAX}
+            step={FONT_SIZE_STEP}
+            units="%"
+            isIntegerOnly
+            isWheelEnabled={false}
+            size="md"
+            width={104}
+          />
+        </div>
+      </SettingRow>
     </SettingsSection>
   );
 }
 
-interface ThemeModeTileProps {
-  mode: ThemeMode;
-  label: string;
-  isSelected: boolean;
-  onSelect: () => void;
-}
-
-/**
- * 主题模式预览瓦片
- *
- * 纯 CSS 迷你界面示意：顶栏 + 内容行。
- * 预览需要脱离当前主题固定表达亮/暗，故使用中性色而非语义 token。
- */
-function ThemeModeTile({
-  mode,
-  label,
-  isSelected,
-  onSelect,
-}: ThemeModeTileProps) {
-  return (
-    <label
-      className={`group flex flex-col gap-1.5 rounded-panel border-2 p-1.5 text-left transition-[border-color,box-shadow] cursor-pointer focus-within:outline-2 focus-within:outline-accent focus-within:outline-offset-2 ${
-        isSelected
-          ? 'border-accent ring-2 ring-accent/30'
-          : 'border-border hover:border-accent/50'
-      }`}
-    >
-      <span className="flex h-14 w-full overflow-hidden rounded-control border border-border">
-        {(mode === 'light' || mode === 'system') && (
-          <MiniWindowScheme dark={false} />
-        )}
-        {(mode === 'dark' || mode === 'system') && (
-          <MiniWindowScheme dark={true} />
-        )}
-      </span>
-      <Text
-        size="sm"
-        weight={isSelected ? 'medium' : 'normal'}
-        className="px-0.5"
-      >
-        {label}
-      </Text>
-      <input
-        type="radio"
-        name="theme-mode"
-        value={mode}
-        checked={isSelected}
-        onChange={onSelect}
-        className="sr-only"
-        aria-label={label}
-      />
-    </label>
-  );
-}
-
-/** 迷你窗口示意（亮/暗各半用于「跟随系统」） */
+/** 固定明暗色用于主题预览，不随当前主题变化。 */
 function MiniWindowScheme({ dark }: { dark: boolean }) {
   const bg = dark ? 'bg-neutral-800' : 'bg-neutral-100';
   const bar = dark ? 'bg-neutral-700' : 'bg-neutral-300';
   const line = dark ? 'bg-neutral-600' : 'bg-neutral-400';
   return (
     <span className={`flex-1 ${bg} p-1.5 flex flex-col gap-1`} aria-hidden>
-      <span className={`h-1 w-1/3 rounded-full ${bar}`} />
-      <span className={`h-1 w-2/3 rounded-full ${line}`} />
-      <span className={`h-1 w-1/2 rounded-full ${line}`} />
+      <span className={`h-1 w-1/3 rounded-control ${bar}`} />
+      <span className={`h-1 w-2/3 rounded-control ${line}`} />
+      <span className={`h-1 w-1/2 rounded-control ${line}`} />
     </span>
   );
 }

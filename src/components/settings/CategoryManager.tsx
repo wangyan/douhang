@@ -135,7 +135,8 @@ export function CategoryManager({ initialCategories }: CategoryManagerProps) {
   return (
     <SettingsSection
       title="分类"
-      description="拖拽排序，右侧按钮编辑或删除"
+      description="拖拽调整分类顺序，支持编辑与删除"
+      layout="rows"
       actions={
         <Button
           label="新建分类"
@@ -149,29 +150,27 @@ export function CategoryManager({ initialCategories }: CategoryManagerProps) {
       {categories.length === 0 ? (
         <EmptyPlaceholder label="暂无分类" hint="点击「新建分类」开始创建" />
       ) : (
-        <div className="rounded-panel border border-border overflow-hidden -mx-1">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={categories.map((c) => c.id)}
+            strategy={verticalListSortingStrategy}
           >
-            <SortableContext
-              items={categories.map((c) => c.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <VStack gap={0}>
-                {categories.map((category) => (
-                  <CategoryRow
-                    key={category.id}
-                    category={category}
-                    onEdit={() => handleEdit(category)}
-                    onDelete={() => handleDelete(category)}
-                  />
-                ))}
-              </VStack>
-            </SortableContext>
-          </DndContext>
-        </div>
+            <VStack gap={0}>
+              {categories.map((category) => (
+                <CategoryRow
+                  key={category.id}
+                  category={category}
+                  onEdit={() => handleEdit(category)}
+                  onDelete={() => handleDelete(category)}
+                />
+              ))}
+            </VStack>
+          </SortableContext>
+        </DndContext>
       )}
 
       <CategoryEditModal
@@ -205,41 +204,38 @@ function CategoryRow({ category, onEdit, onDelete }: CategoryRowProps) {
 
   return (
     <SortableRow id={category.id}>
-      {/* 分类徽章：与主页视觉一致的组合预览 */}
       <CategoryBadge
         name={category.name}
         icon={category.icon}
         color={category.color}
         size="md"
       />
-
-      {/* 名称 */}
-      <Text size="sm" className="flex-1 min-w-0 truncate">
-        {category.name}
-      </Text>
-
-      {/* 卡片数 */}
-      <Text size="sm" color="secondary">
-        {cardCount} 张卡片
-      </Text>
-
-      {/* 操作按钮 */}
-      <IconButton
-        label="编辑分类"
-        icon={<Pencil size={ICON_SIZE.sm} />}
-        variant="ghost"
-        size="sm"
-        tooltip="编辑"
-        onClick={onEdit}
-      />
-      <IconButton
-        label="删除分类"
-        icon={<Trash2 size={ICON_SIZE.sm} />}
-        variant="ghost"
-        size="sm"
-        tooltip="删除"
-        onClick={onDelete}
-      />
+      <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1">
+        <Text size="sm" className="min-w-0 break-words">
+          {category.name}
+        </Text>
+        <Text size="sm" color="secondary" className="shrink-0">
+          {cardCount} 张卡片
+        </Text>
+      </div>
+      <HStack gap={0.5} className="shrink-0">
+        <IconButton
+          label={`编辑分类：${category.name}`}
+          icon={<Pencil size={ICON_SIZE.sm} />}
+          variant="ghost"
+          size="sm"
+          tooltip="编辑"
+          onClick={onEdit}
+        />
+        <IconButton
+          label={`删除分类：${category.name}`}
+          icon={<Trash2 size={ICON_SIZE.sm} />}
+          variant="ghost"
+          size="sm"
+          tooltip="删除"
+          onClick={onDelete}
+        />
+      </HStack>
     </SortableRow>
   );
 }
@@ -355,7 +351,7 @@ function CategoryEditModalInner({
                       <button
                         type="button"
                         onClick={() => setForm({ ...form, color: '' })}
-                        className="text-secondary hover:text-error transition-colors text-xs rounded-control px-1 focus-ring"
+                        className="text-secondary hover:text-error transition-colors text-sm rounded-control px-1 focus-ring"
                         aria-label="清除颜色"
                       >
                         清除

@@ -163,7 +163,7 @@ export function SortableCardGrid({
                 <p className="text-base font-medium text-secondary">
                   这里还没有卡片
                 </p>
-                <p className="mt-1.5 text-sm text-tertiary">
+                <p className="mt-1.5 text-sm text-secondary">
                   拖一张过来，松手即移入此分类
                 </p>
               </div>

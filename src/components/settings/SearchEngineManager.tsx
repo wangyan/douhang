@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertDialog } from '@astryxdesign/core/AlertDialog';
+import { Badge } from '@astryxdesign/core/Badge';
 import { Button } from '@astryxdesign/core/Button';
 import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog';
 import { FormLayout } from '@astryxdesign/core/FormLayout';
@@ -18,6 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import useSWR from 'swr';
 import {
   IconPicker,
   type IconUploadSelection,
@@ -28,7 +30,7 @@ import { SortableRow } from '@/components/settings/SortableRow';
 import { useSortableReorder } from '@/components/settings/use-sortable-reorder';
 import { DIALOG_WIDTH, ICON_SIZE } from '@/lib/design-tokens';
 import { ApiError } from '@/lib/request/ApiError';
-import { iconsApi } from '@/services';
+import { iconsApi, preferencesApi } from '@/services';
 import { searchEnginesApi } from '@/services/search-engines';
 import type { SearchEngineConfig } from '@/types';
 
@@ -55,7 +57,7 @@ const EMPTY_ENGINE_FORM: EngineFormState = {
  * - 引擎统一管理（内置 5 个已由迁移落库）：拖拽排序、增删改
  * - 服务端保证至少保留一个引擎（最后一行的删除按钮隐藏 + 服务端校验）
  * - 图标复用卡片 IconPicker（图标库 + 上传）
- * - 删除当前默认引擎时服务端自动回退 google
+ * - 默认引擎来自独立偏好；删除后服务端回退到剩余列表的首项
  */
 export function SearchEngineManager({
   initialEngines,
@@ -72,6 +74,14 @@ export function SearchEngineManager({
   );
   const [deleting, setDeleting] = useState(false);
   const showToast = useToast();
+  const { data: preferences, mutate: refreshPreferences } = useSWR(
+    preferencesApi.getKey,
+    preferencesApi.get,
+  );
+  const defaultEngineKey = preferences
+    ? (engines.find((engine) => engine.key === preferences.searchEngine)?.key ??
+      engines[0]?.key)
+    : null;
 
   const handleNew = () => {
     setEditing(null);
@@ -105,6 +115,7 @@ export function SearchEngineManager({
       await searchEnginesApi.remove(pendingDelete.key);
       setEngines((prev) => prev.filter((e) => e.key !== pendingDelete.key));
       setPendingDelete(null);
+      void refreshPreferences();
     } catch (err) {
       if (err instanceof ApiError && err.isNetworkError) {
         showToast({ body: '网络错误', type: 'error' });
@@ -165,7 +176,8 @@ export function SearchEngineManager({
   return (
     <SettingsSection
       title="搜索引擎"
-      description="拖拽排序；至少保留一个引擎"
+      description="拖拽调整显示顺序；默认引擎在首页切换，至少保留一个引擎"
+      layout="rows"
       actions={
         <Button
           label="添加引擎"
@@ -176,30 +188,29 @@ export function SearchEngineManager({
         />
       }
     >
-      <div className="rounded-panel border border-border overflow-hidden -mx-1">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={engines.map((e) => e.key)}
+          strategy={verticalListSortingStrategy}
         >
-          <SortableContext
-            items={engines.map((e) => e.key)}
-            strategy={verticalListSortingStrategy}
-          >
-            <VStack gap={0}>
-              {engines.map((engine) => (
-                <EngineRow
-                  key={engine.key}
-                  engine={engine}
-                  isLastEngine={engines.length <= 1}
-                  onEdit={() => handleEdit(engine)}
-                  onDelete={() => setPendingDelete(engine)}
-                />
-              ))}
-            </VStack>
-          </SortableContext>
-        </DndContext>
-      </div>
+          <VStack gap={0}>
+            {engines.map((engine) => (
+              <EngineRow
+                key={engine.key}
+                engine={engine}
+                isDefault={engine.key === defaultEngineKey}
+                isLastEngine={engines.length <= 1}
+                onEdit={() => handleEdit(engine)}
+                onDelete={() => setPendingDelete(engine)}
+              />
+            ))}
+          </VStack>
+        </SortableContext>
+      </DndContext>
 
       <EngineEditModal
         key={editing?.key ?? 'new'}
@@ -219,7 +230,7 @@ export function SearchEngineManager({
           if (!open && !deleting) setPendingDelete(null);
         }}
         title="删除引擎"
-        description={`确认删除「${pendingDelete?.name ?? ''}」吗？若它是当前默认引擎，会自动回退到 Google。`}
+        description={`确认删除「${pendingDelete?.name ?? ''}」吗？若它是当前默认引擎，会自动使用剩余列表的第一个引擎。`}
         cancelLabel="取消"
         actionLabel="删除"
         isActionLoading={deleting}
@@ -232,26 +243,36 @@ export function SearchEngineManager({
 
 interface EngineRowProps {
   engine: SearchEngineConfig;
+  isDefault: boolean;
   isLastEngine: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-/** 单行引擎：拖拽手柄 + 图标 + 名称 + URL + 编辑/删除按钮 */
-function EngineRow({ engine, isLastEngine, onEdit, onDelete }: EngineRowProps) {
+/** 单行引擎：拖拽手柄、引擎信息与操作。 */
+function EngineRow({
+  engine,
+  isDefault,
+  isLastEngine,
+  onEdit,
+  onDelete,
+}: EngineRowProps) {
   return (
     <SortableRow id={engine.key}>
       <EngineIcon engine={engine} size={ICON_SIZE.lg} />
       <VStack gap={0.5} className="flex-1 min-w-0">
-        <Text size="sm" className="truncate">
-          {engine.name}
-        </Text>
-        <Text size="sm" color="secondary" className="truncate">
+        <div className="flex min-w-0 items-center gap-2">
+          <Text size="sm" className="min-w-0 truncate">
+            {engine.name}
+          </Text>
+          {isDefault && <Badge label="默认" variant="neutral" />}
+        </div>
+        <Text size="sm" color="secondary" className="font-mono truncate">
           {engine.urlTemplate}
         </Text>
       </VStack>
 
-      <HStack gap={0.5}>
+      <HStack gap={0.5} className="shrink-0">
         <IconButton
           label="编辑"
           icon={<Pencil size={ICON_SIZE.sm} />}

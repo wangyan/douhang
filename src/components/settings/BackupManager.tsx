@@ -2,132 +2,153 @@
 
 import { AlertDialog } from '@astryxdesign/core/AlertDialog';
 import { Button } from '@astryxdesign/core/Button';
-import { HStack } from '@astryxdesign/core/HStack';
-import { Text } from '@astryxdesign/core/Text';
-import { useToast } from '@astryxdesign/core/Toast';
-import { VStack } from '@astryxdesign/core/VStack';
 import { Download, Upload } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
+import { SettingRow } from '@/components/settings/SettingRow';
 import { SettingsSection } from '@/components/settings/SettingsSection';
+import { useSaveFeedback } from '@/components/settings/useSaveFeedback';
 import { DIALOG_WIDTH, ICON_SIZE } from '@/lib/design-tokens';
 import { ApiError } from '@/lib/request/ApiError';
 import { backupApi } from '@/services';
 
-/**
- * 备份与恢复
- *
- * - 导出：下载 zip（backup.json + data/uploads 上传文件）
- * - 恢复：上传 zip，确认后事务内清空重建并还原上传文件
- */
+/** 备份导出与需二次确认的数据恢复。 */
 export function BackupManager() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const pendingFileRef = useRef<File | null>(null);
+  const pending = useRef(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const showToast = useToast();
+  const feedback = useSaveFeedback();
   const router = useRouter();
+  const busy = exporting || importing || pendingFile !== null;
 
   const handleExport = async () => {
+    if (pending.current || pendingFileRef.current) return;
+    pending.current = true;
     setExporting(true);
     try {
       const blob = await backupApi.exportBackup();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const anchor = document.createElement('a');
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
       const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-      a.href = url;
-      a.download = `douhang-backup-${stamp}.zip`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      showToast({ body: '导出失败', type: 'error' });
+      anchor.href = url;
+      anchor.download = `douhang-backup-${stamp}.zip`;
+      // 延后释放，使浏览器先处理下载。
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      anchor.click();
+      feedback.success('备份已导出');
+    } catch (error) {
+      feedback.error(error instanceof ApiError ? error.message : '导出失败');
     } finally {
+      pending.current = false;
       setExporting(false);
     }
   };
 
-  const handleFileChange = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (!file) return;
+    if (!file || pending.current || pendingFileRef.current) return;
+    pendingFileRef.current = file;
     setPendingFile(file);
   };
 
   const confirmImport = async () => {
-    if (!pendingFile || importing) return;
+    const file = pendingFileRef.current;
+    if (!file || pending.current) return;
+    pending.current = true;
     setImporting(true);
     try {
-      await backupApi.importBackup(pendingFile);
+      await backupApi.importBackup(file);
+      pendingFileRef.current = null;
       setPendingFile(null);
-      showToast({ body: '恢复完成，页面即将刷新', type: 'info' });
+      feedback.success('恢复完成，页面即将刷新');
       router.refresh();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        const data = err.data as { error?: string } | undefined;
-        showToast({ body: data?.error ?? '导入失败', type: 'error' });
-      } else {
-        showToast({ body: '恢复失败', type: 'error' });
-      }
+    } catch (error) {
+      feedback.error(error instanceof ApiError ? error.message : '恢复失败');
     } finally {
+      pending.current = false;
       setImporting(false);
     }
   };
 
   return (
-    <SettingsSection title="备份与恢复" description="一键导出 / 恢复全部数据">
-      <VStack gap={3}>
-        <HStack gap={2}>
+    <>
+      <SettingsSection
+        title="备份"
+        description="导出站点数据与上传文件"
+        layout="rows"
+      >
+        <SettingRow
+          label="导出备份"
+          description="不含登录账号与密码（上传的图标与壁纸已一并打包）"
+        >
           <Button
             label="导出备份"
-            variant="primary"
+            variant="secondary"
             size="sm"
             icon={<Download size={ICON_SIZE.sm} />}
-            isDisabled={exporting}
+            isLoading={exporting}
+            isDisabled={busy}
             onClick={() => void handleExport()}
           />
+        </SettingRow>
+      </SettingsSection>
+
+      <SettingsSection
+        title="危险操作"
+        description="恢复备份将覆盖当前全部数据"
+        variant="danger"
+        layout="rows"
+      >
+        <SettingRow label="恢复备份" description="此操作不可撤销，请先导出备份">
           <Button
             label="从备份恢复"
-            variant="ghost"
+            variant="destructive"
             size="sm"
             icon={<Upload size={ICON_SIZE.sm} />}
-            isDisabled={importing}
-            onClick={() => fileRef.current?.click()}
+            isLoading={importing}
+            isDisabled={busy}
+            onClick={() => {
+              if (!pending.current && !pendingFileRef.current) {
+                fileRef.current?.click();
+              }
+            }}
           />
           <input
             ref={fileRef}
             type="file"
             accept="application/zip,.zip"
             className="hidden"
-            onChange={(e) => void handleFileChange(e)}
+            disabled={busy}
+            onChange={handleFileChange}
           />
-        </HStack>
-
-        <Text size="sm" color="secondary">
-          不含登录账号与密码（上传的图标与壁纸已一并打包）
-        </Text>
-      </VStack>
+        </SettingRow>
+      </SettingsSection>
 
       <AlertDialog
         isOpen={pendingFile !== null}
         onOpenChange={(open) => {
-          if (!open && !importing) setPendingFile(null);
+          if (!open && !pending.current) {
+            pendingFileRef.current = null;
+            setPendingFile(null);
+          }
         }}
         title="从备份恢复"
-        description={`将覆盖当前全部数据，此操作不可撤销。
-
-          文件：${pendingFile?.name ?? ''}（${
-            pendingFile ? (pendingFile.size / 1024 / 1024).toFixed(2) : 0
-          } MB）`}
+        description={`将覆盖当前全部数据，此操作不可撤销。\n\n文件：${pendingFile?.name ?? ''}（${
+          pendingFile ? (pendingFile.size / 1024 / 1024).toFixed(2) : 0
+        } MB）`}
         cancelLabel="取消"
         actionLabel="确认恢复"
+        actionVariant="destructive"
         isActionLoading={importing}
         onAction={() => void confirmImport()}
         width={DIALOG_WIDTH.md}
       />
-    </SettingsSection>
+    </>
   );
 }

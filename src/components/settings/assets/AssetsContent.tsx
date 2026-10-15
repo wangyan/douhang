@@ -108,11 +108,11 @@ export function ListContent({
 }: ContentProps) {
   return (
     <div className="rounded-control border border-border/60 bg-surface overflow-hidden divide-y divide-border/40">
-      <div className="grid grid-cols-[20px_32px_minmax(0,1fr)_88px_64px_24px] items-center gap-3 px-2 py-1.5 bg-surface-2/40 text-xs uppercase tracking-wide text-secondary">
+      <div className="grid grid-cols-[20px_32px_minmax(0,1fr)_72px_28px] sm:grid-cols-[20px_32px_minmax(0,1fr)_88px_64px_28px] items-center gap-3 px-2 py-1.5 bg-surface-2/40 text-sm uppercase tracking-wide text-secondary">
         <span />
         <span />
         <span>名称</span>
-        <span>修改时间</span>
+        <span className="hidden sm:block">修改时间</span>
         <span className="text-right">大小</span>
         <span />
       </div>
@@ -355,7 +355,7 @@ function AssetRow({
             handleActivate();
           }
         }}
-        className={`group relative grid grid-cols-[20px_32px_minmax(0,1fr)_88px_64px_24px] items-center gap-3 px-2 py-1.5 cursor-pointer focus-ring ${
+        className={`group relative grid grid-cols-[20px_32px_minmax(0,1fr)_72px_28px] sm:grid-cols-[20px_32px_minmax(0,1fr)_88px_64px_28px] items-center gap-3 px-2 py-1.5 cursor-pointer focus-ring ${
           selected ? 'bg-accent/5' : 'hover:bg-surface-2/40'
         } ${deleting ? 'opacity-40' : ''} ${locked ? 'opacity-60' : ''}`}
       >
@@ -394,20 +394,20 @@ function AssetRow({
             {name}
           </span>
           {usageCount > 0 && !locked && (
-            <span className="shrink-0 text-xs font-mono text-secondary">
+            <span className="shrink-0 text-sm font-mono text-secondary">
               ×{usageCount}
             </span>
           )}
           {locked && lockedLabel && (
-            <span className="shrink-0 text-xs font-mono text-secondary">
+            <span className="shrink-0 text-sm font-mono text-secondary">
               {lockedLabel}
             </span>
           )}
         </div>
-        <span className="text-xs font-mono text-secondary tabular-nums">
+        <span className="hidden text-sm font-mono text-secondary tabular-nums sm:block">
           {formatDate(mtime)}
         </span>
-        <span className="text-right text-xs font-mono text-secondary tabular-nums">
+        <span className="text-right text-sm font-mono text-secondary tabular-nums">
           {formatSize(size)}
         </span>
         <div className="flex justify-end">
@@ -423,7 +423,7 @@ function AssetRow({
                 e.stopPropagation();
                 onDelete();
               }}
-              className={`opacity-0 group-hover:opacity-100 focus-visible:opacity-100 ${
+              className={`opacity-0 max-sm:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 ${
                 selected ? 'opacity-100' : ''
               }`}
             />

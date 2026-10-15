@@ -2,9 +2,11 @@
 
 import { DropdownMenu } from '@astryxdesign/core/DropdownMenu';
 import { useState } from 'react';
+import { useSWRConfig } from 'swr';
 import { EngineIcon } from '@/components/icons/EngineIcon';
 import { ICON_SIZE } from '@/lib/design-tokens';
 import { preferencesApi } from '@/services';
+import type { Preferences } from '@/services/widgets';
 import type { CardDensity, SearchEngine, SearchEngineConfig } from '@/types';
 
 interface EngineSwitcherProps {
@@ -35,6 +37,7 @@ export function EngineSwitcher({
   onChange,
 }: EngineSwitcherProps) {
   const [engine, setEngine] = useState<SearchEngine>(initialEngine);
+  const { mutate } = useSWRConfig();
 
   const currentConfig = engines.find((e) => e.key === engine) ?? engines[0];
   const iconSize = density === 'compact' ? ICON_SIZE.md : ICON_SIZE.lg;
@@ -46,6 +49,12 @@ export function EngineSwitcher({
     // 持久化到服务端
     try {
       await preferencesApi.update('searchEngine', key);
+      void mutate(
+        preferencesApi.getKey,
+        (current: Preferences | undefined) =>
+          current ? { ...current, searchEngine: key } : current,
+        { revalidate: true },
+      ).catch(() => {});
     } catch (e) {
       console.error('保存搜索引擎失败', e);
     }

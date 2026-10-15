@@ -49,7 +49,7 @@ export function ChangelogHighlightList({
 interface ChangelogTimelineProps {
   /** 覆盖展示的版本列表（缺省为全部版本） */
   releases?: ChangelogRelease[];
-  /** 默认展开的版本号（缺省为第一个版本，即最新） */
+  /** 默认展开的版本号（缺省全部折叠） */
   defaultExpandedVersion?: string;
 }
 
@@ -61,7 +61,7 @@ const INITIAL_VISIBLE_COUNT = 8;
  *
  * 每个版本只展示「亮点」条目——面向使用者的能力描述，
  * 完整变更（含部署、开发等技术分类）见发布页。
- * 最新版本默认展开，历史版本折叠成单行。
+ * 各版本默认折叠，点击标题行展开。
  * 数据来自 CHANGELOG.md 构建期解析结果。
  */
 export function ChangelogTimeline({
@@ -74,14 +74,7 @@ export function ChangelogTimeline({
   const visibleList = showAll ? list : list.slice(0, INITIAL_VISIBLE_COUNT);
   const hiddenCount = list.length - visibleList.length;
   const [expanded, setExpanded] = useState<Set<string>>(
-    () =>
-      new Set(
-        defaultExpandedVersion
-          ? [defaultExpandedVersion]
-          : list.length > 0
-            ? [list[0].version]
-            : [],
-      ),
+    () => new Set(defaultExpandedVersion ? [defaultExpandedVersion] : []),
   );
 
   const toggle = (version: string) => {
@@ -107,14 +100,14 @@ export function ChangelogTimeline({
           <VStack
             key={release.version}
             gap={1}
-            className="border-b border-border/60 pb-2 last:border-b-0 last:pb-0"
+            className="border-b border-border/60 pb-1.5 last:border-b-0 last:pb-0"
           >
             <button
               type="button"
               aria-expanded={isOpen}
               aria-controls={rowId}
               onClick={() => toggle(release.version)}
-              className="flex w-full items-center gap-2 rounded-control px-2 py-2 text-left hover:bg-overlay-hover focus-ring"
+              className="flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-left hover:bg-overlay-hover focus-ring"
             >
               <ChevronDown
                 size={ICON_SIZE.sm}
@@ -135,7 +128,7 @@ export function ChangelogTimeline({
               )}
             </button>
             {isOpen && (
-              <div id={rowId} className="px-4 pb-2">
+              <div id={rowId} className="px-4 pb-1.5">
                 <ChangelogHighlightList release={release} />
               </div>
             )}
@@ -146,7 +139,7 @@ export function ChangelogTimeline({
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="rounded-control px-2 py-2 text-center hover:bg-overlay-hover focus-ring"
+          className="rounded-control px-2 py-1.5 text-center hover:bg-overlay-hover focus-ring"
         >
           <Text size="sm" color="secondary">
             查看更早版本（{hiddenCount}）

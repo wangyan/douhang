@@ -7,6 +7,7 @@ import { ToastViewport } from '@astryxdesign/core/Toast';
 import { Theme } from '@astryxdesign/core/theme';
 import { neutralTheme } from '@astryxdesign/theme-neutral/built';
 import Link from 'next/link';
+import { SessionProvider, useSession } from 'next-auth/react';
 import { useEffect, useRef } from 'react';
 import useSWR, { SWRConfig } from 'swr';
 import { ServiceWorkerRegister } from '@/components/pwa/ServiceWorkerRegister';
@@ -14,6 +15,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { astryxZh } from '@/lib/astryx-locale-zh';
 import { installContextMenuAnchorFallback } from '@/lib/context-menu-anchor-fallback';
 import { installContextMenuTouchGuard } from '@/lib/context-menu-touch-guard';
+import { GUEST_PREF_KEYS } from '@/lib/guest-preferences';
 import { errorMiddleware } from '@/lib/request/middleware';
 import { swrFetcher } from '@/lib/request/request';
 import { preferencesApi } from '@/services';
@@ -25,33 +27,39 @@ interface ProvidersProps {
   initialTheme: ThemeMode;
 }
 
-export function Providers({
+export function Providers(props: ProvidersProps) {
+  return (
+    <SessionProvider>
+      <AppProviders {...props} />
+    </SessionProvider>
+  );
+}
+
+function AppProviders({
   children,
   initialFontSize,
   initialTheme,
 }: ProvidersProps) {
   // SSR 已读取数据库偏好；hydration 首帧必须保持同一主题，避免二次切换
   const { mode, resolved, setMode } = useTheme(initialTheme);
+  const { status } = useSession();
   const { data: prefs } = useSWR(preferencesApi.getKey, preferencesApi.get);
+  const reconciledAuth = useRef<boolean | null>(null);
+  const isAuthenticated = status === 'authenticated';
 
-  // 主题以服务端 DB 为权威来源，localStorage 只是 hydration 前的缓存。
-  // 两者漂移时（其他浏览器改过 / 上次保存失败）以 DB 为准回写本地，
-  // 避免「设置里是跟随系统、实际渲染却是亮色」这类不一致。
-  // 只在首次拿到 DB 值时对账一次：持续对账会和用户切换打架
-  // （SWR 缓存还是旧值，会把刚切换的主题回滚，表现为「卡住」）。
-  // ref 守卫保证对账只执行一次，后续 mode 变化重跑 effect 时直接跳过。
-  const themeReconciled = useRef(false);
+  // 管理员按数据库默认值对账一次，游客保留本机主题。
   useEffect(() => {
-    if (themeReconciled.current || !prefs?.theme) return;
-    themeReconciled.current = true;
-    if (prefs.theme !== mode) setMode(prefs.theme);
-  }, [mode, prefs?.theme, setMode]);
+    if (status === 'loading' || !prefs?.theme) return;
+    if (reconciledAuth.current === isAuthenticated) return;
+    reconciledAuth.current = isAuthenticated;
+    if (isAuthenticated && prefs.theme !== mode) setMode(prefs.theme);
+  }, [isAuthenticated, mode, prefs?.theme, setMode, status]);
 
   useEffect(() => {
     // 挂载后若本地有游客定制的字号偏好，优先采用本地偏好
     let effective = prefs?.fontSize ?? initialFontSize;
     try {
-      const stored = localStorage.getItem('douhang-font-size');
+      const stored = localStorage.getItem(GUEST_PREF_KEYS.FONT_SIZE);
       if (stored !== null) {
         const num = Number(stored);
         if (Number.isFinite(num) && num > 0) effective = num;

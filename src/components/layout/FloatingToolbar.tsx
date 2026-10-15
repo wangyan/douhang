@@ -48,6 +48,7 @@ import { CmdKModal } from '@/components/search/CmdKModal';
 import { useTheme } from '@/hooks/useTheme';
 import { useWidgetBarVisibility } from '@/hooks/useWidgetBarVisibility';
 import { ICON_SIZE } from '@/lib/design-tokens';
+import { GUEST_PREF_KEYS } from '@/lib/guest-preferences';
 import {
   isNetworkMode,
   NETWORK_MODE_CHANGE_EVENT,
@@ -67,7 +68,7 @@ interface FloatingToolbarProps {
   withinFrame?: boolean;
   /** 远端仓库主页地址（支持外部透传，回落至 REPO_URL） */
   repoUrl?: string;
-  /** 用户指南文档地址（支持外部透传，回落至 MANUAL_URL / USER_GUIDE_URL） */
+  /** 用户指南文档地址（支持外部透传，回落至 MANUAL_URL） */
   manualUrl?: string;
   /** 管理指南文档地址（支持外部透传，回落至 ADMIN_GUIDE_URL） */
   adminGuideUrl?: string;
@@ -400,7 +401,7 @@ export function FloatingToolbar({
   // 挂载后同步浏览器本地持久化的简洁模式偏好
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('douhang-card-simple-mode');
+      const stored = localStorage.getItem(GUEST_PREF_KEYS.CARD_SIMPLE_MODE);
       if (stored !== null) {
         const val = stored === 'true';
         setSimpleMode(val);
@@ -416,7 +417,7 @@ export function FloatingToolbar({
     const next = !simpleMode;
     setSimpleMode(next);
     try {
-      localStorage.setItem('douhang-card-simple-mode', String(next));
+      localStorage.setItem(GUEST_PREF_KEYS.CARD_SIMPLE_MODE, String(next));
     } catch {}
     if (isAuthed) {
       void preferencesApi.update('cardSimpleMode', next).catch((e) => {

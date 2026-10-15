@@ -139,7 +139,7 @@ export function CategorySelector({
             return (
               // 动态宽度与触发器对齐（JS 实测值，Tailwind 任意值类无法动态编译）
               <div className="p-3" style={{ width: panelWidth }}>
-                <p className="pb-2 text-xs font-medium text-tertiary">
+                <p className="pb-2 text-sm font-medium text-secondary">
                   新建分类
                 </p>
                 <TextInput
@@ -217,11 +217,11 @@ export function CategorySelector({
                   />
                 ))}
                 {merged.length === 0 ? (
-                  <p className="px-3 py-3 text-center text-xs text-tertiary">
+                  <p className="px-3 py-3 text-center text-sm text-secondary">
                     还没有分类，可点击下方新建
                   </p>
                 ) : filtered.length === 0 ? (
-                  <p className="px-3 py-3 text-center text-xs text-tertiary">
+                  <p className="px-3 py-3 text-center text-sm text-secondary">
                     未找到匹配的分类
                   </p>
                 ) : null}
@@ -234,7 +234,7 @@ export function CategorySelector({
                     setNewName(query.trim());
                     setMode('create');
                   }}
-                  className="flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/8 cursor-pointer focus-ring"
+                  className="flex w-full items-center gap-2 rounded-control px-2 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-accent/8 cursor-pointer focus-ring"
                 >
                   <Plus size={ICON_SIZE.sm} strokeWidth={2} />
                   新建分类

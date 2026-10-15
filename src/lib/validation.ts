@@ -154,7 +154,7 @@ export const accountUpdateSchema = z
     currentPassword: z.string().optional(),
     newPassword: z
       .string()
-      .min(6, '密码至少 6 位')
+      .min(8, '密码至少 8 位')
       .max(100, '密码最多 100 位')
       .optional(),
   })
@@ -431,9 +431,11 @@ const PREFERENCE_VALUE_SCHEMAS: Record<string, z.ZodSchema> = {
   cardSimpleMode: z.boolean(),
   /** 卡片状态徽章（右上角在线/离线圆点） */
   cardStatusBadge: z.boolean(),
+  /** 全宽布局开关（开启铺满右侧工作区，关闭内容居中） */
+  fullWidth: z.boolean(),
   /** 版本更新检测开关（关闭后不再请求远端） */
   versionCheckEnabled: z.boolean(),
-  /** 国内环境加速（开启后优先走 AtomGit） */
+  /** 国内镜像加速（开启后优先走 AtomGit） */
   cnMirrorEnabled: z.boolean(),
   /** 版本更新检测缓存结果 */
   versionCheckCache: z

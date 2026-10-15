@@ -13,12 +13,9 @@ export interface AccountUpdatePayload {
   newPassword?: string;
 }
 
-/**
- * 账号 API service
- *
- * 账号信息读取由 AccountForm 通过 get() 直接调用（非 SWR，单次拉取）
- */
+/** 账号信息读取与更新。 */
 export const accountApi = {
+  getKey: '/api/account' as const,
   /** 读取当前账号 */
   get: () => request<AccountInfo>('/api/account'),
 

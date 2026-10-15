@@ -50,7 +50,7 @@
 ```
 src/app/          页面与接口：page / layout / error / loading / manifest / providers / globals.css
   api/            REST 接口层，覆盖 cards、categories、widgets、icons、wallpapers、backup 等
-  settings/       后台管理设置页（通用、外观、搜索、分类、素材）
+  settings/       后台管理设置页（通用、外观、分类、搜索、素材、账号、数据、关于）
   login/          管理员登录页
 src/components/   前端组件族：cards、categories、common、icons、layout、search、widgets
 src/hooks/        React 状态与交互 Hooks
@@ -107,7 +107,7 @@ src/lib/db.ts       数据库操作：Prisma Client + LibSQL Adapter 读写 SQLi
 
 1. **DOM 解析期提取**：在浏览器解析 HTML 结构阶段，脚本同步读取 `localStorage` 本地偏好或系统媒体查询（`prefers-color-scheme`）；
 2. **根节点同步注入**：在前端框架运行时加载与执行之前，立即将目标模式写入根节点 `<html>` 的 `data-theme` 属性与 `color-scheme` 样式，确保首帧绘制即呈现正确主题；
-3. **端云偏好对齐**：以数据库持久化的用户配置为单一事实源，在前端应用初始化挂载后与本地缓存状态比对并自动同步。
+3. **按登录状态对齐**：`SessionProvider` 提供客户端登录状态。管理员登录后与数据库默认主题对账一次，后续切换不受旧缓存干扰；游客保留本机主题，公共偏好请求不会覆盖其选择。
 
 ### 5.3 路由安全拦截代理
 
@@ -134,7 +134,7 @@ Next.js 16 采用根目录下的 [`src/proxy.ts`](../src/proxy.ts) 作为请求�
 
 [`src/lib/version-check.ts`](../src/lib/version-check.ts) 负责向远端 Releases 接口查询最新发布版本，并与本地 `package.json` 中的 `APP_VERSION` 做语义化对比：
 - 查询结果缓存于偏好表（无更新 1 小时、已发现更新 6 小时），避免频繁请求远端 API；离线环境下可关闭自动检查；
-- 检测源默认为 GitHub，开启「国内环境加速」（偏好键 `cnMirrorEnabled`）后改为 AtomGit 镜像仓的 v5 接口；
+- 检测源默认为 GitHub，开启「国内镜像加速」（偏好键 `cnMirrorEnabled`）后改为 AtomGit 镜像仓的 v5 接口；
 - 前端更新弹窗与提醒浮层共享 [`src/lib/changelog.ts`](../src/lib/changelog.ts) 解析引擎，且**仅提取面向使用者的「亮点」段落**展示，技术细节仅留存文档。
 
 ### 5.7 浏览器检测探针与离线引导

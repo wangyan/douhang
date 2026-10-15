@@ -76,10 +76,8 @@ export function getReleasesLatestUrl(cnMirror = false): string {
 
 /** 静态只读属性（供同步引用场景使用） */
 export const MANUAL_URL = getUserGuideUrl();
-export const USER_GUIDE_URL = getUserGuideUrl();
 export const ADMIN_GUIDE_URL = getAdminGuideUrl();
 export const DEPLOYMENT_GUIDE_URL = getDeploymentGuideUrl();
-export const RELEASES_LATEST_URL = getReleasesLatestUrl(false);
 
 /** 解析 vX.Y.Z 版本号为 [major, minor, patch]，非法格式返回 null */
 export function parseVersion(version: string): [number, number, number] | null {

@@ -4,27 +4,21 @@ import { Button } from '@astryxdesign/core/Button';
 import { HStack } from '@astryxdesign/core/HStack';
 import { NumberInput } from '@astryxdesign/core/NumberInput';
 import { Slider } from '@astryxdesign/core/Slider';
-import { StackItem } from '@astryxdesign/core/Stack';
 import { Text } from '@astryxdesign/core/Text';
-import { useToast } from '@astryxdesign/core/Toast';
 import { VStack } from '@astryxdesign/core/VStack';
 import { Upload, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { EmptyPlaceholder } from '@/components/common/EmptyPlaceholder';
-import {
-  type FormMessage,
-  FormSaveBar,
-} from '@/components/settings/FormSaveBar';
+import { OptionTile } from '@/components/settings/OptionTile';
 import { SettingsSection } from '@/components/settings/SettingsSection';
+import { useSaveFeedback } from '@/components/settings/useSaveFeedback';
 import { useFileUpload } from '@/hooks/useFileUpload';
 import { useTheme } from '@/hooks/useTheme';
 import { ICON_SIZE } from '@/lib/design-tokens';
 import {
   GUEST_CUSTOM_WALLPAPER_ID,
   GUEST_PREF_KEYS,
-  getGuestPreference,
-  setGuestPreference,
   WALLPAPER_CHANGE_EVENT,
   WALLPAPER_SCRIM_EVENT,
 } from '@/lib/guest-preferences';
@@ -46,48 +40,129 @@ import {
 interface WallpaperManagerProps {
   wallpapers: Wallpaper[];
   preferences: WallpaperPreferences;
-  /** 遮罩强度 0-80（SSR 读取偏好） */
   initialScrim: number;
-  /** 是否已登录（未登录游客仅可选择预置壁纸与本机壁纸，无服务端保存栏） */
   isAuthed?: boolean;
+  compact?: boolean;
 }
 
-/**
- * 壁纸管理（使用入口）
- *
- * - 管理员：点击缩略图更新 selectedId，底部「撤销 + 应用」落库，支持上传新壁纸
- * - 游客（双层偏好模式）：支持选用预设壁纸与本机壁纸（存入 IndexedDB），纯本地生效
- */
+const clampScrim = (value: number) =>
+  Number.isFinite(value)
+    ? Math.min(WALLPAPER_SCRIM_MAX, Math.max(WALLPAPER_SCRIM_MIN, value))
+    : WALLPAPER_SCRIM_DEFAULT;
+
+function restoreLocal(key: string, previous: string | null) {
+  if (previous === null) localStorage.removeItem(key);
+  else localStorage.setItem(key, previous);
+}
+
+async function persistCustomWallpaper(dataUrl: string | null) {
+  if (dataUrl === null) await deleteGuestCustomWallpaper();
+  else await saveGuestCustomWallpaper(dataUrl);
+  if ((await getGuestCustomWallpaper()) !== dataUrl) {
+    throw new Error('本机壁纸保存失败');
+  }
+}
+
+/** 壁纸点击即保存；游客图片仅存入 IndexedDB。 */
 export function WallpaperManager({
   wallpapers,
   preferences,
   initialScrim,
   isAuthed = true,
+  compact = false,
 }: WallpaperManagerProps) {
   const router = useRouter();
-  const showToast = useToast();
+  const feedback = useSaveFeedback();
   const { resolved } = useTheme();
-  // 本地选中态（可能是 null = 清除，string = 选中某张，undefined = 未改动）
-  const [selectedId, setSelectedId] = useState<string | null | undefined>(
-    undefined,
-  );
+  const radioName = useId();
+  const serverWallpaperId = preferences.wallpaper ?? null;
+  const serverScrim = clampScrim(initialScrim);
+  const [localWallpaperId, setLocalWallpaperId] = useState<
+    string | null | undefined
+  >();
+  const [localScrim, setLocalScrim] = useState<number | undefined>();
+  const [wallpaperDraft, setWallpaperDraft] = useState<{
+    value: string | null;
+    source: WallpaperPreferences | null;
+  } | null>(null);
+  const [scrimDraft, setScrimDraft] = useState<{
+    value: number;
+    source: WallpaperPreferences | null;
+  } | null>(null);
+  const latestPreferencesRef = useRef(preferences);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<FormMessage | null>(null);
-  const clampScrim = (value: number) =>
-    Math.min(WALLPAPER_SCRIM_MAX, Math.max(WALLPAPER_SCRIM_MIN, value));
-  const initial = Number.isFinite(initialScrim)
-    ? clampScrim(initialScrim)
-    : WALLPAPER_SCRIM_DEFAULT;
-  const [scrim, setScrim] = useState(initial);
-  const scrimRef = useRef(initial);
-
-  // 游客本机自定义壁纸（IndexedDB 中存储的 Data URL）
+  const savingRef = useRef(false);
   const [guestCustomDataUrl, setGuestCustomDataUrl] = useState<string | null>(
     null,
   );
+  const guestCustomRef = useRef<string | null>(null);
+  const customEditedRef = useRef(false);
+  const [guestReady, setGuestReady] = useState(false);
   const guestFileInputRef = useRef<HTMLInputElement>(null);
 
-  // 文件选择取消事件阻止冒泡，避免外层 Dialog 误判为关闭请求
+  // 保存结束后的下一份服务端快照代表最终状态，届时释放临时覆盖。
+  if (
+    isAuthed &&
+    wallpaperDraft?.source &&
+    preferences !== wallpaperDraft.source
+  )
+    setWallpaperDraft(null);
+  if (isAuthed && scrimDraft?.source && preferences !== scrimDraft.source)
+    setScrimDraft(null);
+
+  const activeId = isAuthed
+    ? wallpaperDraft
+      ? wallpaperDraft.value
+      : serverWallpaperId
+    : localWallpaperId === undefined
+      ? serverWallpaperId
+      : localWallpaperId;
+  const scrim = isAuthed
+    ? (scrimDraft?.value ?? serverScrim)
+    : (localScrim ?? serverScrim);
+  const activeIdRef = useRef(activeId);
+  const savedScrimRef = useRef(serverScrim);
+
+  useEffect(() => {
+    activeIdRef.current = activeId;
+  }, [activeId]);
+  useEffect(() => {
+    latestPreferencesRef.current = preferences;
+  }, [preferences]);
+  useEffect(() => {
+    if (isAuthed && !saving && !scrimDraft) {
+      savedScrimRef.current = serverScrim;
+    }
+  }, [isAuthed, saving, serverScrim, scrimDraft]);
+
+  useEffect(() => {
+    if (isAuthed) return;
+    let cancelled = false;
+    try {
+      const wallpaper = localStorage.getItem(GUEST_PREF_KEYS.WALLPAPER);
+      if (wallpaper !== null) {
+        activeIdRef.current = wallpaper === 'none' ? null : wallpaper;
+        setLocalWallpaperId(activeIdRef.current);
+      }
+      const localScrim = localStorage.getItem(GUEST_PREF_KEYS.WALLPAPER_SCRIM);
+      if (localScrim !== null) {
+        savedScrimRef.current = clampScrim(Number(localScrim));
+        setLocalScrim(savedScrimRef.current);
+      }
+    } catch {}
+    void getGuestCustomWallpaper().then((url) => {
+      if (cancelled) return;
+      if (!customEditedRef.current) {
+        guestCustomRef.current = url;
+        setGuestCustomDataUrl(url);
+      }
+      setGuestReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthed]);
+
   useEffect(() => {
     const input = guestFileInputRef.current;
     if (!input) return;
@@ -96,470 +171,403 @@ export function WallpaperManager({
     return () => input.removeEventListener('cancel', stopCancel);
   }, []);
 
-  // 挂载后若为游客且本地有偏好，读取本地选中态、遮罩及本机自定义壁纸
-  useEffect(() => {
-    if (!isAuthed) {
-      const guestWp = getGuestPreference<string | null>(
-        GUEST_PREF_KEYS.WALLPAPER,
-        null,
-      );
-      if (guestWp !== null) {
-        setSelectedId(guestWp === 'none' ? null : guestWp);
-      }
-      const guestScrim = getGuestPreference<number | null>(
-        GUEST_PREF_KEYS.WALLPAPER_SCRIM,
-        null,
-      );
-      if (guestScrim !== null) {
-        setScrim(guestScrim);
-        scrimRef.current = guestScrim;
-      }
-      void getGuestCustomWallpaper().then((url) => {
-        setGuestCustomDataUrl(url);
-      });
-    }
-  }, [isAuthed]);
+  const beginSave = () => {
+    if (savingRef.current) return false;
+    savingRef.current = true;
+    setSaving(true);
+    return true;
+  };
+  const endSave = () => {
+    savingRef.current = false;
+    setSaving(false);
+  };
+  const publishWallpaper = (id: string | null) => {
+    activeIdRef.current = id;
+    if (isAuthed) setWallpaperDraft({ value: id, source: null });
+    else setLocalWallpaperId(id);
+    window.dispatchEvent(
+      new CustomEvent(WALLPAPER_CHANGE_EVENT, { detail: id }),
+    );
+  };
+  const publishScrim = (value: number) => {
+    if (isAuthed) setScrimDraft({ value, source: null });
+    else setLocalScrim(value);
+    window.dispatchEvent(
+      new CustomEvent(WALLPAPER_SCRIM_EVENT, { detail: value }),
+    );
+  };
+  const settleWallpaperDraft = () => {
+    setWallpaperDraft((draft) =>
+      draft ? { ...draft, source: latestPreferencesRef.current } : draft,
+    );
+  };
+  const settleScrimDraft = () => {
+    setScrimDraft((draft) =>
+      draft ? { ...draft, source: latestPreferencesRef.current } : draft,
+    );
+  };
 
-  // 遮罩颜色：与主页一致（暗色压黑 / 亮色压白），透明度跟随滑杆
+  const saveWallpaper = async (
+    next: string | null,
+    offerUndo = true,
+    customSnapshot?: string | null,
+  ) => {
+    if (next === activeIdRef.current && customSnapshot === undefined)
+      return true;
+    if (!beginSave()) {
+      feedback.error('正在保存壁纸，请稍后再试');
+      return false;
+    }
+    const previous = activeIdRef.current;
+    const previousCustom = guestCustomRef.current;
+    let previousLocal: string | null = null;
+    let localWritten = false;
+    let customWritten = false;
+    let serverAttempted = false;
+    try {
+      if (!isAuthed) {
+        previousLocal = localStorage.getItem(GUEST_PREF_KEYS.WALLPAPER);
+        if (next === GUEST_CUSTOM_WALLPAPER_ID && customSnapshot) {
+          customEditedRef.current = true;
+          customWritten = true;
+          await persistCustomWallpaper(customSnapshot);
+          guestCustomRef.current = customSnapshot;
+          setGuestCustomDataUrl(customSnapshot);
+        }
+        if (next === GUEST_CUSTOM_WALLPAPER_ID && !guestCustomRef.current) {
+          throw new Error('本机壁纸不存在');
+        }
+        localStorage.setItem(GUEST_PREF_KEYS.WALLPAPER, next ?? 'none');
+        localWritten = true;
+      }
+      publishWallpaper(next);
+      if (isAuthed) {
+        serverAttempted = true;
+        await preferencesApi.update('wallpaper', next);
+        settleWallpaperDraft();
+        router.refresh();
+      }
+      feedback.success(
+        offerUndo
+          ? next === null
+            ? '壁纸已清除'
+            : isAuthed
+              ? '壁纸已保存'
+              : '壁纸已保存在本机'
+          : '壁纸设置已恢复',
+        offerUndo
+          ? () =>
+              void saveWallpaper(
+                previous,
+                false,
+                previous === GUEST_CUSTOM_WALLPAPER_ID
+                  ? previousCustom
+                  : undefined,
+              )
+          : undefined,
+      );
+      return true;
+    } catch {
+      let restored = true;
+      if (customWritten) {
+        try {
+          if (previousCustom) await persistCustomWallpaper(previousCustom);
+          else await persistCustomWallpaper(null);
+        } catch {
+          restored = false;
+        }
+        guestCustomRef.current = previousCustom;
+        setGuestCustomDataUrl(previousCustom);
+      }
+      if (localWritten) {
+        try {
+          restoreLocal(GUEST_PREF_KEYS.WALLPAPER, previousLocal);
+        } catch {
+          restored = false;
+        }
+      }
+      publishWallpaper(previous);
+      if (serverAttempted) {
+        try {
+          await preferencesApi.update('wallpaper', previous);
+        } catch {
+          restored = false;
+        }
+        settleWallpaperDraft();
+        router.refresh();
+      }
+      feedback.error(
+        restored
+          ? '壁纸保存失败，已恢复原设置'
+          : '壁纸保存失败，请检查连接后重新保存',
+      );
+      return false;
+    } finally {
+      endSave();
+    }
+  };
+
+  const upload = useFileUpload({
+    accept: 'image/png,image/jpeg,image/webp',
+    onFile: async (file) => {
+      if (!isAuthed || !beginSave()) return;
+      try {
+        await wallpapersApi.upload(file);
+        router.refresh();
+        feedback.success('壁纸已上传，请点击图片选用');
+      } catch {
+        feedback.error('壁纸上传失败');
+      } finally {
+        endSave();
+      }
+    },
+  });
+  const disabled = saving || upload.uploading || (!isAuthed && !guestReady);
+  const gridClass = compact
+    ? 'grid grid-cols-2 gap-2'
+    : 'grid grid-cols-2 gap-2 sm:grid-cols-4';
+
+  const handleGuestFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !beginSave()) return;
+    let dataUrl: string;
+    try {
+      if (file.size > 10 * 1024 * 1024)
+        throw new Error('图片过大，最大支持 10MB');
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+        throw new Error('请选择 PNG、JPEG 或 WebP 图片');
+      }
+      dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('读取图片失败'));
+        reader.readAsDataURL(file);
+      });
+    } catch (error) {
+      feedback.error(
+        error instanceof Error ? error.message : '读取本机壁纸失败',
+      );
+      endSave();
+      return;
+    }
+    endSave();
+    await saveWallpaper(GUEST_CUSTOM_WALLPAPER_ID, true, dataUrl);
+  };
+
+  const handleDeleteGuestCustom = async () => {
+    if (!beginSave()) return;
+    customEditedRef.current = true;
+    const previous = activeIdRef.current;
+    const previousCustom = guestCustomRef.current;
+    let previousLocal: string | null = null;
+    let localWritten = false;
+    try {
+      if (previous === GUEST_CUSTOM_WALLPAPER_ID) {
+        previousLocal = localStorage.getItem(GUEST_PREF_KEYS.WALLPAPER);
+        localStorage.setItem(GUEST_PREF_KEYS.WALLPAPER, 'none');
+        localWritten = true;
+        publishWallpaper(null);
+      }
+      await persistCustomWallpaper(null);
+      guestCustomRef.current = null;
+      setGuestCustomDataUrl(null);
+      feedback.success(
+        '本机壁纸已移除',
+        previous === GUEST_CUSTOM_WALLPAPER_ID
+          ? () => void saveWallpaper(previous, false, previousCustom)
+          : undefined,
+      );
+    } catch {
+      try {
+        if (previousCustom) await persistCustomWallpaper(previousCustom);
+        if (localWritten)
+          restoreLocal(GUEST_PREF_KEYS.WALLPAPER, previousLocal);
+      } catch {}
+      guestCustomRef.current = previousCustom;
+      setGuestCustomDataUrl(previousCustom);
+      publishWallpaper(previous);
+      feedback.error('移除本机壁纸失败，已恢复原设置');
+    } finally {
+      endSave();
+    }
+  };
+
+  const handleScrimPreview = (value: number | [number, number]) => {
+    if (savingRef.current || typeof value !== 'number') return;
+    publishScrim(clampScrim(value));
+  };
+
+  const handleScrimCommit = async (value: number) => {
+    if (savingRef.current) return;
+    const next = clampScrim(value);
+    const previous = savedScrimRef.current;
+    if (next === previous) {
+      if (isAuthed) setScrimDraft(null);
+      else publishScrim(next);
+      return;
+    }
+    if (!beginSave()) return;
+    let previousLocal: string | null = null;
+    let localWritten = false;
+    let serverAttempted = false;
+    try {
+      if (!isAuthed) {
+        previousLocal = localStorage.getItem(GUEST_PREF_KEYS.WALLPAPER_SCRIM);
+        localStorage.setItem(GUEST_PREF_KEYS.WALLPAPER_SCRIM, String(next));
+        localWritten = true;
+      }
+      publishScrim(next);
+      if (isAuthed) {
+        serverAttempted = true;
+        await preferencesApi.update('wallpaperScrim', next);
+        settleScrimDraft();
+        router.refresh();
+      }
+      savedScrimRef.current = next;
+      feedback.success(isAuthed ? '遮罩强度已保存' : '遮罩强度已保存在本机');
+    } catch {
+      let restored = true;
+      if (localWritten) {
+        try {
+          restoreLocal(GUEST_PREF_KEYS.WALLPAPER_SCRIM, previousLocal);
+        } catch {
+          restored = false;
+        }
+      }
+      publishScrim(previous);
+      if (serverAttempted) {
+        try {
+          await preferencesApi.update('wallpaperScrim', previous);
+        } catch {
+          restored = false;
+        }
+        settleScrimDraft();
+        router.refresh();
+      }
+      feedback.error(
+        restored
+          ? '遮罩强度保存失败，已恢复原设置'
+          : '遮罩强度保存失败，请检查连接后重新保存',
+      );
+    } finally {
+      endSave();
+    }
+  };
+
+  const selected =
+    !isAuthed && activeId === GUEST_CUSTOM_WALLPAPER_ID && guestCustomDataUrl
+      ? {
+          id: GUEST_CUSTOM_WALLPAPER_ID,
+          name: '本机壁纸',
+          path: guestCustomDataUrl,
+        }
+      : wallpapers.find((wallpaper) => wallpaper.id === activeId);
+  const presets = wallpapers.filter(
+    (wallpaper) => wallpaper.source === 'preset',
+  );
+  const uploads = wallpapers.filter(
+    (wallpaper) => wallpaper.source === 'upload',
+  );
   const scrimColor =
     resolved === 'dark'
       ? `rgba(0, 0, 0, ${scrim / 100})`
       : `rgba(255, 255, 255, ${scrim / 100})`;
 
-  const upload = useFileUpload({
-    accept: 'image/png,image/jpeg,image/webp',
-    onFile: async (file) => {
-      await wallpapersApi.upload(file);
-      // 上传成功后刷新列表，不自动选中
-      router.refresh();
-    },
-  });
-
-  // 当前已应用的壁纸（来自 props）
-  const appliedId = preferences.wallpaper;
-  // 渲染时用：本地有改动用本地，否则用已应用值
-  const renderId = selectedId === undefined ? (appliedId ?? null) : selectedId;
-  const isDirty = renderId !== (appliedId ?? null);
-
-  const handleApply = async () => {
-    if (!isDirty) return;
-    const value = selectedId === undefined ? null : selectedId;
-    setSaving(true);
-    setMessage(null);
-    try {
-      await preferencesApi.update('wallpaper', value);
-      setSelectedId(undefined);
-      router.refresh();
-    } catch (e) {
-      setMessage({
-        type: 'error',
-        text: e instanceof Error ? e.message : '网络错误',
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const selected =
-    !isAuthed && renderId === GUEST_CUSTOM_WALLPAPER_ID && guestCustomDataUrl
-      ? {
-          id: GUEST_CUSTOM_WALLPAPER_ID,
-          name: '本机壁纸',
-          source: 'local' as const,
-          path: guestCustomDataUrl,
-          thumbnail: null,
-          createdAt: new Date().toISOString(),
-        }
-      : (wallpapers.find((w) => w.id === renderId) ?? null);
-
-  const presets = wallpapers.filter((w) => w.source === 'preset');
-  const uploads = wallpapers.filter((w) => w.source === 'upload');
-
-  const handleSelectWallpaper = (id: string | null) => {
-    setSelectedId(id);
-    if (!isAuthed) {
-      setGuestPreference(GUEST_PREF_KEYS.WALLPAPER, id ?? 'none');
-      window.dispatchEvent(
-        new CustomEvent(WALLPAPER_CHANGE_EVENT, { detail: id }),
-      );
-    }
-  };
-
-  const handleClearWallpaper = () => {
-    setSelectedId(null);
-    if (!isAuthed) {
-      setGuestPreference(GUEST_PREF_KEYS.WALLPAPER, 'none');
-      window.dispatchEvent(
-        new CustomEvent(WALLPAPER_CHANGE_EVENT, { detail: null }),
-      );
-    }
-  };
-
-  const handleGuestFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) {
-      showToast({ body: '图片过大，最大支持 10MB', type: 'error' });
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUrl = reader.result as string;
-      try {
-        await saveGuestCustomWallpaper(dataUrl);
-        setGuestCustomDataUrl(dataUrl);
-        handleSelectWallpaper(GUEST_CUSTOM_WALLPAPER_ID);
-      } catch {
-        showToast({ body: '保存本机壁纸失败', type: 'error' });
-      }
-    };
-    reader.onerror = () => {
-      showToast({ body: '读取图片失败', type: 'error' });
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleDeleteGuestCustom = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await deleteGuestCustomWallpaper();
-      setGuestCustomDataUrl(null);
-      if (renderId === GUEST_CUSTOM_WALLPAPER_ID) {
-        handleClearWallpaper();
-      }
-    } catch {
-      showToast({ body: '移除本机壁纸失败', type: 'error' });
-    }
-  };
-
-  const handleScrimPreview = (value: number | [number, number]) => {
-    if (typeof value === 'number') {
-      const clamped = clampScrim(value);
-      setScrim(clamped);
-      if (!isAuthed) {
-        setGuestPreference(GUEST_PREF_KEYS.WALLPAPER_SCRIM, clamped);
-        window.dispatchEvent(
-          new CustomEvent(WALLPAPER_SCRIM_EVENT, { detail: clamped }),
-        );
-      }
-    }
-  };
-
-  const handleScrimCommit = async (value: number) => {
-    const next = clampScrim(value);
-    const previous = scrimRef.current;
-    if (next === previous) {
-      setScrim(next);
-      return;
-    }
-    scrimRef.current = next;
-    setScrim(next);
-
-    if (!isAuthed) {
-      setGuestPreference(GUEST_PREF_KEYS.WALLPAPER_SCRIM, next);
-      window.dispatchEvent(
-        new CustomEvent(WALLPAPER_SCRIM_EVENT, { detail: next }),
-      );
-      return;
-    }
-
-    try {
-      await preferencesApi.update('wallpaperScrim', next);
-    } catch (e) {
-      scrimRef.current = previous;
-      setScrim(previous);
-      setMessage({
-        type: 'error',
-        text: e instanceof Error ? e.message : '遮罩强度保存失败',
-      });
-    }
-  };
+  const renderThumb = (wallpaper: {
+    id: string;
+    name: string;
+    path: string;
+  }) => (
+    <OptionTile
+      key={wallpaper.id}
+      name={radioName}
+      value={wallpaper.id}
+      label={wallpaper.name}
+      checked={wallpaper.id === activeId}
+      disabled={disabled}
+      onChange={() => void saveWallpaper(wallpaper.id)}
+    >
+      <span
+        className="block aspect-video w-full rounded-control bg-cover bg-center"
+        style={{ backgroundImage: `url(${wallpaper.path})` }}
+        aria-hidden
+      />
+    </OptionTile>
+  );
 
   return (
     <SettingsSection
       title="壁纸"
       description={
         isAuthed
-          ? '选择桌面背景图；图片文件的删除统一在素材页管理'
-          : '选择桌面背景图（预置壁纸）'
+          ? '点击图片立即保存；图片文件可在素材页管理'
+          : '选择预设或本机图片，仅保存在当前浏览器'
       }
     >
       {isAuthed && upload.input}
-
-      <WallpaperPreviewSection
-        selected={selected}
-        scrim={scrim}
-        scrimColor={scrimColor}
-        saving={saving}
-        uploading={upload.uploading}
-        onClear={handleClearWallpaper}
-        onScrimPreview={handleScrimPreview}
-        onScrimCommit={(value) => void handleScrimCommit(value)}
-      />
-
-      {/* 预设 */}
-      {presets.length > 0 && (
-        <VStack gap={2}>
-          <Text size="sm" weight="medium">
-            预设
-          </Text>
-          <div
-            className="grid grid-cols-3 gap-2"
-            role="radiogroup"
-            aria-label="预设壁纸"
-          >
-            {presets.map((w) => (
-              <WallpaperThumb
-                key={w.id}
-                wallpaper={w}
-                isSelected={w.id === renderId}
-                disabled={saving || upload.uploading}
-                onClick={() => handleSelectWallpaper(w.id)}
-              />
-            ))}
-          </div>
-        </VStack>
-      )}
-
-      {/* 游客本机壁纸：纯客户端存储，不发送至服务端 */}
-      {!isAuthed && (
-        <VStack gap={2}>
-          <input
-            ref={guestFileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="hidden"
-            onChange={handleGuestFileSelect}
-          />
-          <HStack justify="between" align="center">
-            <Text size="sm" weight="medium">
-              本机壁纸
-            </Text>
-            <HStack gap={1}>
-              <Button
-                label={guestCustomDataUrl ? '更换本机图片' : '选择本机图片'}
-                variant="ghost"
-                size="sm"
-                icon={<Upload size={ICON_SIZE.sm} />}
-                onClick={() => guestFileInputRef.current?.click()}
-              />
-              {guestCustomDataUrl && (
-                <Button
-                  label="移除"
-                  variant="ghost"
-                  size="sm"
-                  icon={<X size={ICON_SIZE.sm} />}
-                  onClick={handleDeleteGuestCustom}
-                />
-              )}
-            </HStack>
-          </HStack>
-          {guestCustomDataUrl ? (
+      <VStack gap={3}>
+        <Text size="sm" weight="medium">
+          当前壁纸
+        </Text>
+        {selected ? (
+          <div className="relative h-24 overflow-hidden rounded-panel border border-border">
             <div
-              className="grid grid-cols-3 gap-2"
-              role="radiogroup"
-              aria-label="本机壁纸"
-            >
-              {/* biome-ignore lint/a11y/useSemanticElements: 视觉卡片与预置瓦片对齐 */}
-              <div
-                role="radio"
-                aria-checked={renderId === GUEST_CUSTOM_WALLPAPER_ID}
-                tabIndex={0}
-                onClick={() => handleSelectWallpaper(GUEST_CUSTOM_WALLPAPER_ID)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleSelectWallpaper(GUEST_CUSTOM_WALLPAPER_ID);
-                  }
-                }}
-                aria-label="选择本机自定义壁纸"
-                className={`group relative aspect-video rounded-control overflow-hidden border-2 cursor-pointer transition-[border-color,box-shadow,opacity,transform] focus-ring ${
-                  renderId === GUEST_CUSTOM_WALLPAPER_ID
-                    ? 'border-accent ring-2 ring-accent/30'
-                    : 'border-border hover:border-accent/50'
-                }`}
-              >
-                <div
-                  className="absolute inset-0 bg-cover bg-center"
-                  style={{ backgroundImage: `url(${guestCustomDataUrl})` }}
-                />
-                <div className="absolute inset-0 bg-black/20" />
-                {/* 底部名称条 */}
-                <div className="absolute inset-x-0 bottom-0 pt-6 pb-1 px-2 flex items-center bg-gradient-to-t from-black/80 via-black/40 to-transparent">
-                  <Text
-                    size="sm"
-                    weight="medium"
-                    className="text-white truncate drop-shadow"
-                  >
-                    本机自定义
-                  </Text>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <EmptyPlaceholder
-              label="未选择本机壁纸"
-              hint="点击从电脑选择图片，仅保存在当前浏览器"
-              onClick={() => guestFileInputRef.current?.click()}
+              className="absolute -inset-2 bg-cover bg-center bg-no-repeat"
+              style={{ backgroundImage: `url(${selected.path})` }}
             />
-          )}
-        </VStack>
-      )}
-
-      {/* 我的上传：仅已登录管理员可见与操作 */}
-      {isAuthed && (
-        <VStack gap={2}>
-          <HStack justify="between" align="center">
-            <Text size="sm" weight="medium">
-              我的上传
-            </Text>
-            <Button
-              label={upload.uploading ? '上传中…' : '上传新壁纸'}
-              variant="ghost"
-              size="sm"
-              icon={<Upload size={ICON_SIZE.sm} />}
-              isDisabled={upload.uploading || saving}
-              onClick={() => upload.open()}
-            />
-          </HStack>
-          {uploads.length > 0 ? (
             <div
-              className="grid grid-cols-3 gap-2"
-              role="radiogroup"
-              aria-label="上传的壁纸"
-            >
-              {uploads.map((w) => (
-                <WallpaperThumb
-                  key={w.id}
-                  wallpaper={w}
-                  isSelected={w.id === renderId}
-                  disabled={saving || upload.uploading}
-                  onClick={() => handleSelectWallpaper(w.id)}
-                />
-              ))}
-            </div>
-          ) : (
-            <EmptyPlaceholder
-              label="还没有上传的壁纸"
-              hint="点击上传"
-              onClick={() => upload.open()}
-              disabled={upload.uploading || saving}
+              className="absolute -inset-2"
+              style={{ backgroundColor: scrimColor }}
             />
-          )}
-        </VStack>
-      )}
-
-      {/* 管理员展示统一保存栏；游客 Local-First 即时生效无需保存栏 */}
-      {isAuthed && (
-        <FormSaveBar
-          message={message ?? null}
-          isDirty={isDirty}
-          saving={saving}
-          onReset={() => {
-            setSelectedId(undefined);
-            setMessage(null);
-          }}
-          onSave={() => void handleApply()}
-        />
-      )}
-    </SettingsSection>
-  );
-}
-
-interface WallpaperPreviewSectionProps {
-  selected: Wallpaper | null;
-  scrim: number;
-  scrimColor: string;
-  saving: boolean;
-  uploading: boolean;
-  onClear: () => void;
-  onScrimPreview: (value: number | [number, number]) => void;
-  onScrimCommit: (value: number) => void;
-}
-
-/** 当前壁纸预览 + 遮罩强度调节（从主组件拆出） */
-function WallpaperPreviewSection({
-  selected,
-  scrim,
-  scrimColor,
-  saving,
-  uploading,
-  onClear,
-  onScrimPreview,
-  onScrimCommit,
-}: WallpaperPreviewSectionProps) {
-  return (
-    <VStack gap={2}>
-      <Text size="sm" weight="medium">
-        当前壁纸
-      </Text>
-      {selected ? (
-        <div className="relative h-32 overflow-hidden rounded-panel border border-border">
-          {/* 壁纸层：向四周外扩 2px，消除高分屏亚像素取整缝隙 */}
-          <div
-            className="absolute -inset-2 bg-cover bg-center bg-no-repeat"
-            style={{ backgroundImage: `url(${selected.path})` }}
-          />
-          {/* 遮罩层：与壁纸同尺寸外扩，实时跟随滑杆（暗压黑 / 亮压白） */}
-          <div
-            className="absolute -inset-2"
-            style={{ backgroundColor: scrimColor }}
-          />
-          {/* 右上角清除按钮 */}
-          <button
-            type="button"
-            onClick={() => onClear()}
-            disabled={saving || uploading}
-            aria-label="清除壁纸"
-            className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring"
-          >
-            <X size={ICON_SIZE.xs} />
-          </button>
-          <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between rounded-control bg-black/60 px-2 py-1">
-            <Text size="sm" weight="medium" className="text-white drop-shadow">
+            <button
+              type="button"
+              onClick={() => void saveWallpaper(null)}
+              disabled={disabled}
+              aria-label="清除壁纸"
+              className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-control bg-black/60 text-white transition-colors hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-50 focus-ring"
+            >
+              <X size={ICON_SIZE.sm} />
+            </button>
+            <span className="absolute bottom-2 left-2 max-w-[calc(100%-16px)] truncate rounded-control bg-black/60 px-2 py-1 text-sm text-white">
               {selected.name}
-            </Text>
-            <Text size="sm" className="text-white/80 drop-shadow">
-              {selected.source === 'preset'
-                ? '预设'
-                : selected.source === 'local'
-                  ? '本机'
-                  : '上传'}
-            </Text>
+            </span>
           </div>
-        </div>
-      ) : (
-        <EmptyPlaceholder label="未设置壁纸" hint="使用主题默认背景色" />
-      )}
-      {selected && (
-        <>
-          <Text type="supporting" textWrap="pretty">
-            遮罩强度：壁纸上的明暗遮罩，保证前景文字可读；0
-            为无遮罩，拖动下方滑杆实时预览并保存。
-          </Text>
-          <HStack gap={4} width="100%" align="center">
-            <StackItem size="fill">
-              <Slider
-                label="遮罩强度"
-                isLabelHidden
-                value={scrim}
-                onChange={onScrimPreview}
-                onChangeEnd={onScrimCommit}
-                min={WALLPAPER_SCRIM_MIN}
-                max={WALLPAPER_SCRIM_MAX}
-                step={WALLPAPER_SCRIM_STEP}
-                formatValue={(value) => `${value}%`}
-                valueDisplay="none"
-                width="100%"
-              />
-            </StackItem>
-            <StackItem size="static">
+        ) : (
+          <div className="rounded-panel border border-dashed border-border px-4 py-5 text-sm text-secondary">
+            未设置壁纸，使用主题默认背景色
+          </div>
+        )}
+        {selected && (
+          <>
+            <Text size="sm" color="secondary" textWrap="pretty">
+              遮罩强度影响壁纸明暗，拖动预览，松开保存；0% 为无遮罩。
+            </Text>
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <Slider
+                  label="遮罩强度"
+                  isLabelHidden
+                  value={scrim}
+                  onChange={handleScrimPreview}
+                  onChangeEnd={(value: number) => void handleScrimCommit(value)}
+                  isDisabled={disabled}
+                  min={WALLPAPER_SCRIM_MIN}
+                  max={WALLPAPER_SCRIM_MAX}
+                  step={WALLPAPER_SCRIM_STEP}
+                  formatValue={(value) => `${value}%`}
+                  valueDisplay="none"
+                  width="100%"
+                />
+              </div>
               <NumberInput
                 label="遮罩强度百分比"
                 isLabelHidden
                 value={scrim}
-                onChange={(value) => void onScrimCommit(value)}
+                onChange={(value) => void handleScrimCommit(value)}
+                isDisabled={disabled}
                 min={WALLPAPER_SCRIM_MIN}
                 max={WALLPAPER_SCRIM_MAX}
                 step={WALLPAPER_SCRIM_STEP}
@@ -567,66 +575,116 @@ function WallpaperPreviewSection({
                 isIntegerOnly
                 isWheelEnabled={false}
                 size="md"
-                width={112}
+                width={104}
               />
-            </StackItem>
-          </HStack>
-        </>
+            </div>
+          </>
+        )}
+      </VStack>
+      {presets.length > 0 && (
+        <VStack gap={2}>
+          <Text size="sm" weight="medium">
+            预设
+          </Text>
+          <div className={gridClass} role="radiogroup" aria-label="预设壁纸">
+            {presets.map(renderThumb)}
+          </div>
+        </VStack>
       )}
-    </VStack>
-  );
-}
-
-interface WallpaperThumbProps {
-  wallpaper: Wallpaper;
-  isSelected: boolean;
-  disabled: boolean;
-  onClick: () => void;
-}
-
-function WallpaperThumb({
-  wallpaper,
-  isSelected,
-  disabled,
-  onClick,
-}: WallpaperThumbProps) {
-  return (
-    // biome-ignore lint/a11y/useSemanticElements: 内部嵌套删除 button，HTML 不允许 button 嵌套 button
-    <div
-      role="radio"
-      aria-checked={isSelected}
-      tabIndex={disabled ? -1 : 0}
-      onClick={disabled ? undefined : onClick}
-      onKeyDown={(e) => {
-        if (disabled) return;
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      aria-label={`选择壁纸：${wallpaper.name}`}
-      className={`group relative aspect-video rounded-control overflow-hidden border-2 cursor-pointer transition-[border-color,box-shadow,opacity,transform] focus-ring ${
-        isSelected
-          ? 'border-accent ring-2 ring-accent/30'
-          : 'border-border hover:border-accent/50'
-      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-    >
-      <div
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: `url(${wallpaper.path})` }}
-      />
-      <div className="absolute inset-0 bg-black/20" />
-
-      {/* 底部名称条 */}
-      <div className="absolute inset-x-0 bottom-0 pt-6 pb-1 px-2 flex items-center bg-gradient-to-t from-black/80 via-black/40 to-transparent">
-        <Text
-          size="sm"
-          weight="medium"
-          className="text-white truncate drop-shadow"
-        >
-          {wallpaper.name}
-        </Text>
-      </div>
-    </div>
+      {!isAuthed && (
+        <VStack gap={2}>
+          <input
+            ref={guestFileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            disabled={disabled}
+            onChange={(event) => void handleGuestFileSelect(event)}
+          />
+          <HStack justify="between" align="center">
+            <Text size="sm" weight="medium">
+              本机壁纸
+            </Text>
+            <HStack gap={1}>
+              <Button
+                label={guestCustomDataUrl ? '更换图片' : '选择图片'}
+                variant="ghost"
+                size="sm"
+                icon={<Upload size={ICON_SIZE.sm} />}
+                isDisabled={disabled}
+                onClick={() => {
+                  if (!savingRef.current) guestFileInputRef.current?.click();
+                }}
+              />
+              {guestCustomDataUrl && (
+                <Button
+                  label="移除"
+                  variant="ghost"
+                  size="sm"
+                  icon={<X size={ICON_SIZE.sm} />}
+                  isDisabled={disabled}
+                  onClick={() => void handleDeleteGuestCustom()}
+                />
+              )}
+            </HStack>
+          </HStack>
+          {guestCustomDataUrl ? (
+            <div className={gridClass} role="radiogroup" aria-label="本机壁纸">
+              {renderThumb({
+                id: GUEST_CUSTOM_WALLPAPER_ID,
+                name: '本机自定义',
+                path: guestCustomDataUrl,
+              })}
+            </div>
+          ) : (
+            <EmptyPlaceholder
+              label="未选择本机壁纸"
+              hint="从电脑选择图片，仅保存在当前浏览器"
+              disabled={disabled}
+              onClick={() => {
+                if (!savingRef.current) guestFileInputRef.current?.click();
+              }}
+            />
+          )}
+        </VStack>
+      )}
+      {isAuthed && (
+        <VStack gap={2}>
+          <HStack justify="between" align="center">
+            <Text size="sm" weight="medium">
+              我的上传
+            </Text>
+            <Button
+              label="上传新壁纸"
+              variant="ghost"
+              size="sm"
+              icon={<Upload size={ICON_SIZE.sm} />}
+              isDisabled={disabled}
+              onClick={() => {
+                if (!savingRef.current && !upload.uploading) upload.open();
+              }}
+            />
+          </HStack>
+          {uploads.length > 0 ? (
+            <div
+              className={gridClass}
+              role="radiogroup"
+              aria-label="上传的壁纸"
+            >
+              {uploads.map(renderThumb)}
+            </div>
+          ) : (
+            <EmptyPlaceholder
+              label="还没有上传的壁纸"
+              hint="上传后点击图片选用"
+              disabled={disabled}
+              onClick={() => {
+                if (!savingRef.current && !upload.uploading) upload.open();
+              }}
+            />
+          )}
+        </VStack>
+      )}
+    </SettingsSection>
   );
 }

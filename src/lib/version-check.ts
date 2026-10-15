@@ -10,7 +10,7 @@ import {
 
 /** 版本检测开关（UserPreference key） */
 const VERSION_CHECK_ENABLED_KEY = 'versionCheckEnabled';
-/** 国内环境加速开关（UserPreference key，开启后优先走 AtomGit） */
+/** 国内镜像加速开关（UserPreference key，开启后优先走 AtomGit） */
 const CN_MIRROR_ENABLED_KEY = 'cnMirrorEnabled';
 /** 最近一次检查结果缓存（UserPreference key） */
 const VERSION_CHECK_CACHE_KEY = 'versionCheckCache';
@@ -66,15 +66,10 @@ export async function checkForUpdate(
     return { enabled: false, currentVersion, updateAvailable: false };
   }
 
-  const cnMirror = await getUserPreference<boolean>(
-    CN_MIRROR_ENABLED_KEY,
-    false,
-  );
-
-  const cached = await getUserPreference<VersionUpdateInfo | null>(
-    VERSION_CHECK_CACHE_KEY,
-    null,
-  );
+  const [cnMirror, cached] = await Promise.all([
+    getUserPreference<boolean>(CN_MIRROR_ENABLED_KEY, false),
+    getUserPreference<VersionUpdateInfo | null>(VERSION_CHECK_CACHE_KEY, null),
+  ]);
   const cacheFresh =
     cached !== null &&
     Number.isFinite(Date.parse(cached.checkedAt)) &&
@@ -99,7 +94,7 @@ export async function checkForUpdate(
       ...resolve(cached),
       error: cnMirror
         ? '连接国内镜像源 (AtomGit) 失败，请检查网络'
-        : '连接发布服务失败，国内网络环境建议开启「国内环境加速」',
+        : '连接发布服务失败，国内网络环境建议开启「国内镜像加速」',
     };
   }
 

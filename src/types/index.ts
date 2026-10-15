@@ -49,6 +49,8 @@ export type CardDensity = 'auto' | 'compact' | 'normal' | 'cozy';
 /** 实际渲染生效的具体密度档位 */
 export type ConcreteCardDensity = 'compact' | 'normal' | 'cozy';
 export const CARD_DENSITY_DEFAULT: CardDensity = 'auto';
+/** 全宽布局默认值：默认开启（铺满右侧工作区） */
+export const FULL_WIDTH_DEFAULT = true;
 
 export interface CardDensityConfig {
   cardWidth: number;

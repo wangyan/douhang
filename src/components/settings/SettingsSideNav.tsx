@@ -1,93 +1,183 @@
 'use client';
 
-import {
-  SegmentedControl,
-  SegmentedControlItem,
-} from '@astryxdesign/core/SegmentedControl';
+import { Avatar } from '@astryxdesign/core/Avatar';
+import { DropdownMenu } from '@astryxdesign/core/DropdownMenu';
+import { IconButton } from '@astryxdesign/core/IconButton';
 import {
   SideNav,
-  SideNavHeading,
   SideNavItem,
   SideNavSection,
 } from '@astryxdesign/core/SideNav';
+import { Text } from '@astryxdesign/core/Text';
+import { Check, Home, LogOut, Menu } from 'lucide-react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
+import { useState } from 'react';
+import useSWR from 'swr';
+import { BrandMark } from '@/components/layout/BrandMark';
+import { BrandTitle } from '@/components/layout/BrandTitle';
 import {
   getActiveSettingsNavItem,
+  SETTINGS_NAV_GROUPS,
   SETTINGS_NAV_ITEMS,
 } from '@/components/settings/settings-nav-items';
+import { useSaveFeedback } from '@/components/settings/useSaveFeedback';
+import { DEFAULT_BRAND_CONFIG } from '@/lib/brand-constants';
+import { ICON_SIZE } from '@/lib/design-tokens';
+import { APP_VERSION } from '@/lib/version';
+import { accountApi } from '@/services';
+import type { BrandConfig } from '@/types';
 
-/**
- * 设置导航单一数据源。
- *
- * 桌面端由 AppShell 渲染为常驻侧栏。
- */
-function SettingsNavItems({ onNavigate }: { onNavigate?: () => void }) {
+export function SettingsSideNav({
+  brand,
+  username,
+}: {
+  brand: BrandConfig;
+  username: string;
+}) {
   const pathname = usePathname();
+  const { data: account } = useSWR(accountApi.getKey, accountApi.get);
+  const currentUsername = account?.username ?? username;
 
-  return (
-    <SideNavSection
-      title="站点设置"
-      isHeaderHidden
-      // 覆盖内置 items 容器的 2px 间距，提升菜单项呼吸感。
-      className="[&>div:last-child]:gap-1!"
-    >
-      {SETTINGS_NAV_ITEMS.map((item) => {
-        const isActive = getActiveSettingsNavItem(pathname)?.href === item.href;
-
-        return (
-          <SideNavItem
-            key={item.href}
-            label={item.label}
-            href={item.href}
-            icon={item.icon}
-            size="lg"
-            isSelected={isActive}
-            onClick={onNavigate}
-          />
-        );
-      })}
-    </SideNavSection>
-  );
-}
-
-export function SettingsSideNav() {
   return (
     <SideNav
-      // 与 AppShell breakpoint="none" 配合，避免首屏断点切换闪烁。
-      className="max-md:hidden px-2"
+      className="settings-side-nav max-md:hidden"
       header={
-        <div className="md:pt-28">
-          <SideNavHeading heading="设置" />
+        <div className="settings-brand-header">
+          <Link
+            href="/"
+            aria-label="返回首页"
+            className="inline-flex shrink-0 items-center rounded-control focus-ring"
+          >
+            <BrandMark size="md" logo={brand.logo} aria-label={brand.title} />
+          </Link>
+          <BrandTitle
+            title={brand.title || DEFAULT_BRAND_CONFIG.title}
+            className="brand-title min-w-0 flex-1 truncate select-none text-primary"
+          />
+        </div>
+      }
+      topContent={
+        <div className="settings-top-actions">
+          <Link
+            href="/"
+            className="settings-nav-home-btn focus-ring"
+            title="返回前台首页"
+          >
+            <Home size={ICON_SIZE.md} className="shrink-0" />
+            <span className="flex-1 truncate">主页</span>
+          </Link>
+        </div>
+      }
+      footer={
+        <div className="settings-account-footer">
+          <Avatar name={currentUsername} size="sm" />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <Text size="sm" weight="medium" className="truncate">
+              {currentUsername}
+            </Text>
+            <Text size="sm" color="secondary">
+              管理员 · v{APP_VERSION}
+            </Text>
+          </div>
+          <SettingsLogout />
         </div>
       }
     >
-      <SettingsNavItems />
+      {SETTINGS_NAV_GROUPS.map((group) => (
+        <SideNavSection
+          key={group}
+          title={group}
+          className="settings-nav-section"
+        >
+          {SETTINGS_NAV_ITEMS.filter((item) => item.group === group).map(
+            (item) => (
+              <SideNavItem
+                key={item.href}
+                as={Link}
+                label={item.label}
+                href={item.href}
+                icon={item.icon}
+                size="md"
+                isSelected={
+                  getActiveSettingsNavItem(pathname)?.href === item.href
+                }
+              />
+            ),
+          )}
+        </SideNavSection>
+      ))}
     </SideNav>
   );
 }
 
 export function SettingsMobileNavPicker() {
   const pathname = usePathname();
-  const router = useRouter();
-  const currentItem =
-    getActiveSettingsNavItem(pathname) ?? SETTINGS_NAV_ITEMS[0];
+  const current = getActiveSettingsNavItem(pathname) ?? SETTINGS_NAV_ITEMS[0];
 
   return (
-    <SegmentedControl
-      value={currentItem.href}
-      onChange={(value) => router.push(value)}
-      label="设置分区"
+    <DropdownMenu
+      button={{
+        label: current.label,
+        icon: <Menu size={ICON_SIZE.md} />,
+        variant: 'secondary',
+        size: 'sm',
+      }}
+      alignment="end"
+      presentation="adaptive"
+      menuWidth={240}
+      items={SETTINGS_NAV_GROUPS.map((group) => ({
+        type: 'section' as const,
+        title: group,
+        items: SETTINGS_NAV_ITEMS.filter((item) => item.group === group).map(
+          (item) => ({
+            label: item.label,
+            href: item.href,
+            onClick: () => {
+              if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+              }
+            },
+            icon: <item.icon width={ICON_SIZE.md} height={ICON_SIZE.md} />,
+            endContent:
+              item.href === current.href ? (
+                <Check size={ICON_SIZE.sm} />
+              ) : undefined,
+          }),
+        ),
+      }))}
+    />
+  );
+}
+
+export function SettingsLogout() {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const feedback = useSaveFeedback();
+
+  const logout = async () => {
+    if (pending) return;
+    setPending(true);
+    try {
+      await signOut({ redirect: false });
+      router.replace('/');
+      router.refresh();
+    } catch {
+      setPending(false);
+      feedback.error('退出登录失败，请稍后重试');
+    }
+  };
+
+  return (
+    <IconButton
+      label="退出登录"
+      tooltip="退出登录"
+      icon={<LogOut size={ICON_SIZE.md} />}
+      variant="ghost"
       size="sm"
-      layout="fill"
-      className="mb-4 md:hidden"
-    >
-      {SETTINGS_NAV_ITEMS.map((item) => (
-        <SegmentedControlItem
-          key={item.href}
-          value={item.href}
-          label={item.label}
-        />
-      ))}
-    </SegmentedControl>
+      isDisabled={pending}
+      onClick={() => void logout()}
+    />
   );
 }

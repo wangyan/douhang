@@ -1,4 +1,3 @@
-import { VStack } from '@astryxdesign/core/VStack';
 import { CardStatusBadgeSetting } from '@/components/settings/CardStatusBadgeSetting';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { ThemeForm } from '@/components/settings/ThemeForm';
@@ -16,14 +15,7 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-/**
- * 外观设置页
- *
- * Linear / Vercel 风格：Card 容器 + label-above-input
- * - 外观 Card：RadioList 即时保存主题与字体大小
- * - 显示 Card：卡片大小、简洁模式与 Widget 横条开关
- * - 壁纸 Card：默认展开，本地选中态，底部「撤销 + 应用」统一保存
- */
+/** 外观设置页：主题、卡片显示与壁纸偏好。 */
 export default async function AppearanceSettingsPage() {
   const [
     wallpapers,
@@ -44,18 +36,18 @@ export default async function AppearanceSettingsPage() {
   ]);
 
   return (
-    <VStack gap={6}>
-      <ThemeForm initialFontSize={normalizeFontSize(rawFontSize)}>
-        <CardStatusBadgeSetting initialEnabled={cardStatusBadge} />
-      </ThemeForm>
+    <div className="settings-groups">
+      <ThemeForm initialFontSize={normalizeFontSize(rawFontSize)} />
       <SettingsSection
-        title="显示"
-        description="显示密度、卡片简洁模式与 Widget 横条的显示开关"
+        title="卡片显示"
+        description="设置首页卡片显示密度、简洁模式、可达状态与 Widget 横条"
+        layout="rows"
       >
         <ViewDisplaySetting
           initialCardSimpleMode={cardSimpleMode}
           initialCardDensity={cardDensity ?? CARD_DENSITY_DEFAULT}
         />
+        <CardStatusBadgeSetting initialEnabled={cardStatusBadge} />
       </SettingsSection>
       <WallpaperManager
         wallpapers={wallpapers}
@@ -66,6 +58,6 @@ export default async function AppearanceSettingsPage() {
             : WALLPAPER_SCRIM_DEFAULT
         }
       />
-    </VStack>
+    </div>
   );
 }

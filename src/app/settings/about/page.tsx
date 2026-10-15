@@ -1,7 +1,6 @@
-import { VStack } from '@astryxdesign/core/VStack';
 import {
   AboutChangelog,
-  AboutHero,
+  AboutResourceLinks,
   AboutSystemInfo,
 } from '@/components/settings/AboutSections';
 import { VersionCheckSetting } from '@/components/settings/VersionCheckSetting';
@@ -15,7 +14,7 @@ export const dynamic = 'force-dynamic';
  * 关于设置页
  *
  * 统一信息与版本控制中心：
- * - 品牌与项目概览（Hero Card）
+ * - 官方项目与文档直达（AboutResourceLinks）
  * - 版本更新检测与升级指引（VersionCheckSetting）
  * - 更新日志与历史亮点（AboutChangelog）
  * - 系统规格与运行环境（AboutSystemInfo）
@@ -29,8 +28,8 @@ export default async function AboutSettingsPage() {
     ]);
 
   return (
-    <VStack gap={6}>
-      <AboutHero />
+    <div className="settings-groups">
+      <AboutResourceLinks />
       <VersionCheckSetting
         initialEnabled={versionCheckEnabled}
         initialCnMirror={cnMirrorEnabled}
@@ -42,6 +41,6 @@ export default async function AboutSettingsPage() {
         )}
       />
       <AboutSystemInfo />
-    </VStack>
+    </div>
   );
 }

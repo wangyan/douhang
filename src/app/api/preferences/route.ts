@@ -12,6 +12,7 @@ import type { CardDensity, NetworkMode } from '@/types';
 import {
   CARD_DENSITY_DEFAULT,
   FONT_SIZE_DEFAULT,
+  FULL_WIDTH_DEFAULT,
   WALLPAPER_SCRIM_DEFAULT,
 } from '@/types';
 
@@ -34,6 +35,7 @@ export const GET = async () => {
     cardSimpleMode,
     cardStatusBadge,
     wallpaperScrim,
+    fullWidth,
   ] = await Promise.all([
     getUserPreference<NetworkMode>('networkMode', 'auto'),
     getUserPreference<'light' | 'dark' | 'system'>('theme', 'system'),
@@ -44,6 +46,7 @@ export const GET = async () => {
     getUserPreference<boolean>('cardSimpleMode', false),
     getUserPreference<boolean>('cardStatusBadge', true),
     getUserPreference<unknown>('wallpaperScrim', WALLPAPER_SCRIM_DEFAULT),
+    getUserPreference<boolean>('fullWidth', FULL_WIDTH_DEFAULT),
   ]);
 
   return NextResponse.json({
@@ -55,6 +58,7 @@ export const GET = async () => {
     cardDensity: cardDensity ?? CARD_DENSITY_DEFAULT,
     cardSimpleMode,
     cardStatusBadge,
+    fullWidth,
     wallpaperScrim:
       typeof wallpaperScrim === 'number'
         ? wallpaperScrim
@@ -75,5 +79,6 @@ export const PATCH = withAuth(async (_session, req) => {
 
   await setUserPreference(key, value);
   if (key === 'brand') revalidatePath('/', 'layout');
+  if (key === 'fullWidth') revalidatePath('/settings', 'layout');
   return NextResponse.json({ success: true });
 });

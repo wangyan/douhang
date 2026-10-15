@@ -42,6 +42,8 @@ export interface Preferences {
   versionCheckEnabled: boolean;
   /** 国内镜像源开关（开启后使用 AtomGit） */
   cnMirrorEnabled?: boolean;
+  /** 全宽布局开关（开启铺满右侧工作区，关闭内容居中） */
+  fullWidth?: boolean;
 }
 
 /**

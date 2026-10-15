@@ -85,23 +85,23 @@ export function AppearanceQuickPanel({
               title="主题与字体"
               initialFontSize={data.fontSize}
               isAuthed={isAuthed}
-            >
-              <CardStatusBadgeSetting
-                initialEnabled={data.cardStatusBadge}
-                isAuthed={isAuthed}
-              />
-            </ThemeForm>
+            />
             <SettingsSection
-              title="显示"
+              title="卡片显示"
               description={
                 isAuthed
-                  ? '卡片与 Widget 横条的显示开关（与工具栏同步）'
-                  : '卡片显示密度与简洁模式设置'
+                  ? '设置显示密度、简洁模式、可达状态与 Widget 横条'
+                  : '卡片显示设置仅保存在本机'
               }
+              layout="rows"
             >
               <ViewDisplaySetting
                 initialCardSimpleMode={cardSimpleMode}
                 initialCardDensity={data.cardDensity}
+                isAuthed={isAuthed}
+              />
+              <CardStatusBadgeSetting
+                initialEnabled={data.cardStatusBadge}
                 isAuthed={isAuthed}
               />
             </SettingsSection>
@@ -110,12 +110,12 @@ export function AppearanceQuickPanel({
               preferences={data.wallpaperPreferences}
               initialScrim={data.wallpaperScrim}
               isAuthed={isAuthed}
+              compact
             />
 
-            {/* 访客模式静音底栏：克制无框，平滑融入面板 */}
             {!isAuthed && (
-              <div className="pt-3 mt-1 border-t border-border flex items-center justify-between text-xs text-tertiary">
-                <span className="truncate">访客模式 · 仅保存在本机</span>
+              <div className="pt-3 mt-1 border-t border-border flex flex-wrap items-center justify-between gap-2 text-sm text-secondary">
+                <span>访客模式 · 仅保存在本机</span>
                 <button
                   type="button"
                   onClick={async () => {
@@ -124,7 +124,7 @@ export function AppearanceQuickPanel({
                   }}
                   className="inline-flex items-center gap-1.5 py-1 px-2 rounded-control text-secondary hover:text-primary hover:bg-surface-hover transition-colors focus-ring cursor-pointer"
                 >
-                  <RotateCcw size={ICON_SIZE.xs} />
+                  <RotateCcw size={ICON_SIZE.sm} />
                   <span>恢复默认外观</span>
                 </button>
               </div>

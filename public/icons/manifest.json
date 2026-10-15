@@ -7,11 +7,6 @@
   "assetBase": "/icons/library",
   "icons": [
     {
-      "name": "adguard-home",
-      "label": "AdGuard Home",
-      "format": "svg"
-    },
-    {
       "name": "alist",
       "label": "AList",
       "format": "svg"

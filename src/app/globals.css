@@ -293,6 +293,13 @@ html[data-theme="dark"] .widget-surface {
   letter-spacing: 0.04em;
 }
 
+/* 设置侧栏品牌标题：沿用品牌字体基准字号；得意黑仅单一字重，
+ * 用描边补笔画浓度（paint-order 保持字形锐利） */
+.settings-brand-header .brand-title {
+  -webkit-text-stroke: 0.01em currentColor;
+  paint-order: stroke fill;
+}
+
 /* 日期 widget 参考 Nothing Date Time：纯色底板 + 左对齐四段式排版
  * 圆角与 --radius-widget 统一（18px，与链接卡片、其他 widget 一致） */
 .date-widget-surface {
@@ -990,6 +997,457 @@ html[data-theme="dark"]
 .scrollbar-hidden::-webkit-scrollbar {
   width: 0;
   height: 0;
+}
+
+.settings-side-nav {
+  border-inline-end: 1px solid var(--color-border);
+}
+
+.settings-page {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 32px 36px 48px;
+}
+
+.settings-content {
+  width: 100%;
+  margin-inline: 0;
+  transition: max-width 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.settings-content[data-full-width="false"] {
+  margin-inline: auto;
+}
+
+.settings-content[data-full-width="true"] {
+  margin-inline: 0;
+}
+
+.settings-layout-segmented {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: var(--radius-control);
+  background: var(--color-background-muted);
+  border: 1px solid var(--color-border);
+  gap: 2px;
+}
+
+.settings-layout-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: calc(var(--radius-control) - 2px);
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  cursor: pointer;
+  transition: all 150ms ease;
+  user-select: none;
+}
+
+.settings-layout-tab:hover:not(.is-active) {
+  color: var(--color-text-primary);
+}
+
+.settings-layout-tab.is-active {
+  background: var(--color-background-surface);
+  color: var(--color-text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.settings-page-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 24px;
+}
+
+.settings-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* 品牌块与导航列表的分割线（与底部账号区分割线对称） */
+.settings-brand-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-top-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+}
+
+.settings-nav-home-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  margin-top: 5px;
+  padding: 0 8px;
+  border-radius: var(--radius-control);
+  font-size: 0.8125rem;
+  font-weight: 450;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition:
+    background-color 100ms ease,
+    color 100ms ease;
+}
+
+.settings-nav-home-btn:hover {
+  background: var(--color-overlay-hover);
+  color: var(--color-text-primary);
+}
+
+.settings-home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px;
+  border-radius: var(--radius-control);
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.settings-home-link:hover {
+  color: var(--color-text-primary);
+  background: var(--color-overlay-hover);
+}
+
+.settings-shell .settings-side-nav a[href] {
+  height: 30px;
+  padding-inline: 8px;
+  margin-inline: 4px;
+  border-radius: var(--radius-control);
+  font-size: 0.8125rem;
+  font-weight: 450;
+  color: var(--color-text-secondary);
+  transition:
+    background-color 100ms ease,
+    color 100ms ease;
+}
+
+.settings-shell .settings-side-nav a[href]:hover:not([aria-current="page"]) {
+  background-color: var(--color-overlay-hover);
+  color: var(--color-text-primary);
+}
+
+.settings-shell .settings-side-nav a[href][aria-current="page"] {
+  background-color: color-mix(
+    in srgb,
+    var(--color-text-primary) 7%,
+    transparent
+  );
+  color: var(--color-text-primary);
+  font-weight: 500;
+  box-shadow: none;
+  border: none;
+}
+
+html[data-theme="dark"]
+  .settings-shell
+  .settings-side-nav
+  a[href][aria-current="page"] {
+  background-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+.settings-shell .settings-side-nav a[href]:focus-visible,
+.settings-nav-home-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.settings-shell .settings-side-nav a[href]:focus:not(:focus-visible),
+.settings-nav-home-btn:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.settings-account-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 6px;
+  border-top: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  transition: background-color 120ms ease;
+}
+
+.settings-account-footer:hover {
+  background: var(--color-overlay-hover);
+}
+
+/* 压缩顶部容器与列表间距，消除主页按钮下边距断层 */
+.settings-shell .settings-side-nav > div:first-child {
+  padding-block-end: 2px;
+}
+
+/* 侧栏分组与列表间距 */
+.settings-shell .settings-side-nav .settings-nav-section {
+  padding-inline: 0;
+}
+
+.settings-shell .settings-side-nav .settings-nav-section:first-child {
+  padding-block-start: 0;
+  margin-top: 0;
+}
+
+.settings-shell
+  .settings-side-nav
+  .settings-nav-section
+  + .settings-nav-section {
+  margin-top: 8px;
+}
+
+.settings-shell .settings-side-nav .settings-nav-section > div:first-child {
+  padding: 4px 12px 2px;
+  min-height: unset;
+}
+
+.settings-shell
+  .settings-side-nav
+  .settings-nav-section
+  > div:first-child
+  span {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--color-text-tertiary);
+}
+
+.settings-shell .settings-side-nav .settings-nav-section > div:last-child {
+  gap: 1px;
+}
+
+.settings-mobile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.settings-mobile-header .settings-home-link {
+  margin-left: 0;
+}
+
+.settings-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.settings-group-body {
+  container-type: inline-size;
+  container-name: settings-surface;
+}
+
+.settings-group-body-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+/* 元数据列表（MetadataList）：字号与行距收紧 */
+.settings-shell dl {
+  row-gap: 4px;
+}
+
+.settings-shell dl dt,
+.settings-shell dl dd {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  min-height: 1rem;
+}
+
+.settings-shell dl dt :where(span, div),
+.settings-shell dl dd :where(span, div) {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+/* 关于页资源入口按钮：字号收小，窄窗口下保持单行 */
+.about-resource-links .astryx-button {
+  font-size: 0.75rem;
+}
+
+/* 手机竖屏改为两列网格，避免四枚按钮孤行换行 */
+@media (max-width: 480px) {
+  .about-resource-links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 56px;
+  padding: 14px 20px;
+}
+
+.setting-row + .setting-row,
+.settings-save-bar {
+  border-top: 1px solid var(--color-border);
+}
+
+.setting-row-label {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting-row-control {
+  display: flex;
+  width: min(460px, 100%);
+  max-width: 100%;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
+.setting-row[data-stacked="true"] {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.setting-row[data-stacked="true"] .setting-row-control {
+  width: 100%;
+  display: block;
+}
+
+.settings-option-tile {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+  padding: 7px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  cursor: pointer;
+  transition: border-color 150ms;
+}
+
+.settings-option-tile[data-selected="true"] {
+  border-color: var(--color-accent);
+}
+
+.settings-option-tile:hover {
+  border-color: var(--color-border-emphasized);
+}
+
+.settings-option-tile[data-selected="true"]:hover {
+  border-color: var(--color-accent);
+}
+
+.settings-option-tile:has(input:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.settings-option-tile[data-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-save-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--color-background-muted);
+  border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+}
+
+@container settings-surface (max-width: 600px) {
+  .setting-row {
+    padding: 14px 16px;
+  }
+
+  .setting-row:not([data-stacked="true"]):not([data-switch="true"]) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .setting-row:not([data-stacked="true"]):not([data-switch="true"])
+    .setting-row-control {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .setting-row[data-switch="true"] {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .setting-row[data-switch="true"] .setting-row-control {
+    width: auto;
+    justify-content: flex-end;
+  }
+}
+
+@media (min-width: 768px) {
+  .settings-mobile-header {
+    display: none;
+  }
+}
+
+@media (min-width: 1280px) {
+  .settings-page {
+    padding: 36px 48px 64px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .settings-page {
+    padding: 36px clamp(48px, 5vw, 96px) 64px;
+  }
+}
+
+@media (max-width: 767px) {
+  .settings-page {
+    padding: 16px 16px 32px;
+  }
+
+  .settings-group-heading {
+    gap: 8px;
+  }
+
+  .settings-save-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: var(--z-raised);
+    background: var(--color-background-surface);
+  }
 }
 
 /* === card-fly-in：卡片错峰入场（会话内仅首访播放） ===

@@ -1,7 +1,6 @@
 import { existsSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { VStack } from '@astryxdesign/core/VStack';
 import {
   AssetsManager,
   type UploadedIcon,
@@ -67,13 +66,13 @@ export default async function AssetsPage() {
   const uploadedWallpapers = allWallpapers.filter((w) => w.source === 'upload');
 
   return (
-    <VStack gap={6}>
+    <div className="settings-groups">
       <AssetsManager
         icons={icons}
         wallpapers={uploadedWallpapers}
         appliedWallpaperId={wallpaperPrefs.wallpaper}
         iconUsage={iconUsage}
       />
-    </VStack>
+    </div>
   );
 }

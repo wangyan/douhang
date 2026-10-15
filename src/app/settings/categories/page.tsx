@@ -1,4 +1,3 @@
-import { VStack } from '@astryxdesign/core/VStack';
 import { CategoryManager } from '@/components/settings/CategoryManager';
 import { prisma } from '@/lib/db';
 import type { Category } from '@/types';
@@ -45,8 +44,8 @@ export default async function CategoriesSettingsPage() {
   }));
 
   return (
-    <VStack gap={6}>
+    <div className="settings-groups">
       <CategoryManager initialCategories={initialCategories} />
-    </VStack>
+    </div>
   );
 }

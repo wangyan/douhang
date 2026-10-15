@@ -6,7 +6,6 @@ import { Text } from '@astryxdesign/core/Text';
 import { VStack } from '@astryxdesign/core/VStack';
 import { ImagePlus, Shapes } from 'lucide-react';
 import { useAssetsController } from '@/components/settings/assets/useAssetsController';
-import { SettingsSection } from '@/components/settings/SettingsSection';
 import { ICON_SIZE } from '@/lib/design-tokens';
 import type { Wallpaper } from '@/types';
 import { AssetsControls } from './AssetsControls';
@@ -49,7 +48,7 @@ export function AssetsManager({
   });
 
   return (
-    <SettingsSection title="素材管理" description="已上传的卡片图标与壁纸文件">
+    <div className="min-w-0">
       <VStack gap={5}>
         <AssetsControls
           ctl={ctl}
@@ -172,6 +171,6 @@ export function AssetsManager({
           onAction={() => void ctl.confirmBulkDelete()}
         />
       </VStack>
-    </SettingsSection>
+    </div>
   );
 }
