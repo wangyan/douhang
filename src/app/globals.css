@@ -1450,6 +1450,23 @@ html[data-theme="dark"]
   }
 }
 
+/* 首页悬浮工具栏：hover 设备默认仅显示末尾用户菜单，悬停或键盘聚焦时展开。
+ * display: contents 保证展开态布局与整体一致；触屏设备（无 hover）保持常显。 */
+.floating-toolbar-main {
+  display: contents;
+}
+
+@media (hover: hover) {
+  .floating-toolbar-main {
+    display: none;
+  }
+
+  .floating-toolbar:hover .floating-toolbar-main,
+  .floating-toolbar:focus-within .floating-toolbar-main {
+    display: contents;
+  }
+}
+
 /* === card-fly-in：卡片错峰入场（会话内仅首访播放） ===
  * 每张卡从下方 16px + scale(0.96) 淡入归位。
  * 父容器加 .stagger-cards，每张卡由内联 style 设置 animation-delay 错峰。

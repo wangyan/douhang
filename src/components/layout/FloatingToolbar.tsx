@@ -479,49 +479,52 @@ export function FloatingToolbar({
       <HStack
         gap={1}
         align="center"
-        className={`${withinFrame ? 'absolute' : 'fixed'} top-6 right-4 md:right-6 z-chrome rounded-full bg-surface/80 backdrop-blur-md border border-border shadow-float px-1.5 py-1 sm:px-2 md:px-3`}
+        className={`floating-toolbar ${withinFrame ? 'absolute' : 'fixed'} top-6 right-4 md:right-6 z-chrome rounded-full bg-surface/80 backdrop-blur-md border border-border shadow-float px-1.5 py-1 sm:px-2 md:px-3`}
       >
-        {/* 环境区：网络模式 + 主题（高频，各自循环/切换） */}
-        <ToolbarEnvCluster
-          netMode={netMode}
-          onCycleNetwork={handleCycleNetworkMode}
-          mode={mode}
-          resolved={resolved}
-          onCycleTheme={handleCycleTheme}
-        />
-
-        {/* 视图区：显示开关 */}
-        <ToolbarViewCluster
-          onOpenCmdK={() => setCmdKOpen(true)}
-          simpleMode={simpleMode}
-          onToggleSimpleMode={handleToggleSimpleMode}
-        />
-
-        {/* 模式区：仅登录用户可见（Widget 显隐、编辑模式、批量删除） */}
-        {isAuthed && (
-          <ToolbarModeCluster
-            widgetBarVisible={widgetBarVisible}
-            onToggleWidgetBar={() => setWidgetBarVisible(!widgetBarVisible)}
-            editMode={editMode}
-            batchMode={batchMode}
-            dispatchEditModeChange={dispatchEditModeChange}
-            dispatchBatchModeChange={dispatchBatchModeChange}
+        {/* 折叠区：默认收起（悬停或聚焦展开），末尾用户菜单单独常驻 */}
+        <div className="floating-toolbar-main">
+          {/* 环境区：网络模式 + 主题（高频，各自循环/切换） */}
+          <ToolbarEnvCluster
+            netMode={netMode}
+            onCycleNetwork={handleCycleNetworkMode}
+            mode={mode}
+            resolved={resolved}
+            onCycleTheme={handleCycleTheme}
           />
-        )}
 
-        {/* 更新提醒：仅登录态检查与展示，浮层关闭后才出现的常驻入口，直达关于弹窗 */}
-        {isAuthed && dismissedUpdate && (
-          <>
-            <span className="mx-2 h-5 w-px bg-border" aria-hidden />
-            <IconButton
-              label={`新版本 ${dismissedUpdate.tag} 可用`}
-              icon={<ArrowUpCircle size={ICON_SIZE.md} />}
-              variant="secondary"
-              tooltip={`新版本 ${dismissedUpdate.tag} 可用，点击查看更新日志`}
-              onClick={() => setAboutOpen(true)}
+          {/* 视图区：显示开关 */}
+          <ToolbarViewCluster
+            onOpenCmdK={() => setCmdKOpen(true)}
+            simpleMode={simpleMode}
+            onToggleSimpleMode={handleToggleSimpleMode}
+          />
+
+          {/* 模式区：仅登录用户可见（Widget 显隐、编辑模式、批量删除） */}
+          {isAuthed && (
+            <ToolbarModeCluster
+              widgetBarVisible={widgetBarVisible}
+              onToggleWidgetBar={() => setWidgetBarVisible(!widgetBarVisible)}
+              editMode={editMode}
+              batchMode={batchMode}
+              dispatchEditModeChange={dispatchEditModeChange}
+              dispatchBatchModeChange={dispatchBatchModeChange}
             />
-          </>
-        )}
+          )}
+
+          {/* 更新提醒：仅登录态检查与展示，浮层关闭后才出现的常驻入口，直达关于弹窗 */}
+          {isAuthed && dismissedUpdate && (
+            <>
+              <span className="mx-2 h-5 w-px bg-border" aria-hidden />
+              <IconButton
+                label={`新版本 ${dismissedUpdate.tag} 可用`}
+                icon={<ArrowUpCircle size={ICON_SIZE.md} />}
+                variant="secondary"
+                tooltip={`新版本 ${dismissedUpdate.tag} 可用，点击查看更新日志`}
+                onClick={() => setAboutOpen(true)}
+              />
+            </>
+          )}
+        </div>
 
         {/* 用户菜单：纯导航（设置 / 退出登录 / 登录后台 / 关于），常驻末尾 */}
         <ToolbarUserMenu
