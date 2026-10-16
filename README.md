@@ -59,14 +59,15 @@
 
 ## 快速部署
 
-推荐使用镜像方式部署，默认拉取官方 GitHub Packages 公开镜像 `ghcr.io/wangyan/douhang:latest`（若网络受限亦可使用官方 Docker Hub 镜像 `idiswy/douhang:latest`），无需克隆源码。完整部署方式详见[部署指南](./docs/DEPLOYMENT.md)。
+推荐使用镜像方式部署，无需克隆源码。海外环境默认拉取 `ghcr.io/wangyan/douhang:latest`（GitHub Packages）；国内环境可使用国内官方镜像 `hamgit.com/wangyan/douhang:latest`，另提供备选镜像 `bg7pbp/douhang:latest`（Docker Hub）。完整部署方式详见[部署指南](./docs/DEPLOYMENT.md)。
 
 **前置条件**：已安装 Docker 与 Docker Compose v2，且主机可访问互联网以下载镜像。
 
 ```bash
 mkdir douhang && cd douhang
 
-# 1. 获取生产编排文件
+# 1. 获取生产编排文件（国内环境可改用 AtomGit 镜像仓直链：
+#    https://raw.atomgit.com/wang_yan/douhang/raw/main/docker-compose.prod.yml）
 curl -O https://raw.githubusercontent.com/wangyan/douhang/main/docker-compose.prod.yml
 
 # 2. 生成 .env（仅在 .env 不存在时创建）

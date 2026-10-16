@@ -11,7 +11,7 @@
 
 ## 1. 容器部署（推荐）
 
-官方预构建容器镜像托管于 GitHub Packages：`ghcr.io/wangyan/douhang`，多架构支持 `linux/amd64` 与 `linux/arm64`。
+官方预构建容器镜像默认托管于 GitHub Packages：`ghcr.io/wangyan/douhang`，多架构支持 `linux/amd64` 与 `linux/arm64`。国内网络环境可改用国内官方镜像 `hamgit.com/wangyan/douhang`，亦可使用备选镜像 `bg7pbp/douhang`（Docker Hub）；三个渠道承载同一版本镜像，选型见第 5.1 节。
 
 **前置条件**：主机已安装 Docker 与 Docker Compose（v2.0+），且具备访问外网拉取镜像的网络环境。
 
@@ -22,6 +22,8 @@
 1. **准备工作目录与编排配置**：
    ```bash
    mkdir douhang && cd douhang
+   # 国内环境可改用 AtomGit 镜像仓直链：
+   # https://raw.atomgit.com/wang_yan/douhang/raw/main/docker-compose.prod.yml
    curl -O https://raw.githubusercontent.com/wangyan/douhang/main/docker-compose.prod.yml
    ```
 
@@ -64,6 +66,8 @@ docker run -d \
   --restart unless-stopped \
   ghcr.io/wangyan/douhang:latest
 ```
+
+> **镜像渠道替换**：国内网络环境可将末行镜像地址替换为 `hamgit.com/wangyan/douhang:latest`；若上述渠道均不可达，可使用备选镜像 `bg7pbp/douhang:latest`。
 
 ### 1.3 首次访问与内网运行说明
 
@@ -215,12 +219,13 @@ GITHUB_TOKEN="github_pat_xxxx"
 
 ## 5. 容器镜像渠道与多端分发
 
-### 5.1 官方公开镜像双源
+### 5.1 官方公开镜像三源
 
-DouHang 官方默认提供两个公开镜像下载渠道，使用者可按需自由选用：
+斗航（DouHang）官方提供三个公开镜像下载渠道，承载同一版本镜像，使用者可按网络环境自由选用：
 
-- **主选渠道（文档默认）**：`ghcr.io/wangyan/douhang:latest`（GitHub Packages，多架构由 GitHub Actions 云端自动构建交付）
-- **备选渠道（通用/网络友好）**：`wangyan/douhang:latest`（Docker Hub，同为官方公开维护，当拉取 GHCR 受限时可直接替换使用）
+- **海外默认渠道**：`ghcr.io/wangyan/douhang:latest`（GitHub Packages，多架构由 GitHub Actions 云端自动构建交付）
+- **国内官方渠道**：`hamgit.com/wangyan/douhang:latest`（自建 Forgejo 容器镜像库，国内直连）
+- **备选渠道**：`bg7pbp/douhang:latest`（Docker Hub，官方公开维护）
 
 ### 5.2 维护者镜像多端分发配置
 

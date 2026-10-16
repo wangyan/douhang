@@ -60,7 +60,7 @@ export function getManualUrl(): string {
 }
 
 /** 官方 Docker Hub 镜像主页地址 */
-export const DOCKERHUB_URL = 'https://hub.docker.com/r/idiswy/douhang';
+export const DOCKERHUB_URL = 'https://hub.docker.com/r/bg7pbp/douhang';
 
 /** Releases 列表页地址 */
 export function getReleasesPageUrl(repoUrl?: string): string {
