@@ -180,7 +180,7 @@
           "items": [
             "官方开源渠道与凭据标准化，解耦 GITHUB_TOKEN 代码发版与 GHCR_TOKEN 镜像推送权限",
             "新增 GitHub Actions 工作流，监听版本标签自动构建并分发多架构容器镜像至 GHCR",
-            "官方镜像默认提供 GHCR 与 Docker Hub 双源，支持自建私有平台（MIRROR_*）镜像同步",
+            "官方镜像提供 GHCR、HamGit 与 Docker Hub 多源，支持国内平台（HAMGIT_*）镜像同步",
             "容器启动自动完成数据库迁移与种子写入，数据持久化在宿主机 `./data`",
             "自动探测 Docker socket 属组；`DOCKER_GID` / `PUID` / `PGID` 在 `.env` 设置生效",
             "无鉴权健康检查端点 `/api/health`，已接入容器 HEALTHCHECK",

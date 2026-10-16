@@ -6,7 +6,7 @@
  * 2. 全量一致性对齐：自动补齐缺失版本，并自动比对更新标题与正文差异，确保主仓与镜像仓 100% 完全一致；
  * 3. 自动分页检测：处理 API 分页（每页 100 条递增遍历），支持历史版本数十乃至上百个的场景；
  * 4. 超时与重试容错：内置 10 秒请求超时，防止内网/VPN 私有镜像服务器失联导致脚本卡死；
- * 5. 配置自适应解析：从 MIRROR_REPO_URL 智能提取 host 与 repo，无需手动配置冗余平台参数；
+ * 5. 配置自适应解析：从 HAMGIT_REPO_URL 智能提取 host 与 repo，无需手动配置冗余平台参数；
  * 6. 状态码友好诊断：针对 401/403/404/422 及网络断连给出清晰排错指引；
  * 7. 灵活参数过滤：支持仅针对指定版本号（如 `v1.0.0`）单项执行。
  *
@@ -165,16 +165,16 @@ function getAtomGitConfig(): PlatformConfig {
   };
 }
 
-/** 获取镜像仓库平台配置（从 MIRROR_REPO_URL 智能提取，支持可选显式覆盖） */
-function getMirrorConfig(): PlatformConfig | null {
-  const mirrorUrl = process.env.MIRROR_REPO_URL?.trim();
-  let host = process.env.MIRROR_GIT_HOST?.trim();
-  let repo = process.env.MIRROR_REPO_NAME?.trim();
-  const token = process.env.MIRROR_REPO_TOKEN?.trim();
+/** 获取国内 HamGit 平台配置（从 HAMGIT_REPO_URL 智能提取，支持可选显式覆盖） */
+function getHamGitConfig(): PlatformConfig | null {
+  const hamgitUrl = process.env.HAMGIT_REPO_URL?.trim();
+  let host = process.env.HAMGIT_GIT_HOST?.trim();
+  let repo = process.env.HAMGIT_REPO_NAME?.trim();
+  const token = process.env.HAMGIT_REPO_TOKEN?.trim();
 
-  // 若配置了 MIRROR_REPO_URL，优先提取 host 与 repo
-  if (mirrorUrl) {
-    const parsed = parseGitUrl(mirrorUrl);
+  // 若配置了 HAMGIT_REPO_URL，优先提取 host 与 repo
+  if (hamgitUrl) {
+    const parsed = parseGitUrl(hamgitUrl);
     if (parsed) {
       if (!host) host = parsed.host;
       if (!repo) repo = parsed.repo;
@@ -192,7 +192,7 @@ function getMirrorConfig(): PlatformConfig | null {
   const authHeader = isGitHub ? `Bearer ${token}` : `token ${token}`;
 
   return {
-    name: `私有镜像仓 (${host})`,
+    name: `HamGit 国内仓 (${host})`,
     host,
     repo,
     token,
@@ -444,11 +444,11 @@ async function main() {
 
   const primary = getPrimaryConfig();
   const atomgit = getAtomGitConfig();
-  const mirror = getMirrorConfig();
+  const hamgit = getHamGitConfig();
 
   const platforms: PlatformConfig[] = [primary, atomgit];
-  if (mirror) {
-    platforms.push(mirror);
+  if (hamgit) {
+    platforms.push(hamgit);
   }
 
   let totalPendingMissing = 0;

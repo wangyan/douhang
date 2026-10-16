@@ -203,16 +203,16 @@ npm run start       # 启动生产服务器
 |---|---|---|---|
 | `GITHUB_TOKEN` | 否 | - | 官方 GitHub 发版令牌（PAT，需具备 `Contents: Read and write` 权限），供维护者运行发版脚本打 Tag 与创建 Release |
 | `ATOMGIT_TOKEN` | 否 | - | 官方 AtomGit 国内镜像仓访问令牌，配置后发版脚本同步推送代码与标签并创建 AtomGit Release |
-| `MIRROR_REPO_URL` | 否 | - | （可选）私有 Git 仓库完整地址（如 `ssh://git@mirror.example.com/owner/douhang.git`）。脚本自动提取主机名与仓库路径，发版时同步推送 Git 标签与分支 |
-| `MIRROR_REPO_TOKEN` | 否 | - | （可选）私有代码平台 API 访问令牌，用于发版与 Release 同步脚本调用 API 同步创建 Release |
+| `HAMGIT_REPO_URL` | 否 | - | （可选）国内 HamGit 仓库完整地址（如 `ssh://git@hamgit.com/wangyan/douhang.git`）。脚本自动提取主机名与仓库路径，发版时同步推送 Git 标签与分支 |
+| `HAMGIT_REPO_TOKEN` | 否 | - | （可选）国内 HamGit 平台 API 访问令牌，用于发版与 Release 同步脚本调用 API 同步创建 Release |
 
 ```dotenv
 # 维护者发版配置示例（.env 片段，按需配置）
 GITHUB_TOKEN="github_pat_xxxx"
 
-# 私有镜像仓库同步（按需可选）
-# MIRROR_REPO_URL="ssh://git@mirror.example.com/owner/douhang.git"
-# MIRROR_REPO_TOKEN="your-mirror-repo-token"
+# 国内 HamGit 平台同步（按需可选）
+# HAMGIT_REPO_URL="ssh://git@hamgit.com/wangyan/douhang.git"
+# HAMGIT_REPO_TOKEN="your-hamgit-repo-token"
 ```
 
 ---
@@ -230,13 +230,13 @@ GITHUB_TOKEN="github_pat_xxxx"
 ### 5.2 维护者镜像多端分发配置
 
 > [!NOTE]
-> 如果您直接拉取上述官方镜像部署服务，**无需配置本节变量**。本节参数专供维护者运行 `npm run image:sync` 将官方镜像分发至 Docker Hub 与私有镜像仓库。
+> 如果您直接拉取上述官方镜像部署服务，**无需配置本节变量**。本节参数专供维护者运行 `npm run image:sync` 将官方镜像分发至 Docker Hub 与国内 HamGit 镜像仓库。
 
 | 变量名 | 必填 | 默认值 | 说明 |
 |---|---|---|---|
 | `DOCKERHUB_USERNAME` | 否 | - | 官方 Docker Hub 登录用户名，用于同步流转官方镜像至 `hub.docker.com` |
 | `DOCKERHUB_TOKEN` | 否 | - | Docker Hub Personal Access Token（需具备 Read & Write 权限） |
-| `MIRROR_REGISTRY_TOKEN` | 否 | - | 私有容器镜像库访问令牌，用于同步镜像至自建私有 Registry（自动复用 `MIRROR_REPO_URL` 域名与仓库路径） |
+| `HAMGIT_REGISTRY_TOKEN` | 否 | - | 国内 HamGit 容器镜像库访问令牌，用于同步镜像至 HamGit Registry（自动复用 `HAMGIT_REPO_URL` 域名与仓库路径） |
 | `BUILD_IMAGE_LOCAL` | 否 | `0` | 本地镜像构建后备开关：默认 `0` 委托云端构建；设为 `1` 在本地直接交叉编译多架构镜像 |
 | `GHCR_TOKEN` | 否 | - | 官方 GHCR 镜像库推送令牌（需具备 `write:packages` 权限，仅当 `BUILD_IMAGE_LOCAL=1` 在本地直推 GHCR 时必填） |
 
@@ -245,8 +245,8 @@ GITHUB_TOKEN="github_pat_xxxx"
 DOCKERHUB_USERNAME="wangyan"
 DOCKERHUB_TOKEN="dckr_pat_xxxx"
 
-# 私有镜像库同步配置（.env 片段，按需配置）
-# MIRROR_REGISTRY_TOKEN="your-mirror-registry-token"
+# 国内 HamGit 镜像库同步配置（.env 片段，按需配置）
+# HAMGIT_REGISTRY_TOKEN="your-hamgit-registry-token"
 ```
 
 ### 5.3 镜像状态检查与同步命令
@@ -284,8 +284,8 @@ npm run image:sync full
 ### 6.2 扩展流程（可选，面向私有备份）
 
 3. **多端镜像流转分发（本地/运维机按需触发）**：
-   - 若配置了 `MIRROR_*` 参数，发版脚本在第一阶段已自动将 Git 标签与 Release 同步推送至私有平台；
-   - 待官方 GHCR 镜像构建就绪后，在本地或运维节点运行 `npm run image:sync`，秒级将镜像高速同步至 Docker Hub 与私有镜像库；
+   - 若配置了 `HAMGIT_*` 参数，发版脚本在第一阶段已自动将 Git 标签与 Release 同步推送至 HamGit 平台；
+   - 待官方 GHCR 镜像构建就绪后，在本地或运维节点运行 `npm run image:sync`，秒级将镜像高速同步至 Docker Hub 与国内 HamGit 镜像库；
    - 随时通过 `npm run image:check` 查看全网镜像就绪状态。
 
 ---

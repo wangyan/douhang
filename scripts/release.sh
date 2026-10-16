@@ -59,10 +59,10 @@ if [ -f .env ]; then
 
   [ -z "${BUILD_IMAGE_LOCAL:-}" ] && BUILD_IMAGE_LOCAL=$(grep -E '^[[:space:]]*BUILD_IMAGE_LOCAL=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
 
-  # 镜像平台同步配置（可选：同时发布至第二远端/私有平台）
-  [ -z "${MIRROR_REPO_URL:-}" ] && MIRROR_REPO_URL=$(grep -E '^[[:space:]]*MIRROR_REPO_URL=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
-  [ -z "${MIRROR_REPO_TOKEN:-}" ] && MIRROR_REPO_TOKEN=$(grep -E '^[[:space:]]*MIRROR_REPO_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
-  [ -z "${MIRROR_REGISTRY_TOKEN:-}" ] && MIRROR_REGISTRY_TOKEN=$(grep -E '^[[:space:]]*MIRROR_REGISTRY_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
+  # 国内 HamGit 平台同步配置（可选：同时发布至国内 HamGit 平台）
+  [ -z "${HAMGIT_REPO_URL:-}" ] && HAMGIT_REPO_URL=$(grep -E '^[[:space:]]*HAMGIT_REPO_URL=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
+  [ -z "${HAMGIT_REPO_TOKEN:-}" ] && HAMGIT_REPO_TOKEN=$(grep -E '^[[:space:]]*HAMGIT_REPO_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
+  [ -z "${HAMGIT_REGISTRY_TOKEN:-}" ] && HAMGIT_REGISTRY_TOKEN=$(grep -E '^[[:space:]]*HAMGIT_REGISTRY_TOKEN=' .env | cut -d '=' -f2- | tr -d '"'\'' ') || true
 fi
 
 # 官方公开主仓库常量 (GitHub)
@@ -76,13 +76,13 @@ ATOMGIT_REPO="wang_yan/douhang"
 ATOMGIT_URL="https://${ATOMGIT_HOST}/${ATOMGIT_REPO}"
 ATOMGIT_API_URL="https://api.atomgit.com/api/v5/repos/${ATOMGIT_REPO}/releases"
 
-# 从 MIRROR_REPO_URL 智能提取 Host 与 Repo（若配置）
-MIRROR_GIT_HOST=""
-MIRROR_REPO_NAME=""
-if [ -n "${MIRROR_REPO_URL:-}" ]; then
-  read -r mirror_url_host mirror_url_repo <<<"$(parse_git_url "$MIRROR_REPO_URL")"
-  MIRROR_GIT_HOST="$mirror_url_host"
-  MIRROR_REPO_NAME="$mirror_url_repo"
+# 从 HAMGIT_REPO_URL 智能提取 Host 与 Repo（若配置）
+HAMGIT_GIT_HOST=""
+HAMGIT_REPO_NAME=""
+if [ -n "${HAMGIT_REPO_URL:-}" ]; then
+  read -r hamgit_url_host hamgit_url_repo <<<"$(parse_git_url "$HAMGIT_REPO_URL")"
+  HAMGIT_GIT_HOST="$hamgit_url_host"
+  HAMGIT_REPO_NAME="$hamgit_url_repo"
 fi
 
 [[ -n "${GITHUB_TOKEN:-}" ]] || fail "未在环境变量或 .env 中找到 GITHUB_TOKEN（需具备 GitHub 仓库 Contents: Read & write 权限）"
@@ -237,10 +237,10 @@ if [ -n "${ATOMGIT_TOKEN:-}" ]; then
   }
 fi
 
-if [ -n "${MIRROR_REPO_URL:-}" ]; then
-  printf '==> 发布 %s：同步推送私有镜像 Git 仓库\n' "$tag"
-  git push "$MIRROR_REPO_URL" main "$tag" || {
-    echo "警告：私有镜像 Git 仓库推送失败，但主仓库已推送" >&2
+if [ -n "${HAMGIT_REPO_URL:-}" ]; then
+  printf '==> 发布 %s：同步推送国内 HamGit 仓库\n' "$tag"
+  git push "$HAMGIT_REPO_URL" main "$tag" || {
+    echo "警告：国内 HamGit 仓库推送失败，但主仓库已推送" >&2
   }
 fi
 
@@ -286,25 +286,25 @@ if [ -n "${ATOMGIT_TOKEN:-}" ]; then
   rm -f "$atomgit_resp"
 fi
 
-# 同步创建镜像平台 Release（若已配置镜像平台凭据）
-if [ -n "${MIRROR_GIT_HOST:-}" ] && [ -n "${MIRROR_REPO_TOKEN:-}" ]; then
-  printf '==> 发布 %s：同步创建私有平台 Release\n' "$tag"
-  mirror_api_url="https://$MIRROR_GIT_HOST/api/v1/repos/$MIRROR_REPO_NAME/releases"
-  mirror_resp_file=$(mktemp)
-  mirror_http_code=$(curl --silent --show-error -o "$mirror_resp_file" -w '%{http_code}' \
+# 同步创建国内 HamGit 平台 Release（若已配置 HamGit 凭据）
+if [ -n "${HAMGIT_GIT_HOST:-}" ] && [ -n "${HAMGIT_REPO_TOKEN:-}" ]; then
+  printf '==> 发布 %s：同步创建国内 HamGit Release\n' "$tag"
+  hamgit_api_url="https://$HAMGIT_GIT_HOST/api/v1/repos/$HAMGIT_REPO_NAME/releases"
+  hamgit_resp_file=$(mktemp)
+  hamgit_http_code=$(curl --silent --show-error -o "$hamgit_resp_file" -w '%{http_code}' \
     -X POST \
-    -H "Authorization: token $MIRROR_REPO_TOKEN" \
+    -H "Authorization: token $HAMGIT_REPO_TOKEN" \
     -H "Content-Type: application/json" \
     -H "Accept: application/json" \
-    "$mirror_api_url" \
+    "$hamgit_api_url" \
     --data-binary "$payload") || true
 
-  if [[ $mirror_http_code == 200 || $mirror_http_code == 201 ]]; then
-    echo "私有平台 Release 已创建：https://$MIRROR_GIT_HOST/$MIRROR_REPO_NAME/releases/tag/$tag"
+  if [[ $hamgit_http_code == 200 || $hamgit_http_code == 201 ]]; then
+    echo "国内 HamGit Release 已创建：https://$HAMGIT_GIT_HOST/$HAMGIT_REPO_NAME/releases/tag/$tag"
   else
-    echo "警告：私有平台 Release 创建失败（HTTP $mirror_http_code）" >&2
+    echo "警告：国内 HamGit Release 创建失败（HTTP $hamgit_http_code）" >&2
   fi
-  rm -f "$mirror_resp_file"
+  rm -f "$hamgit_resp_file"
 fi
 
 rm -f "$release_notes"
@@ -312,5 +312,5 @@ rm -f "$release_notes"
 printf '==> %s 发布完成！\n' "$tag"
 printf '    • 代码已推送并已在各代码平台创建 Release\n'
 printf '    • GitHub Actions 正在云端构建并发布 GHCR 多架构镜像\n'
-printf '    • 如需同步至 Docker Hub 或私有镜像库，可运行：npm run image:sync\n'
+printf '    • 如需同步至 Docker Hub 或 HamGit 镜像库，可运行：npm run image:sync\n'
 printf '    • 全量同步所有历史版本镜像可运行：npm run image:sync full\n'

@@ -103,7 +103,7 @@ fix(搜索): 修复拼音首字母匹配在包含数字的卡片上失效的问�
 2. **环境凭据就绪**（仅需单个细粒度 Token，本地无需镜像推送权限）：
    - `GITHUB_TOKEN`：在 [Fine-grained tokens](https://github.com/settings/personal-access-tokens/new) 中仅勾选 `douhang` 仓库的 `Contents: Read and write` 权限（用于创建 Release 与推送标签）；
    - （说明）：**容器镜像由 GitHub Actions 云端自动构建并交付至 GHCR**，无需在本地配置 `GHCR_TOKEN`，亦无需在本地运行 Docker 引擎；（若需本地直接编译推送，可设置 `BUILD_IMAGE_LOCAL=1` 并配置具备 `write:packages` 权限的 `GHCR_TOKEN` 作为后备）；
-   - （可选）镜像平台参数（`MIRROR_*`）：若需同步发布至私有平台，可在 `.env` 配置 `MIRROR_REPO_URL`、`MIRROR_REPO_TOKEN` 与 `MIRROR_REGISTRY_TOKEN`。发版后可使用 `npm run image:sync` 高速流转镜像。
+   - （可选）国内 HamGit 平台参数（`HAMGIT_*`）：若需同步发布至国内 HamGit 平台，可在 `.env` 配置 `HAMGIT_REPO_URL`、`HAMGIT_REPO_TOKEN` 与 `HAMGIT_REGISTRY_TOKEN`。发版后可使用 `npm run image:sync` 高速流转镜像。
 3. **变更日志确认**：提前在 `CHANGELOG.md` 顶部整理好当前版本的 `### 亮点` 与变更条目。
 
 ### 3.3 执行发布命令
@@ -152,14 +152,14 @@ npm run release:sync v1.0.0
 
 ### 3.6 容器镜像多端同步与检查
 
-主版本发布后，官方多架构 Docker 镜像由 GitHub Actions 云端流水线自动构建并交付至 GHCR。如需将镜像同步分发至自建私有镜像平台或 Docker Hub，可运行独立的同步工具（无需本地重复编译）：
+主版本发布后，官方多架构 Docker 镜像由 GitHub Actions 云端流水线自动构建并交付至 GHCR。如需将镜像同步分发至国内 HamGit 镜像平台或 Docker Hub，可运行独立的同步工具（无需本地重复编译）：
 
 ```bash
 # 检查各镜像平台 Release 镜像包状态（以主仓远程 Releases 为准；默认查最新，加 full 查全部）
 npm run image:check
 npm run image:check full
 
-# 高速清单同步：自动将官方 GHCR 产物快速分发至 Docker Hub 与私有镜像库（默认同步最新 Release）
+# 高速清单同步：自动将官方 GHCR 产物快速分发至 Docker Hub 与国内 HamGit 镜像库（默认同步最新 Release）
 npm run image:sync
 
 # 全量同步所有 Releases 镜像包
@@ -185,11 +185,12 @@ npm run image:sync full
 
 ---
 
-## 5. 代码推送与分支管理
+## 5. 平台定位与代码分发规范
 
-- **远端配置**：远程仓库仅保留标准的 `origin` 远端，统一指向公开仓库（`git@github.com:wangyan/douhang.git`）；
-- **日常推送**：
-  ```bash
-  git push origin main --tags
-  ```
-- **分支保护**：**严禁对 `main` 主分支执行强推（`git push -f`）**。如确需整理提交历史，须经维护者严格审核后按规范流程推进。
+| 平台 | 访问属性 | 仓库定位与核心职责 | 版本更新检测 | 容器镜像托管 |
+|---|---|---|---|---|
+| **GitHub** | **海外公开仓** | 官方海外核心代码仓（`github.com/wangyan/douhang`） | **是**（海外环境默认） | **是**（GHCR，海外默认） |
+| **AtomGit** | **国内镜像仓** | 官方国内镜像代码仓（`atomgit.com/wang_yan/douhang`） | **是**（国内开启加速） | **否**（不提供镜像服务） |
+| **HamGit** | **国内私有仓** | 官方国内私有备份仓（`hamgit.com/wangyan/douhang`） | **否**（私有仓绝不参与） | **是**（官方国内容器镜像直连源） |
+
+应用前台版本更新检测仅面向 GitHub 与 AtomGit；HamGit 虽对外提供国内容器镜像下载，但作为私有代码仓库，不参与国内用户的代码更新检查。

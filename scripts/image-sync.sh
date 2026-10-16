@@ -3,7 +3,7 @@
 # DouHang 多架构容器镜像同步与检查工具
 #
 # 以官方 GHCR (ghcr.io/wangyan/douhang) 产物为权威源，直接通过 buildx imagetools
-# 快速流转分发至官方 Docker Hub 与自建私有镜像平台，无需本地重新编译。
+# 快速流转分发至官方 Docker Hub 与国内 HamGit 镜像平台，无需本地重新编译。
 # ==============================================================================
 
 set -euo pipefail
@@ -49,8 +49,8 @@ show_help() {
 常用命令:
   npm run image:check         # 检查最新版本镜像在各平台的发布状态
   npm run image:check full    # 检查所有版本镜像在各平台的发布状态
-  npm run image:sync          # 同步最新版本镜像至 Docker Hub 与私有镜像库
-  npm run image:sync full     # 全量同步所有版本镜像至 Docker Hub 与私有镜像库
+  npm run image:sync          # 同步最新版本镜像至 Docker Hub 与 HamGit 镜像库
+  npm run image:sync full     # 全量同步所有版本镜像至 Docker Hub 与 HamGit 镜像库
 EOF
 }
 
@@ -227,16 +227,16 @@ if [[ -n "$dockerhub_user" && -n "$dockerhub_token" ]]; then
   target_repos+=("$dockerhub_target")
 fi
 
-# 目标 2: 私有镜像库 (MIRROR)
-MIRROR_REPO_URL="${MIRROR_REPO_URL:-}"
-if [[ -n "$MIRROR_REPO_URL" && -n "${MIRROR_REGISTRY_TOKEN:-}" ]]; then
-  read -r mirror_host mirror_repo_path <<<"$(parse_git_url "$MIRROR_REPO_URL")"
-  mirror_repo=$(echo "${mirror_host}/${mirror_repo_path}" | tr '[:upper:]' '[:lower:]')
-  target_platform_names+=("私有镜像库")
-  target_hosts+=("$mirror_host")
-  target_users+=("${mirror_repo_path%%/*}")
-  target_passes+=("$MIRROR_REGISTRY_TOKEN")
-  target_repos+=("$mirror_repo")
+# 目标 2: 国内 HamGit 镜像库 (HAMGIT)
+HAMGIT_REPO_URL="${HAMGIT_REPO_URL:-}"
+if [[ -n "$HAMGIT_REPO_URL" && -n "${HAMGIT_REGISTRY_TOKEN:-}" ]]; then
+  read -r hamgit_host hamgit_repo_path <<<"$(parse_git_url "$HAMGIT_REPO_URL")"
+  hamgit_repo=$(echo "${hamgit_host}/${hamgit_repo_path}" | tr '[:upper:]' '[:lower:]')
+  target_platform_names+=("HamGit 镜像库")
+  target_hosts+=("$hamgit_host")
+  target_users+=("${hamgit_repo_path%%/*}")
+  target_passes+=("$HAMGIT_REGISTRY_TOKEN")
+  target_repos+=("$hamgit_repo")
 fi
 
 total_targets=${#target_platform_names[@]}
@@ -263,11 +263,11 @@ if [[ $readonly_check -eq 1 ]]; then
   done
   echo ""
 
-  # 私有镜像库
-  if [[ -n "${mirror_repo:-}" ]]; then
-    echo "私有镜像库 (${mirror_repo})"
+  # HamGit 镜像库
+  if [[ -n "${hamgit_repo:-}" ]]; then
+    echo "HamGit 镜像库 (${hamgit_repo})"
     for tag in "${target_tags[@]}"; do
-      img="${mirror_repo}:${tag}"
+      img="${hamgit_repo}:${tag}"
       if inspect_out=$(docker buildx imagetools inspect "$img" 2>/dev/null); then
         platforms=$(echo "$inspect_out" | grep -E "Platform:" | awk '{print $2}' | paste -sd, -)
         printf "  ${C_GREEN}✓${C_RESET} %-10s 已同步 (架构: %s)\n" "$tag" "${platforms:-未知}"
@@ -298,7 +298,7 @@ fi
 
 # 7. 同步模式
 if [[ $total_targets -eq 0 ]]; then
-  fail "未检测到任何需要同步的目标平台配置，请在 .env 中配置 Docker Hub 或私有镜像库凭据。"
+  fail "未检测到任何需要同步的目标平台配置，请在 .env 中配置 Docker Hub 或 HamGit 镜像库凭据。"
 fi
 
 # 目标平台身份鉴权
