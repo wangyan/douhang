@@ -35,6 +35,16 @@ if [ "$(id -u)" = "0" ]; then
   exec setpriv --reuid "$PUID" --regid "$PGID" --groups "$SOCK_GID" sh "$0"
 fi
 
+# 时区：默认东八区，可用 TZ 覆盖为其它 IANA 时区；
+# 经 Intl 构造器校验，避免 POSIX 写法（如 GMT+8，实际为 UTC-8）被误当作有效值
+export TZ="${TZ:-Asia/Shanghai}"
+if ! EFFECTIVE_TZ=$(node -p \
+  "new Intl.DateTimeFormat('en-US', { timeZone: process.env.TZ }).resolvedOptions().timeZone" 2>/dev/null); then
+  echo "[douhang] 错误：TZ=${TZ} 不是有效的 IANA 时区标识，请使用 Asia/Shanghai、Asia/Tokyo、UTC 等名称。" >&2
+  exit 1
+fi
+echo "[douhang] 时区：${EFFECTIVE_TZ}"
+
 # AUTH_SECRET 校验：密钥缺失、过短或为占位值时，登录会报
 # JWTSessionError（no matching decryption secret），提前失败比运行时排查更省事
 if [ -z "${AUTH_SECRET:-}" ]; then

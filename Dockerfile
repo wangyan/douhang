@@ -19,6 +19,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# 默认时区，构建期与运行期保持一致；运行时可经 TZ 覆盖
+ENV TZ=Asia/Shanghai
 # prisma.config.ts 依赖 DATABASE_URL（generate 不连库，占位即可；.env 不入镜像，
 # 该默认值也是 runner 阶段未显式传入时的合理路径）
 ENV DATABASE_URL="file:./data/sqlite.db"
@@ -35,6 +37,8 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 # runner 阶段显式声明（ENV 不跨 FROM 继承）；compose/运行时可覆盖
 ENV DATABASE_URL="file:./data/sqlite.db"
+# 默认时区（东八区）；部署时可用 TZ 环境变量覆盖为其它 IANA 时区
+ENV TZ=Asia/Shanghai
 
 ARG REPO_URL="https://github.com/wangyan/douhang"
 LABEL org.opencontainers.image.source="${REPO_URL}"
@@ -42,8 +46,9 @@ LABEL org.opencontainers.image.source="${REPO_URL}"
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# 入口脚本以 root 修正挂载目录属主，再经 setpriv 降权（显式保留 socket 附加组）运行
-RUN apk add --no-cache setpriv
+# 入口脚本以 root 修正挂载目录属主，再经 setpriv 降权（显式保留 socket 附加组）运行；
+# tzdata 使 date 等系统工具与 Node 使用同一时区
+RUN apk add --no-cache setpriv tzdata
 
 # standalone 产物已自动追踪运行时依赖（含 prisma client、@libsql 等）
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public

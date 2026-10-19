@@ -37,6 +37,8 @@
    EOF
    ```
    > **注意**：命令已自动生成高强度初始口令，可执行 `cat .env` 查看并妥善保存。请勿在每次启动时重复生成密钥，否则会导致既有登录会话失效。
+   >
+   > 容器时区默认 `Asia/Shanghai`；如需调整，在 `.env` 中增加 `TZ=Asia/Tokyo` 一类 IANA 时区标识，再执行 `docker compose -f docker-compose.prod.yml up -d` 重建容器生效。
 
 3. **启动容器**：
    ```bash
@@ -68,6 +70,8 @@ docker run -d \
 ```
 
 > **镜像渠道替换**：国内网络环境可将末行镜像地址替换为 `hamgit.com/wangyan/douhang:latest`；若上述渠道均不可达，可使用备选镜像 `bg7pbp/douhang:latest`。
+>
+> **时区**：容器默认 `Asia/Shanghai`，可在命令中追加 `-e TZ=Asia/Tokyo` 一类参数覆盖。
 
 ### 1.3 首次访问与内网运行说明
 
@@ -187,6 +191,7 @@ npm run start       # 启动生产服务器
 | `AUTH_USERNAME` | 否 | `admin` | 管理员用户名。仅在数据库首次初始化建号时生效 |
 | `AUTH_PASSWORD` | **是** | - | 管理员初始口令，长度须 ≥ 8 位，禁止使用出厂弱口令。仅在首次初始化时写入数据库 |
 | `AUTH_URL` | 否 | - | 反向代理或域名访问时的完整外部地址（如 `https://douhang.example.com`），用于登录跳转与回调 |
+| `TZ` | 否 | `Asia/Shanghai` | 服务时区，取 IANA 标识（如 `Asia/Shanghai`、`Asia/Tokyo`、`UTC`）。影响服务端日期计算与容器内系统时间；取值非法时容器启动失败 |
 | `DOCKER_HOST` | 否 | `unix:///var/run/docker.sock` | Docker Engine API 监控连接源。支持本地 socket 或远程 TCP 地址（如 `tcp://host:2375`） |
 | `DOCKER_GID` | 否 | 自动探测 | 宿主机 `docker.sock` 的所属组 GID。自动探测失败时可显式覆盖（详见故障排查） |
 | `PUID` | 否 | `1001` | 容器内进程运行用户的 UID，用于对齐宿主机文件权限 |
@@ -324,7 +329,7 @@ tar -czvf douhang-data-backup-$(date +%F).tar.gz ./data
 ### 8.1 启动流程
 
 容器启动入口由 `docker-entrypoint.sh` 统一调度，执行顺序如下：
-1. **环境与权限校验**：校验 `AUTH_PASSWORD` 强度与合规性；探测 `docker.sock` 权限组并调整用户组归属；
+1. **环境与权限校验**：校验 `TZ` 时区标识有效性、`AUTH_PASSWORD` 强度与合规性；探测 `docker.sock` 权限组并调整用户组归属；
 2. **安全降权**：将运行上下文从 root 降权至非特权账号；
 3. **数据库结构迁移（`prisma migrate deploy`）**：自动应用已发布的数据库迁移，保证表结构更新；
 4. **数据初始化（`scripts/seed.ts`）**：若数据库为空，写入默认管理员凭据与预设搜索引擎；已有数据时自动跳过；

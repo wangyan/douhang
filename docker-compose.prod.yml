@@ -21,6 +21,8 @@ services:
       - AUTH_USERNAME=${AUTH_USERNAME:-admin}
       - AUTH_PASSWORD=${AUTH_PASSWORD:?请在 .env 中设置 AUTH_PASSWORD}
       - AUTH_URL=${AUTH_URL:-}
+      # 容器时区（IANA 标识），默认东八区，可按部署地覆盖
+      - TZ=${TZ:-Asia/Shanghai}
       # 可选：DOCKER_GID（手动指定 socket 组，默认自动探测）；PUID/PGID（匹配宿主机用户）
       - DOCKER_GID=${DOCKER_GID:-}
       - PUID=${PUID:-}
