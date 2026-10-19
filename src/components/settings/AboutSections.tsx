@@ -19,15 +19,19 @@ import { ChangelogTimeline } from '@/components/layout/ChangelogTimeline';
 import { SettingsSection } from '@/components/settings/SettingsSection';
 import { ICON_SIZE } from '@/lib/design-tokens';
 import {
-  ADMIN_GUIDE_URL,
   APP_VERSION,
-  DEPLOYMENT_GUIDE_URL,
   DOCKERHUB_URL,
-  REPO_URL,
+  getAdminGuideUrl,
+  getDeploymentGuideUrl,
+  getRepoUrl,
 } from '@/lib/version';
 
 /** 官方项目与技术文档快速入口。 */
-export function AboutResourceLinks() {
+export function AboutResourceLinks({
+  cnMirror = false,
+}: {
+  cnMirror?: boolean;
+} = {}) {
   return (
     <div className="about-resource-links flex flex-wrap items-center gap-2">
       <Button
@@ -35,7 +39,7 @@ export function AboutResourceLinks() {
         icon={<GitBranch size={ICON_SIZE.sm} />}
         variant="secondary"
         size="sm"
-        href={REPO_URL}
+        href={getRepoUrl(cnMirror)}
         target="_blank"
         rel="noopener noreferrer"
       />
@@ -53,7 +57,7 @@ export function AboutResourceLinks() {
         icon={<ShieldCheck size={ICON_SIZE.sm} />}
         variant="secondary"
         size="sm"
-        href={ADMIN_GUIDE_URL}
+        href={getAdminGuideUrl(cnMirror)}
         target="_blank"
         rel="noopener noreferrer"
       />
@@ -62,7 +66,7 @@ export function AboutResourceLinks() {
         icon={<Server size={ICON_SIZE.sm} />}
         variant="secondary"
         size="sm"
-        href={DEPLOYMENT_GUIDE_URL}
+        href={getDeploymentGuideUrl(cnMirror)}
         target="_blank"
         rel="noopener noreferrer"
       />

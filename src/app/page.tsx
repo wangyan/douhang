@@ -17,7 +17,7 @@ import { normalizeFontSize } from '@/lib/font-size';
 import { getUserPreference } from '@/lib/preferences';
 import { listSearchEngines } from '@/lib/search-engines';
 import { isUsingDefaultPassword } from '@/lib/security';
-import { getManualUrl, getRepoUrl } from '@/lib/version';
+import { getAdminGuideUrl, getManualUrl, getRepoUrl } from '@/lib/version';
 import { getWallpaperPreferences, getWallpapers } from '@/lib/wallpaper';
 import {
   CARD_DENSITY_DEFAULT,
@@ -64,6 +64,7 @@ export default async function HomePage() {
     wallpaperScrim,
     rawFontSize,
     session,
+    cnMirrorEnabled,
   ] = await Promise.all([
     // 取所有分类（含卡片），按 order 排序
     prisma.category.findMany({
@@ -101,6 +102,8 @@ export default async function HomePage() {
     getUserPreference<unknown>('fontSize', FONT_SIZE_DEFAULT),
     // 会话状态
     auth(),
+    // 国内镜像加速（用于前台指南与远端仓库直达）
+    getUserPreference<boolean>('cnMirrorEnabled', false),
   ]);
 
   const isAuthed = !!session?.user;
@@ -166,8 +169,10 @@ export default async function HomePage() {
         <FloatingToolbar
           networkMode={networkMode}
           cardSimpleMode={cardSimpleMode}
-          repoUrl={getRepoUrl()}
-          manualUrl={getManualUrl()}
+          cnMirrorEnabled={cnMirrorEnabled}
+          repoUrl={getRepoUrl(cnMirrorEnabled)}
+          manualUrl={getManualUrl(cnMirrorEnabled)}
+          adminGuideUrl={getAdminGuideUrl(cnMirrorEnabled)}
           isAuthed={isAuthed}
           appearance={
             {

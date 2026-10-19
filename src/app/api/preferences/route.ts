@@ -36,6 +36,7 @@ export const GET = async () => {
     cardStatusBadge,
     wallpaperScrim,
     fullWidth,
+    cnMirrorEnabled,
   ] = await Promise.all([
     getUserPreference<NetworkMode>('networkMode', 'auto'),
     getUserPreference<'light' | 'dark' | 'system'>('theme', 'system'),
@@ -47,6 +48,7 @@ export const GET = async () => {
     getUserPreference<boolean>('cardStatusBadge', true),
     getUserPreference<unknown>('wallpaperScrim', WALLPAPER_SCRIM_DEFAULT),
     getUserPreference<boolean>('fullWidth', FULL_WIDTH_DEFAULT),
+    getUserPreference<boolean>('cnMirrorEnabled', false),
   ]);
 
   return NextResponse.json({
@@ -59,6 +61,7 @@ export const GET = async () => {
     cardSimpleMode,
     cardStatusBadge,
     fullWidth,
+    cnMirrorEnabled,
     wallpaperScrim:
       typeof wallpaperScrim === 'number'
         ? wallpaperScrim
@@ -80,5 +83,6 @@ export const PATCH = withAuth(async (_session, req) => {
   await setUserPreference(key, value);
   if (key === 'brand') revalidatePath('/', 'layout');
   if (key === 'fullWidth') revalidatePath('/settings', 'layout');
+  if (key === 'cnMirrorEnabled') revalidatePath('/', 'layout');
   return NextResponse.json({ success: true });
 });

@@ -29,7 +29,7 @@ export default async function AboutSettingsPage() {
 
   return (
     <div className="settings-groups">
-      <AboutResourceLinks />
+      <AboutResourceLinks cnMirror={cnMirrorEnabled} />
       <VersionCheckSetting
         initialEnabled={versionCheckEnabled}
         initialCnMirror={cnMirrorEnabled}

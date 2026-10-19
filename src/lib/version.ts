@@ -35,28 +35,31 @@ export function getRepoName(): string {
 }
 
 /** 远端仓库主页地址 */
-export function getRepoUrl(): string {
-  return REPO_URL;
+export function getRepoUrl(cnMirror = false): string {
+  return cnMirror ? ATOMGIT_URL : REPO_URL;
 }
 
 /** 获取用户指南完整 URL（面向访客与日常使用者） */
-export function getUserGuideUrl(): string {
-  return `${REPO_URL}/blob/main/docs/USER_GUIDE.md`;
+export function getUserGuideUrl(cnMirror = false): string {
+  const base = cnMirror ? ATOMGIT_URL : REPO_URL;
+  return `${base}/blob/main/docs/USER_GUIDE.md`;
 }
 
 /** 获取管理指南完整 URL（面向已登录管理员） */
-export function getAdminGuideUrl(): string {
-  return `${REPO_URL}/blob/main/docs/ADMIN_GUIDE.md`;
+export function getAdminGuideUrl(cnMirror = false): string {
+  const base = cnMirror ? ATOMGIT_URL : REPO_URL;
+  return `${base}/blob/main/docs/ADMIN_GUIDE.md`;
 }
 
 /** 获取部署文档完整 URL（面向部署与运维） */
-export function getDeploymentGuideUrl(): string {
-  return `${REPO_URL}/blob/main/docs/DEPLOYMENT.md`;
+export function getDeploymentGuideUrl(cnMirror = false): string {
+  const base = cnMirror ? ATOMGIT_URL : REPO_URL;
+  return `${base}/blob/main/docs/DEPLOYMENT.md`;
 }
 
 /** 获取使用指南完整 URL（默认指向用户指南） */
-export function getManualUrl(): string {
-  return getUserGuideUrl();
+export function getManualUrl(cnMirror = false): string {
+  return getUserGuideUrl(cnMirror);
 }
 
 /** 官方 Docker Hub 镜像主页地址 */

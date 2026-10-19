@@ -56,7 +56,7 @@ import {
   NETWORK_MODE_ORDER,
   NETWORK_MODE_STORAGE_KEY,
 } from '@/lib/network-mode';
-import { ADMIN_GUIDE_URL, MANUAL_URL, REPO_URL } from '@/lib/version';
+import { getAdminGuideUrl, getManualUrl, getRepoUrl } from '@/lib/version';
 import { preferencesApi, versionApi } from '@/services';
 import type { NetworkMode, ThemeMode, VersionUpdateInfo } from '@/types';
 
@@ -66,16 +66,18 @@ interface FloatingToolbarProps {
   cardSimpleMode: boolean;
   /** 页面有整体最大宽度框架时，相对框架绝对定位而非视口固定。 */
   withinFrame?: boolean;
-  /** 远端仓库主页地址（支持外部透传，回落至 REPO_URL） */
+  /** 远端仓库主页地址（支持外部透传，回落至 REPO_URL / ATOMGIT_URL） */
   repoUrl?: string;
-  /** 用户指南文档地址（支持外部透传，回落至 MANUAL_URL） */
+  /** 用户指南文档地址（支持外部透传） */
   manualUrl?: string;
-  /** 管理指南文档地址（支持外部透传，回落至 ADMIN_GUIDE_URL） */
+  /** 管理指南文档地址（支持外部透传） */
   adminGuideUrl?: string;
   /** 当前用户是否已登录，默认 true */
   isAuthed?: boolean;
   /** 外观快捷面板数据包（首页 SSR 取好传入；缺省时菜单不显示外观入口） */
   appearance?: AppearancePanelData;
+  /** 国内镜像加速开关（SSR 初始值，用于自动切换文档与仓库镜像源） */
+  cnMirrorEnabled?: boolean;
 }
 
 /**
@@ -253,9 +255,10 @@ export function FloatingToolbar({
   networkMode,
   cardSimpleMode,
   withinFrame = false,
-  repoUrl = REPO_URL,
-  manualUrl = MANUAL_URL,
-  adminGuideUrl = ADMIN_GUIDE_URL,
+  cnMirrorEnabled = false,
+  repoUrl = getRepoUrl(cnMirrorEnabled),
+  manualUrl = getManualUrl(cnMirrorEnabled),
+  adminGuideUrl = getAdminGuideUrl(cnMirrorEnabled),
   isAuthed = true,
   appearance,
 }: FloatingToolbarProps) {
