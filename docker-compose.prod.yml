@@ -5,7 +5,7 @@ services:
   douhang:
     # 国内网络环境可替换为国内官方镜像：hamgit.com/wangyan/douhang:latest
     # 上述渠道均不可达时，可回落到备选镜像（Docker Hub）：bg7pbp/douhang:latest
-    image: ghcr.io/wangyan/douhang:latest   # 锁定版本可改为具体 tag（如 :v1.2.0）
+    image: ghcr.io/wangyan/douhang:latest   # 锁定版本可改为具体 tag（如 :v1.3.0）
     container_name: douhang
     ports:
       - "3000:3000"
