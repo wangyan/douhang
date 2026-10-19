@@ -31,7 +31,7 @@ export const FONT_SIZE_DEFAULT = 100;
 export const WALLPAPER_SCRIM_MIN = 0;
 export const WALLPAPER_SCRIM_MAX = 80;
 export const WALLPAPER_SCRIM_STEP = 5;
-export const WALLPAPER_SCRIM_DEFAULT = 50;
+export const WALLPAPER_SCRIM_DEFAULT = 20;
 export const FONT_SIZE_LEGACY_SCALES: Record<string, number> = {
   small: 90,
   medium: 100,

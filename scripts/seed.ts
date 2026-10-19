@@ -17,72 +17,77 @@ const DEFAULT_PREFERENCES = [
   { key: 'theme', value: 'system' }, // light | dark | system
   { key: 'fontSize', value: 100 }, // 90-150（%），步进 5
   { key: 'searchEngine', value: 'metaso' }, // metaso | deepseek | sogou | google | bing | baidu
+  { key: 'wallpaperScrim', value: 20 },
   // 壁纸偏好：wallpaper 默认指向第一张预设
   // 由 seedWallpapers 函数动态注入（避免硬编码 id）
 ];
 
 // 默认预设壁纸（已下载到 public/wallpapers/，从自己服务器加载避免外部 CDN 慢）
-// 一张图适配两种主题（light/dark 共用，靠遮罩调整可读性），不区分 theme
+// 按春夏秋冬四季顺序排列（每季 3 张，共 12 张）；默认壁纸通过 seedWallpapers 绑定到「原野繁花」
 const DEFAULT_WALLPAPERS = [
+  // 春
   {
-    name: '晨雾山脉',
+    name: '原野繁花',
     source: 'preset',
-    path: '/wallpapers/mountain-mist.jpg',
+    path: '/wallpapers/flowery-meadow.jpg',
   },
   {
-    name: '海面晨光',
+    name: '古橡晨雾',
     source: 'preset',
-    path: '/wallpapers/sea-dawn.jpg',
+    path: '/wallpapers/misty-oak-forest.jpg',
   },
   {
-    name: '极简白',
+    name: '南美原野',
     source: 'preset',
-    path: '/wallpapers/minimal-light.jpg',
+    path: '/wallpapers/patagonia-wilderness.jpg',
+  },
+  // 夏
+  {
+    name: '峡湾双湖',
+    source: 'preset',
+    path: '/wallpapers/norway-twin-lakes.jpg',
   },
   {
-    name: '城市夜景',
+    name: '静水杉林',
     source: 'preset',
-    path: '/wallpapers/city-night.jpg',
+    path: '/wallpapers/cypress-lake.jpg',
   },
   {
-    name: '深空星云',
+    name: '金辉海岸',
     source: 'preset',
-    path: '/wallpapers/deep-space.jpg',
+    path: '/wallpapers/golden-coastal-cliffs.jpg',
+  },
+  // 秋
+  {
+    name: '极地秋原',
+    source: 'preset',
+    path: '/wallpapers/arctic-tundra.jpg',
   },
   {
-    name: '黑岩熔流',
+    name: '金林雪岭',
     source: 'preset',
-    path: '/wallpapers/dark-lava.jpg',
+    path: '/wallpapers/golden-aspen-mountain.jpg',
   },
   {
-    name: '暮霭山谷',
+    name: '穹顶晚霞',
     source: 'preset',
-    path: '/wallpapers/anime-misty-valley.jpg',
+    path: '/wallpapers/half-dome-sunset.jpg',
+  },
+  // 冬
+  {
+    name: '长城覆雪',
+    source: 'preset',
+    path: '/wallpapers/great-wall-snow.jpg',
   },
   {
-    name: '星夜小镇',
+    name: '云涌雪峰',
     source: 'preset',
-    path: '/wallpapers/anime-starlit-town.webp',
+    path: '/wallpapers/mountain-clouds.jpg',
   },
   {
-    name: '雾隐神社',
+    name: '雪野牧歌',
     source: 'preset',
-    path: '/wallpapers/anime-shrine-forest.jpg',
-  },
-  {
-    name: '落日溪谷',
-    source: 'preset',
-    path: '/wallpapers/anime-sunset-valley.webp',
-  },
-  {
-    name: '龙临之城',
-    source: 'preset',
-    path: '/wallpapers/anime-dragon-city.webp',
-  },
-  {
-    name: '霞光林谷',
-    source: 'preset',
-    path: '/wallpapers/anime-forest-valley.jpg',
+    path: '/wallpapers/snowy-pasture.jpg',
   },
 ];
 
@@ -172,15 +177,22 @@ async function main() {
 
   // 仅初始数据库注入默认偏好，已存在配置保留原有设置
   if (wallpapersTableWasEmpty) {
-    // 如果壁纸偏好未设置，注入默认值（指向第一张预设）
-    const first = await prisma.wallpaper.findFirst({
-      orderBy: { createdAt: 'asc' },
-    });
-    if (first) {
+    // 如果壁纸偏好未设置，注入默认值（优先指向「原野繁花」）
+    const defaultWallpaper =
+      (await prisma.wallpaper.findFirst({
+        where: { path: '/wallpapers/flowery-meadow.jpg' },
+      })) ??
+      (await prisma.wallpaper.findFirst({
+        orderBy: { createdAt: 'asc' },
+      }));
+    if (defaultWallpaper) {
       await prisma.userPreference.upsert({
         where: { key: 'wallpaper' },
         update: {},
-        create: { key: 'wallpaper', value: JSON.stringify(first.id) },
+        create: {
+          key: 'wallpaper',
+          value: JSON.stringify(defaultWallpaper.id),
+        },
       });
     }
     console.log('已注入默认壁纸偏好（wallpaper）');
