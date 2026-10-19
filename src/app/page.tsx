@@ -78,7 +78,7 @@ export default async function HomePage() {
     // 网络模式（供 NetworkToggle 初始值，避免客户端闪烁）
     getUserPreference<NetworkMode>('networkMode', 'auto'),
     // 搜索引擎（供 SearchBox 初始值，避免客户端闪烁）
-    getUserPreference<SearchEngine>('searchEngine', 'google'),
+    getUserPreference<SearchEngine>('searchEngine', 'metaso'),
     // widget 实例（SSR 初始值，避免客户端闪烁）
     prisma.widgetInstance.findMany({ orderBy: { order: 'asc' } }),
     // 壁纸列表 + 偏好（SSR 初始值，客户端根据当前主题选择显示）

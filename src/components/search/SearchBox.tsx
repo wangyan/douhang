@@ -47,7 +47,7 @@ interface SearchBoxProps {
  * - 页面加载自动聚焦输入框；按 / 快速聚焦（弹窗或已聚焦输入框时跳过）
  */
 export function SearchBox({
-  initialEngine = 'google',
+  initialEngine = 'metaso',
   engines,
   density: initialDensity = 'auto',
 }: SearchBoxProps) {

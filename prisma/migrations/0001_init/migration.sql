@@ -103,10 +103,11 @@ CREATE INDEX "date_items_instanceId_idx" ON "date_items"("instanceId");
 CREATE UNIQUE INDEX "user_preferences_key_key" ON "user_preferences"("key");
 
 
--- 内置 5 个搜索引擎落库（id 即内置 key，与前端内置引擎定义一一对应）
+-- 内置 6 个搜索引擎落库（id 即内置 key，与前端内置引擎定义一一对应）
 INSERT INTO "search_engines" ("id", "name", "urlTemplate", "iconPath", "order") VALUES
-  ('google', 'Google', 'https://www.google.com/search?q=', '/icons/library/svg/google.svg', 0),
-  ('bing', 'Bing', 'https://www.bing.com/search?q=', '/icons/library/svg/bing.svg', 1),
-  ('baidu', '百度', 'https://www.baidu.com/s?wd=', '/icons/library/svg/baidu.svg', 2),
-  ('github', 'GitHub', 'https://github.com/search?q=', '/icons/library/svg/github.svg', 3),
-  ('stackoverflow', 'Stack Overflow', 'https://stackoverflow.com/search?q=', '/icons/library/svg/stackoverflow.svg', 4);
+  ('metaso', 'Metaso', 'https://metaso.cn/?q=', '/icons/library/svg/metaso.svg', 0),
+  ('deepseek', 'DeepSeek', 'https://chat.deepseek.com/?autosend=1&search=1&thinking=1&q=', '/icons/library/svg/deepseek.svg', 1),
+  ('sogou', 'Sogou', 'https://weixin.sogou.com/weixin?type=2&query=', '/icons/library/svg/sogou.svg', 2),
+  ('google', 'Google', 'https://www.google.com/search?q=', '/icons/library/svg/google.svg', 3),
+  ('bing', 'Bing', 'https://www.bing.com/search?q=', '/icons/library/svg/bing.svg', 4),
+  ('baidu', 'Baidu', 'https://www.baidu.com/s?wd=', '/icons/library/svg/baidu.svg', 5);

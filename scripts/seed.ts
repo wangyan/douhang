@@ -16,7 +16,7 @@ const DEFAULT_PREFERENCES = [
   { key: 'networkMode', value: 'auto' }, // auto | internal | external
   { key: 'theme', value: 'system' }, // light | dark | system
   { key: 'fontSize', value: 100 }, // 90-150（%），步进 5
-  { key: 'searchEngine', value: 'google' }, // google | bing | baidu | github | stackoverflow
+  { key: 'searchEngine', value: 'metaso' }, // metaso | deepseek | sogou | google | bing | baidu
   // 壁纸偏好：wallpaper 默认指向第一张预设
   // 由 seedWallpapers 函数动态注入（避免硬编码 id）
 ];

@@ -40,7 +40,7 @@ export const GET = async () => {
     getUserPreference<NetworkMode>('networkMode', 'auto'),
     getUserPreference<'light' | 'dark' | 'system'>('theme', 'system'),
     getUserPreference<unknown>('fontSize', FONT_SIZE_DEFAULT),
-    getUserPreference<string>('searchEngine', 'google'),
+    getUserPreference<string>('searchEngine', 'metaso'),
     getBrandConfig(),
     getUserPreference<CardDensity>('cardDensity', CARD_DENSITY_DEFAULT),
     getUserPreference<boolean>('cardSimpleMode', false),

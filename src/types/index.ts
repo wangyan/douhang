@@ -6,13 +6,14 @@ export type NetworkMode = 'auto' | 'internal' | 'external';
 /** 主题模式 */
 export type ThemeMode = 'light' | 'dark' | 'system';
 
-/** 内置 5 个引擎的 key（由初始迁移落库，可编辑/删除） */
+/** 内置 6 个引擎的 key（由初始迁移落库，可编辑/删除） */
 type BuiltinSearchEngine =
+  | 'metaso'
+  | 'deepseek'
+  | 'sogou'
   | 'google'
   | 'bing'
-  | 'baidu'
-  | 'github'
-  | 'stackoverflow';
+  | 'baidu';
 
 /** 搜索引擎 key：内置 key 或自定义引擎的 cuid（DB search_engines.id） */
 export type SearchEngine = BuiltinSearchEngine | (string & {});

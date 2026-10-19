@@ -23,7 +23,7 @@ interface HomeHeaderSectionProps {
  */
 export function HomeHeaderSection({
   initialDensity = 'auto',
-  initialEngine = 'google',
+  initialEngine = 'metaso',
   engines,
 }: HomeHeaderSectionProps) {
   const density = useEffectiveDensity(initialDensity);

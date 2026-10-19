@@ -4,7 +4,7 @@ import type { CustomSearchEngine, SearchEngineConfig } from '@/types';
 /**
  * DB 行 → 引擎配置（key 即 DB id）
  *
- * 内置 5 引擎已由迁移落库（0001_init），与自定义引擎统一管理：
+ * 内置 6 引擎已由迁移落库（0001_init），与自定义引擎统一管理：
  * 全部可编辑、可删除（服务端保证至少保留 1 个）、可拖拽排序。
  */
 export function toEngineConfig(row: CustomSearchEngine): SearchEngineConfig {
