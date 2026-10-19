@@ -18,7 +18,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { CategorySelector } from '@/components/categories/CategorySelector';
 import { DIALOG_WIDTH } from '@/lib/design-tokens';
-import { getUploadedIconPath } from '@/lib/icon-source';
+import { getCustomLibraryIconPath } from '@/lib/icon-source';
 import { ApiError } from '@/lib/request/ApiError';
 import { type CardFormValues, cardCreateSchema } from '@/lib/validation';
 import { iconsApi } from '@/services';
@@ -193,9 +193,12 @@ function CardEditModalInner({
     let uploadedPath: string | null = null;
     if (pendingIconUpload && iconValue === pendingIconUpload.previewUrl) {
       try {
-        const uploaded = await iconsApi.upload(pendingIconUpload.file, 'cards');
+        const uploaded = await iconsApi.upload(
+          pendingIconUpload.file,
+          'library',
+        );
         iconValue = uploaded.path;
-        uploadedPath = getUploadedIconPath(uploaded.path);
+        uploadedPath = getCustomLibraryIconPath(uploaded.path);
       } catch {
         setSubmitError('图标上传失败，请重试');
         return;
@@ -209,14 +212,6 @@ function CardEditModalInner({
         await cardsApi.update(card.id, nextValues as CardFormValues);
       } else {
         await cardsApi.create(nextValues as CardFormValues);
-      }
-
-      const previousUploadPath = card ? getUploadedIconPath(card.icon) : null;
-      if (
-        previousUploadPath &&
-        previousUploadPath !== getUploadedIconPath(iconValue)
-      ) {
-        await iconsApi.delete(previousUploadPath).catch(() => undefined);
       }
 
       if (pendingIconUpload) {

@@ -59,7 +59,7 @@ export function useAssetsController({
 
   const iconUpload = useFileUpload({
     accept:
-      'image/png,image/jpeg,image/webp,image/gif,image/x-icon,image/vnd.microsoft.icon',
+      'image/png,image/jpeg,image/webp,image/gif,image/x-icon,image/vnd.microsoft.icon,image/svg+xml',
     onFile: async (file) => {
       await iconsApi.upload(file, 'library');
       router.refresh();

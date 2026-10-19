@@ -24,6 +24,19 @@ export const iconsApi = {
       items: { name: string; label: string; url: string }[];
     }>('/api/icons/library'),
 
+  /** 自定义图标库目录 */
+  getCustomLibrary: () =>
+    request<{
+      items: {
+        name: string;
+        label: string;
+        path: string;
+        url: string;
+        size?: number;
+        mtime?: string;
+      }[];
+    }>('/api/icons/custom'),
+
   /** 上传图标（FormData） */
   upload: (file: File, scope: 'cards' | 'library' | 'brand' = 'cards') => {
     const formData = new FormData();

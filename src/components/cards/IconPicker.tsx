@@ -14,6 +14,7 @@ import {
   Globe,
   Library,
   Search,
+  Shapes,
   Upload,
   X,
 } from 'lucide-react';
@@ -51,6 +52,15 @@ interface LibraryItem {
   url: string;
 }
 
+interface CustomLibraryItem {
+  name: string;
+  label: string;
+  path: string;
+  url: string;
+  size?: number;
+  mtime?: string;
+}
+
 const ICON_PAGE_SIZE = 60;
 const MAX_ICON_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_ICON_TYPES = new Set([
@@ -61,9 +71,10 @@ const ACCEPTED_ICON_TYPES = new Set([
   'image/gif',
   'image/x-icon',
   'image/vnd.microsoft.icon',
+  'image/svg+xml',
 ]);
 const ACCEPT_ATTRIBUTE =
-  'image/png,image/jpeg,image/webp,image/gif,image/x-icon,image/vnd.microsoft.icon';
+  'image/png,image/jpeg,image/webp,image/gif,image/x-icon,image/vnd.microsoft.icon,image/svg+xml';
 
 function getIconButtonClassName(isSelected: boolean) {
   return `flex h-16 min-w-0 flex-col items-center justify-center rounded-control border p-1.5 transition-colors ${
@@ -216,7 +227,7 @@ export function IconPicker({
 
       if (!ACCEPTED_ICON_TYPES.has(file.type)) {
         showToast({
-          body: '图标仅支持 PNG、JPG、WebP、GIF 或 ICO',
+          body: '图标仅支持 SVG、PNG、JPG、WebP、GIF 或 ICO',
           type: 'error',
         });
         return;
@@ -260,6 +271,7 @@ export function IconPicker({
   const sourceLabels: Record<string, string> = {
     empty: '名称首字母',
     library: '图标库',
+    customLibrary: '自定义图标库',
     upload: activeUpload ? '本地上传（保存时提交）' : '本地上传',
     link: '外部链接',
     manual: '自定义文本',
@@ -337,6 +349,12 @@ export function IconPicker({
                 disabled={isBusy}
               />
 
+              <CustomIconLibraryPicker
+                value={value}
+                onSelect={applyIcon}
+                disabled={isBusy}
+              />
+
               {value && (
                 <IconButton
                   label="清除图标"
@@ -399,6 +417,100 @@ export function IconPicker({
         </HStack>
       </div>
     </VStack>
+  );
+}
+
+interface IconPickerItemButtonProps {
+  url: string;
+  label: string;
+  title?: string;
+  isSelected: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}
+
+function IconPickerItemButton({
+  url,
+  label,
+  title,
+  isSelected,
+  disabled,
+  onClick,
+}: IconPickerItemButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title ?? label}
+      aria-pressed={isSelected}
+      disabled={disabled}
+      className={getIconButtonClassName(isSelected)}
+    >
+      <Image
+        src={url}
+        alt=""
+        width={28}
+        height={28}
+        loading="eager"
+        decoding="async"
+        unoptimized
+        className="size-7 object-contain"
+      />
+      <Text
+        size="sm"
+        color="secondary"
+        className="mt-1 w-full truncate text-center"
+      >
+        {label}
+      </Text>
+    </button>
+  );
+}
+
+interface IconPickerPaginationProps {
+  totalCount: number;
+  currentPage: number;
+  totalPages: number;
+  disabled?: boolean;
+  onPageChange: (page: number) => void;
+}
+
+function IconPickerPagination({
+  totalCount,
+  currentPage,
+  totalPages,
+  disabled,
+  onPageChange,
+}: IconPickerPaginationProps) {
+  return (
+    <HStack justify="between" align="center">
+      <Text size="sm" color="secondary">
+        共 {totalCount} 个
+      </Text>
+      <HStack gap={1} align="center" vAlign="center">
+        <IconButton
+          label="上一页"
+          tooltip="上一页"
+          variant="ghost"
+          size="sm"
+          icon={<ChevronLeft size={ICON_SIZE.md} />}
+          isDisabled={disabled || currentPage <= 1}
+          onClick={() => onPageChange(currentPage - 1)}
+        />
+        <Text size="sm" color="secondary">
+          {currentPage} / {totalPages}
+        </Text>
+        <IconButton
+          label="下一页"
+          tooltip="下一页"
+          variant="ghost"
+          size="sm"
+          icon={<ChevronRight size={ICON_SIZE.md} />}
+          isDisabled={disabled || currentPage >= totalPages}
+          onClick={() => onPageChange(currentPage + 1)}
+        />
+      </HStack>
+    </HStack>
   );
 }
 
@@ -533,38 +645,17 @@ function IconLibraryPicker({
                   根据名称 / 地址推荐
                 </Text>
                 <div className="grid grid-cols-5 gap-1.5">
-                  {recommendations.map((item) => {
-                    const isSelected = item.url === value;
-                    return (
-                      <button
-                        key={`recommended-${item.name}`}
-                        type="button"
-                        onClick={() => handleSelect(item)}
-                        title={`推荐：${item.label}`}
-                        aria-pressed={isSelected}
-                        disabled={disabled}
-                        className={getIconButtonClassName(isSelected)}
-                      >
-                        <Image
-                          src={item.url}
-                          alt=""
-                          width={28}
-                          height={28}
-                          loading="eager"
-                          decoding="async"
-                          unoptimized
-                          className="size-7 object-contain"
-                        />
-                        <Text
-                          size="sm"
-                          color="secondary"
-                          className="mt-1 w-full truncate text-center"
-                        >
-                          {item.label}
-                        </Text>
-                      </button>
-                    );
-                  })}
+                  {recommendations.map((item) => (
+                    <IconPickerItemButton
+                      key={`recommended-${item.name}`}
+                      url={item.url}
+                      label={item.label}
+                      title={`推荐：${item.label}`}
+                      isSelected={item.url === value}
+                      disabled={disabled}
+                      onClick={() => handleSelect(item)}
+                    />
+                  ))}
                 </div>
               </VStack>
             )}
@@ -590,70 +681,27 @@ function IconLibraryPicker({
               </Text>
             ) : (
               <div className="grid grid-cols-5 gap-1.5">
-                {pageIcons.map((item) => {
-                  const isSelected = item.url === value;
-                  return (
-                    <button
-                      key={item.name}
-                      type="button"
-                      onClick={() => handleSelect(item)}
-                      title={item.label}
-                      aria-pressed={isSelected}
-                      disabled={disabled}
-                      className={getIconButtonClassName(isSelected)}
-                    >
-                      <Image
-                        src={item.url}
-                        alt=""
-                        width={28}
-                        height={28}
-                        loading="eager"
-                        decoding="async"
-                        unoptimized
-                        className="size-7 object-contain"
-                      />
-                      <Text
-                        size="sm"
-                        color="secondary"
-                        className="mt-1 w-full truncate text-center"
-                      >
-                        {item.label}
-                      </Text>
-                    </button>
-                  );
-                })}
+                {pageIcons.map((item) => (
+                  <IconPickerItemButton
+                    key={item.name}
+                    url={item.url}
+                    label={item.label}
+                    isSelected={item.url === value}
+                    disabled={disabled}
+                    onClick={() => handleSelect(item)}
+                  />
+                ))}
               </div>
             )}
           </div>
 
-          <HStack justify="between" align="center">
-            <Text size="sm" color="secondary">
-              共 {filteredIcons.length} 个
-            </Text>
-            <HStack gap={1} align="center" vAlign="center">
-              <IconButton
-                label="上一页"
-                tooltip="上一页"
-                variant="ghost"
-                size="sm"
-                icon={<ChevronLeft size={ICON_SIZE.md} />}
-                isDisabled={disabled || safePage <= 1}
-                onClick={() => goToPage(safePage - 1)}
-              />
-              <Text size="sm" color="secondary">
-                {safePage} / {totalPages}
-              </Text>
-              <IconButton
-                label="下一页"
-                tooltip="下一页"
-                variant="ghost"
-                size="sm"
-                icon={<ChevronRight size={ICON_SIZE.md} />}
-                isDisabled={disabled || safePage >= totalPages}
-                onClick={() => goToPage(safePage + 1)}
-              />
-            </HStack>
-          </HStack>
+          <IconPickerPagination
+            totalCount={filteredIcons.length}
+            currentPage={safePage}
+            totalPages={totalPages}
+            disabled={disabled}
+            onPageChange={goToPage}
+          />
         </VStack>
       }
     >
@@ -663,6 +711,204 @@ function IconLibraryPicker({
         variant="ghost"
         size="sm"
         icon={<Library size={ICON_SIZE.md} />}
+        isDisabled={disabled}
+      />
+    </Popover>
+  );
+}
+
+function useCustomLibraryCatalog() {
+  const [icons, setIcons] = useState<CustomLibraryItem[] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await iconsApi.getCustomLibrary();
+      setIcons(res.items);
+      setLoadError(null);
+    } catch {
+      setLoadError('自定义图标库加载失败');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { icons, isLoading, loadError, load };
+}
+
+interface CustomIconLibraryPickerProps {
+  value: string;
+  onSelect: (value: string) => void;
+  disabled?: boolean;
+}
+
+function CustomIconLibraryPicker({
+  value,
+  onSelect,
+  disabled = false,
+}: CustomIconLibraryPickerProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const { icons, isLoading, loadError, load } = useCustomLibraryCatalog();
+  const showToast = useToast();
+
+  useEffect(() => {
+    if (isOpen) void load();
+  }, [isOpen, load]);
+
+  useEffect(() => {
+    if (loadError) {
+      showToast({ body: loadError, type: 'error' });
+    }
+  }, [loadError, showToast]);
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredIcons = useMemo(() => {
+    if (!icons) return [];
+
+    const terms = normalizedQuery.split(/\s+/).filter(Boolean);
+    if (terms.length === 0) return icons;
+
+    return icons.filter((icon) => {
+      const haystack = `${icon.name} ${icon.label}`.toLowerCase();
+      return terms.every((term) => haystack.includes(term));
+    });
+  }, [icons, normalizedQuery]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredIcons.length / ICON_PAGE_SIZE),
+  );
+  const safePage = Math.min(currentPage, totalPages);
+  const pageIcons = useMemo(
+    () =>
+      filteredIcons.slice(
+        (safePage - 1) * ICON_PAGE_SIZE,
+        safePage * ICON_PAGE_SIZE,
+      ),
+    [filteredIcons, safePage],
+  );
+
+  useEffect(() => {
+    if (!isOpen || !icons) return;
+
+    const selectedIndex = icons.findIndex((icon) => icon.url === value);
+    if (selectedIndex >= 0) {
+      setCurrentPage(Math.floor(selectedIndex / ICON_PAGE_SIZE) + 1);
+    }
+  }, [icons, isOpen, value]);
+
+  const goToPage = (page: number) => {
+    const nextPage = Math.min(Math.max(page, 1), totalPages);
+    if (nextPage === safePage) return;
+    setCurrentPage(nextPage);
+    scrollRef.current?.scrollTo({ top: 0 });
+  };
+
+  const handleSelect = (item: CustomLibraryItem) => {
+    if (disabled) return;
+    onSelect(item.url);
+    setIsOpen(false);
+  };
+
+  return (
+    <Popover
+      isOpen={isOpen}
+      onOpenChange={setIsOpen}
+      label="选择自定义图标"
+      width={340}
+      placement="below"
+      content={
+        <VStack gap={2} className="w-[320px] p-3">
+          <Text size="sm" weight="medium">
+            自定义图标库
+          </Text>
+          <TextInput
+            label="搜索自定义图标"
+            isLabelHidden
+            placeholder="搜索图标名称…"
+            value={query}
+            onChange={(next) => {
+              setQuery(next);
+              setCurrentPage(1);
+              scrollRef.current?.scrollTo({ top: 0 });
+            }}
+            width="100%"
+            startIcon={<Search size={ICON_SIZE.sm} />}
+            isDisabled={disabled}
+          />
+
+          <div
+            ref={scrollRef}
+            aria-busy={isLoading}
+            className="-mx-1 max-h-[280px] overflow-y-auto px-1"
+          >
+            {isLoading && !icons ? (
+              <VStack gap={2} className="items-center py-6">
+                <Text size="sm" color="secondary" className="text-center">
+                  自定义图标加载中…
+                </Text>
+              </VStack>
+            ) : loadError && !icons ? (
+              <VStack gap={2} className="items-center py-6">
+                <Text size="sm" color="secondary" className="text-center">
+                  {loadError}
+                </Text>
+                <Button
+                  label="重试"
+                  variant="ghost"
+                  size="sm"
+                  isDisabled={disabled}
+                  onClick={() => void load()}
+                />
+              </VStack>
+            ) : filteredIcons.length === 0 ? (
+              <VStack gap={1} className="py-6 items-center text-center">
+                <Text size="sm" color="secondary">
+                  {query ? '未找到匹配的图标' : '暂无自定义图标'}
+                </Text>
+                {!query && (
+                  <Text size="sm" color="secondary">
+                    可在后台「系统设置 - 素材管理」中上传
+                  </Text>
+                )}
+              </VStack>
+            ) : (
+              <div className="grid grid-cols-5 gap-1.5">
+                {pageIcons.map((item) => (
+                  <IconPickerItemButton
+                    key={item.path}
+                    url={item.url}
+                    label={item.label}
+                    isSelected={item.url === value}
+                    disabled={disabled}
+                    onClick={() => handleSelect(item)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <IconPickerPagination
+            totalCount={filteredIcons.length}
+            currentPage={safePage}
+            totalPages={totalPages}
+            disabled={disabled}
+            onPageChange={goToPage}
+          />
+        </VStack>
+      }
+    >
+      <IconButton
+        label="自定义图标库"
+        tooltip="自定义图标库"
+        variant="ghost"
+        size="sm"
+        icon={<Shapes size={ICON_SIZE.md} />}
         isDisabled={disabled}
       />
     </Popover>
