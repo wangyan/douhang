@@ -1,10 +1,10 @@
 <div align="center">
 
-<a href="https://github.com/wangyan/douhang"><img src="public/brand/icon-192.png" width="128" alt="douhang"></a>
+[![斗航（DouHang）](./public/brand/icon-192.png)](./public/brand/icon-192.png)
 
 # 斗航（DouHang）
 
-### 面向局域网与私有云的自托管网址导航站
+### 自建网址导航站：Docker 一键部署，内外网地址自动切换
 
 以卡片网格组织服务入口，支持分类归档、拖拽排序与内外网址自动切换<br>
 提供资源监控、在线状态探测、拼音搜索与小组件面板<br>
@@ -151,11 +151,14 @@ npm run typecheck   # 执行 TypeScript 严格类型检查
 
 感谢 [LINUX DO](https://linux.do/) 社区提供开放、友善的技术交流平台。
 
-<a href="https://star-history.com/#wangyan/douhang&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=wangyan/douhang&type=Date&theme=dark">
-    <img src="https://api.star-history.com/svg?repos=wangyan/douhang&type=Date" width="600" alt="Star history">
-  </picture>
+## Star History
+
+<a href="https://www.star-history.com/?repos=wangyan%2Fdouhang&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=wangyan/douhang&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=wangyan/douhang&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=wangyan/douhang&type=date&legend=top-left" />
+ </picture>
 </a>
 
 ## 许可证
