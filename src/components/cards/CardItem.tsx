@@ -2,6 +2,7 @@ import { Card } from '@astryxdesign/core/Card';
 import type { ContextMenuOption } from '@astryxdesign/core/ContextMenu';
 import { ContextMenu } from '@astryxdesign/core/ContextMenu';
 import { useToast } from '@astryxdesign/core/Toast';
+import { Tooltip } from '@astryxdesign/core/Tooltip';
 import { AppWindow, Check, Copy, Pencil, Trash2 } from 'lucide-react';
 import { memo, useState } from 'react';
 import { CardPreviewDialog } from '@/components/cards/CardPreviewDialog';
@@ -239,10 +240,27 @@ function CardItemImpl({
       />
     ) : null;
 
+  const tooltipContent = (
+    <div className="flex flex-col gap-0.5 max-w-[220px] text-left [overflow-wrap:anywhere]">
+      <span className="font-semibold text-sm leading-snug">{card.name}</span>
+      {card.description?.trim() && (
+        <span className="text-secondary text-xs leading-normal line-clamp-3">
+          {card.description.trim()}
+        </span>
+      )}
+    </div>
+  );
+
+  const cardContentWithTooltip = (
+    <Tooltip content={tooltipContent} placement="above">
+      {cardContent}
+    </Tooltip>
+  );
+
   if (items.length === 0) {
     return (
       <>
-        {cardContent}
+        {cardContentWithTooltip}
         {previewDialog}
       </>
     );
@@ -256,7 +274,7 @@ function CardItemImpl({
         label={`卡片：${card.name}`}
         presentation="adaptive"
       >
-        {cardContent}
+        {cardContentWithTooltip}
       </ContextMenu>
       {previewDialog}
     </>
@@ -325,7 +343,6 @@ function CardItemVisual({
       {/* 标题在卡片下方，允许 2 行截断以适配长名字（如 Audiobookshelf） */}
       {!simple && (
         <span
-          title={card.name}
           style={{ width: cardWidth }}
           className={`block text-center font-medium leading-tight [overflow-wrap:anywhere] line-clamp-2 ${titleTextClass} ${titleHeightClass}`}
         >
