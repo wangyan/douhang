@@ -44,7 +44,9 @@ const ENTRANCE_GATE_SCRIPT = `(function(){try{if(sessionStorage.getItem('douhang
 /** 现代浏览器特性探针：仅凭原生特性支持判定（Chrome 123+ / Firefox 128+ / Safari 17.5+），零 UA 解析负担 */
 const BROWSER_PROBE_SCRIPT = `(function(){
   try {
-    if (window.location && window.location.pathname && window.location.pathname.indexOf('/outdated.html') !== -1) return;
+    var path = (window.location && window.location.pathname) || '';
+    if (path.indexOf('/outdated.html') !== -1) return;
+    if (path.indexOf('/browsers/') === 0) return;
     try {
       if (window.sessionStorage && window.sessionStorage.getItem('douhang-ignore-browser-check') === '1') return;
     } catch (e) {}
@@ -52,9 +54,8 @@ const BROWSER_PROBE_SCRIPT = `(function(){
     var c = window.CSS;
     var ok = c && c.supports && c.supports('color', 'light-dark(red,blue)') && ('registerProperty' in c);
     if (!ok) {
-      var p = (window.location && window.location.pathname) || '/';
       var s = (window.location && window.location.search) || '';
-      window.location.replace('/outdated.html?from=' + encodeURIComponent(p + s));
+      window.location.replace('/outdated.html?from=' + encodeURIComponent((path || '/') + s));
     }
   } catch (err) {}
 })();`.replace(/\\s+/g, ' ');

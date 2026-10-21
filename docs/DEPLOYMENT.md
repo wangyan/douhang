@@ -86,7 +86,7 @@ docker run -d \
   ```bash
   bash scripts/download-browsers.sh
   ```
-- **离线部署挂载**：安装包合计约 1 GB，既不进代码仓库也不打进镜像（见 `.dockerignore`），**必须将目录挂载进容器**，引导页的下载入口才可用；未挂载时访问 `/browsers/*` 会返回 404。
+- **离线部署挂载**：安装包合计约 2 GB，既不进代码仓库也不打进镜像（见 `.dockerignore`），**必须将目录挂载进容器**，引导页的下载入口才可用；未挂载时访问 `/browsers/*` 会返回 404。
   - 使用 `docker-compose.yml` 或 `docker-compose.prod.yml` 部署：编排文件中已预置该挂载，只需确认宿主机 `./public/browsers` 内已放置安装包。
   - 使用 `docker run` 部署：在启动命令中追加一行挂载参数：
     ```bash

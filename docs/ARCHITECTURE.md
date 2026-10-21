@@ -142,12 +142,14 @@ Next.js 16 采用根目录下的 [`src/proxy.ts`](../src/proxy.ts) 作为请求�
 系统通过原生特性探针与静态引导页处理低版本内核访问：
 
 1. **特性探针**（[`src/app/layout.tsx`](../src/app/layout.tsx)）：
-   根布局内联轻量探针脚本，基于 `CSS.supports` 检测 `light-dark()` 与 `registerProperty` 支持。未通过检测且无忽略标记时，重定向至 `/outdated.html`。
+   根布局内联轻量探针脚本，基于 `CSS.supports` 检测 `light-dark()` 与 `registerProperty` 支持。未通过检测且无忽略标记时，重定向至 `/outdated.html`。引导页自身与 `/browsers/*` 安装包路径不在拦截范围，安装包缺失返回的 404 页面不会再次触发重定向。
 2. **离线引导页**（[`public/outdated.html`](../public/outdated.html)）：
-   独立静态单页，无外部网络依赖。根据客户端操作系统提供对应的离线安装包下载入口，并支持通过 `sessionStorage` 记录跳过状态后临时访问。
+   独立静态单页，无外部网络依赖。根据客户端操作系统提供对应的离线安装包下载入口，并支持通过 `sessionStorage` 记录跳过状态后临时访问；回跳目标限定为站内页面路径，安装包路径不作回跳目标。
 3. **路由放行**（[`src/proxy.ts`](../src/proxy.ts)）：
    在代理层放行 `offline.html`、`outdated.html` 及 `browsers` 目录，无需登录鉴权即可访问。
-4. **离线包脚本**（[`scripts/download-browsers.sh`](../scripts/download-browsers.sh)）：
+4. **下载响应头**（[`next.config.ts`](../next.config.ts)）：
+   `/browsers/*` 响应附加 `Content-Disposition: attachment` 与 `X-Content-Type-Options: nosniff`，浏览器按附件处理安装包，不将其作为页面导航。
+5. **离线包脚本**（[`scripts/download-browsers.sh`](../scripts/download-browsers.sh)）：
    提供一键拉取跨平台安装包脚本，产物保存于 `public/browsers` 供内网分发。该目录不进代码仓库、也不打进镜像，容器部署时经宿主机目录挂载提供给引导页。
 
 ---

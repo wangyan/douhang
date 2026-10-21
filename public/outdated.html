@@ -191,6 +191,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      white-space: nowrap;
       transition: background-color 0.15s ease, color 0.15s ease;
       -webkit-appearance: none;
       appearance: none;
@@ -449,11 +450,14 @@
       }
       .official-sites-links {
         width: 100%;
+        flex-wrap: wrap;
         justify-content: space-between;
+        gap: 0.35rem;
       }
       .official-link-pill {
-        flex: 1;
+        flex: 1 1 45%;
         text-align: center;
+        margin-left: 0;
       }
       .footer {
         flex-direction: column;
@@ -565,6 +569,13 @@
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm6.73 7.82c-.17 1.48-.82 2.82-1.84 3.82-.41.4-.87.73-1.37.99-.07.04-.15.07-.22.1-.21.09-.43.16-.65.21-.18.04-.37.07-.56.08-.22.01-.44.01-.66 0-.31-.02-.61-.06-.9-.13-.24-.06-.47-.14-.69-.24-.2-.09-.39-.2-.57-.33-.31-.22-.59-.48-.82-.78-.29-.38-.51-.81-.66-1.27-.13-.41-.19-.84-.18-1.27.02-.54.14-1.07.36-1.57.17-.38.39-.73.65-1.05.23-.28.5-.52.8-.72.33-.22.69-.39 1.07-.51.41-.13.84-.19 1.27-.18.52.01 1.03.12 1.51.32.42.17.8.4 1.14.69.31.26.58.57.79.92.24.4.41.84.51 1.3.09.43.11.87.06 1.31z"/>
           </svg>
           <span>Firefox</span>
+        </button>
+        <button type="button" onclick="switchBrowser('360')" id="tab-360" class="tab-btn">
+          <svg viewBox="0 0 24 24" width="15" height="15">
+            <rect x="1" y="1" width="22" height="22" rx="6" fill="#3cba55"/>
+            <text x="12" y="15.5" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="7.5" font-weight="700" fill="#ffffff">360</text>
+          </svg>
+          <span>360 极速版</span>
         </button>
       </div>
 
@@ -730,6 +741,7 @@
           <a href="https://www.google.cn/chrome/" target="_blank" rel="noopener noreferrer" class="official-link-pill">Chrome 官网 ↗</a>
           <a href="https://www.microsoft.com/edge" target="_blank" rel="noopener noreferrer" class="official-link-pill">Edge 官网 ↗</a>
           <a href="https://www.firefox.com.cn/" target="_blank" rel="noopener noreferrer" class="official-link-pill">Firefox 官网 ↗</a>
+          <a href="https://browser.360.cn/ee/" target="_blank" rel="noopener noreferrer" class="official-link-pill">360 官网 ↗</a>
         </div>
       </div>
     </div>
@@ -778,15 +790,24 @@
         'win-arm': '/browsers/Firefox-Setup.exe',
         'linux-deb': '/browsers/firefox.tar.xz',
         'linux-rpm': '/browsers/firefox.tar.xz'
+      },
+      // 360 极速浏览器仅提供 Windows 与 macOS 安装包，Linux 行按无包处理，由脚本自动隐藏
+      '360': {
+        'mac-arm': '/browsers/360Browser_for_mac_arm.pkg',
+        'mac-x64': '/browsers/360Browser_for_mac.pkg',
+        'win-x64': '/browsers/360csex_setup.exe'
       }
     };
+
+    var PLATFORMS = ['mac', 'win', 'linux'];
+    var DOWNLOAD_KEYS = ['mac-arm', 'mac-x64', 'win-x64', 'win-arm', 'linux-deb', 'linux-rpm'];
 
     var currentBrowser = 'chrome';
 
     // 切换浏览器 Tab
     function switchBrowser(name) {
       currentBrowser = name;
-      var tabs = ['chrome', 'edge', 'firefox'];
+      var tabs = ['chrome', 'edge', 'firefox', '360'];
       for (var i = 0; i < tabs.length; i++) {
         var el = document.getElementById('tab-' + tabs[i]);
         if (el) {
@@ -800,17 +821,72 @@
       updateDownloadLinks();
     }
 
-    // 更新下载链接地址为本地离线包
+    // 按平台显隐安装包行与平台分组
+    function setRowVisible(key, visible) {
+      var a = document.getElementById('link-' + key);
+      if (!a || !a.parentNode) return;
+      a.parentNode.className = visible ? 'download-row' : 'download-row hidden';
+    }
+
+    function setPlatformVisible(platform, visible) {
+      var header = document.getElementById('header-' + platform);
+      if (!header || !header.parentNode) return;
+      header.parentNode.className = visible ? 'platform-item' : 'platform-item hidden';
+    }
+
+    // 更新下载链接地址为本地离线包；当前浏览器未提供的平台整体隐藏
     function updateDownloadLinks() {
       var cfg = DOWNLOAD_MAP[currentBrowser];
       if (!cfg) return;
-      var keys = ['mac-arm', 'mac-x64', 'win-x64', 'win-arm', 'linux-deb', 'linux-rpm'];
-      for (var i = 0; i < keys.length; i++) {
-        var key = keys[i];
-        var url = cfg[key];
-        var a = document.getElementById('link-' + key);
-        if (a && url) {
-          a.href = url;
+      var available = {};
+      var i, j, platform, key, url, a;
+      for (i = 0; i < PLATFORMS.length; i++) {
+        platform = PLATFORMS[i];
+        available[platform] = false;
+        for (j = 0; j < DOWNLOAD_KEYS.length; j++) {
+          key = DOWNLOAD_KEYS[j];
+          if (key.indexOf(platform + '-') !== 0) continue;
+          url = cfg[key];
+          a = document.getElementById('link-' + key);
+          if (!a) continue;
+          if (url) {
+            a.href = url;
+            available[platform] = true;
+          }
+          setRowVisible(key, !!url);
+        }
+        setPlatformVisible(platform, available[platform]);
+      }
+
+      // 当前展开的平台在该浏览器下无安装包时，切换到第一个可用平台
+      var open = null;
+      for (i = 0; i < PLATFORMS.length; i++) {
+        var header = document.getElementById('header-' + PLATFORMS[i]);
+        if (header && header.className.indexOf('active') > -1) open = PLATFORMS[i];
+      }
+      if (!open || !available[open]) {
+        for (i = 0; i < PLATFORMS.length; i++) {
+          if (available[PLATFORMS[i]]) {
+            applyPlatform(PLATFORMS[i]);
+            break;
+          }
+        }
+      }
+    }
+
+    // 展开指定平台，其余平台收起
+    function applyPlatform(platform) {
+      for (var i = 0; i < PLATFORMS.length; i++) {
+        var p = PLATFORMS[i];
+        var h = document.getElementById('header-' + p);
+        var c = document.getElementById('content-' + p);
+        if (!h || !c) continue;
+        if (p === platform) {
+          h.className = 'platform-header active';
+          c.className = 'platform-content';
+        } else {
+          h.className = 'platform-header';
+          c.className = 'platform-content hidden';
         }
       }
     }
@@ -829,21 +905,7 @@
         content.className = 'platform-content hidden';
       } else {
         // 折叠其他平台，展开当前平台
-        var platforms = ['mac', 'win', 'linux'];
-        for (var i = 0; i < platforms.length; i++) {
-          var p = platforms[i];
-          var h = document.getElementById('header-' + p);
-          var c = document.getElementById('content-' + p);
-          if (h && c) {
-            if (p === platform) {
-              h.className = 'platform-header active';
-              c.className = 'platform-content';
-            } else {
-              h.className = 'platform-header';
-              c.className = 'platform-content hidden';
-            }
-          }
-        }
+        applyPlatform(platform);
       }
     }
 
@@ -906,6 +968,20 @@
       updateDownloadLinks();
     })();
 
+    // 仅接受同源页面路径；安装包路径不作为回跳目标，避免再次落入下载请求
+    function resolveReturnPath(from) {
+      if (!from) return '/';
+      try {
+        var url = new URL(from, window.location.origin);
+        if (url.origin !== window.location.origin || url.pathname.indexOf('/browsers/') === 0) {
+          return '/';
+        }
+        return url.pathname + url.search + url.hash;
+      } catch (e) {
+        return '/';
+      }
+    }
+
     // 逃生跳转
     function bypassCheck() {
       try {
@@ -916,10 +992,14 @@
       if (search) {
         var match = search.match(/[?&]from=([^&]+)/);
         if (match && match[1]) {
-          from = decodeURIComponent(match[1]);
+          try {
+            from = decodeURIComponent(match[1]);
+          } catch (e) {
+            from = '';
+          }
         }
       }
-      window.location.replace(from ? from : '/');
+      window.location.replace(resolveReturnPath(from));
     }
   </script>
 </body>
