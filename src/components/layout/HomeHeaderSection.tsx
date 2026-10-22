@@ -10,6 +10,8 @@ interface HomeHeaderSectionProps {
   initialDensity?: CardDensity;
   initialEngine?: SearchEngine;
   engines: SearchEngineConfig[];
+  /** 站点时区（IANA 名称） */
+  siteTimeZone?: string;
 }
 
 /**
@@ -25,6 +27,7 @@ export function HomeHeaderSection({
   initialDensity = 'auto',
   initialEngine = 'metaso',
   engines,
+  siteTimeZone,
 }: HomeHeaderSectionProps) {
   const density = useEffectiveDensity(initialDensity);
 
@@ -50,7 +53,7 @@ export function HomeHeaderSection({
         gap: gapStyle,
       }}
     >
-      <HomeClock density={density} />
+      <HomeClock density={density} timeZone={siteTimeZone} />
       <SearchBox
         initialEngine={initialEngine}
         engines={engines}

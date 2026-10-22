@@ -17,6 +17,7 @@ import { normalizeFontSize } from '@/lib/font-size';
 import { getUserPreference } from '@/lib/preferences';
 import { listSearchEngines } from '@/lib/search-engines';
 import { isUsingDefaultPassword } from '@/lib/security';
+import { resolveClockTimeZone } from '@/lib/time';
 import { getAdminGuideUrl, getManualUrl, getRepoUrl } from '@/lib/version';
 import { getWallpaperPreferences, getWallpapers } from '@/lib/wallpaper';
 import {
@@ -107,6 +108,7 @@ export default async function HomePage() {
   ]);
 
   const isAuthed = !!session?.user;
+  const siteTimeZone = resolveClockTimeZone(process.env.TZ);
   const wallpaperScrimValue =
     typeof wallpaperScrim === 'number'
       ? wallpaperScrim
@@ -202,6 +204,7 @@ export default async function HomePage() {
               initialDensity={cardDensity ?? CARD_DENSITY_DEFAULT}
               initialEngine={searchEngine}
               engines={engines}
+              siteTimeZone={siteTimeZone}
             />
 
             {isAuthed && (

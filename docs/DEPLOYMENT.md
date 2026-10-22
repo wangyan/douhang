@@ -191,7 +191,7 @@ npm run start       # 启动生产服务器
 | `AUTH_USERNAME` | 否 | `admin` | 管理员用户名。仅在数据库首次初始化建号时生效 |
 | `AUTH_PASSWORD` | **是** | - | 管理员初始口令，长度须 ≥ 8 位，禁止使用出厂弱口令。仅在首次初始化时写入数据库 |
 | `AUTH_URL` | 否 | - | 反向代理或域名访问时的完整外部地址（如 `https://douhang.example.com`），用于登录跳转与回调 |
-| `TZ` | 否 | `Asia/Shanghai` | 服务时区，取 IANA 标识（如 `Asia/Shanghai`、`Asia/Tokyo`、`UTC`）。影响服务端日期计算与容器内系统时间；取值非法时容器启动失败 |
+| `TZ` | 否 | `Asia/Shanghai` | 服务时区，取 IANA 标识（如 `Asia/Shanghai`、`Asia/Tokyo`、`UTC`）。影响服务端日期计算、容器内系统时间与首页时钟的显示时区；取值非法时容器启动失败 |
 | `DOCKER_HOST` | 否 | `unix:///var/run/docker.sock` | Docker Engine API 监控连接源。支持本地 socket 或远程 TCP 地址（如 `tcp://host:2375`） |
 | `DOCKER_GID` | 否 | 自动探测 | 宿主机 `docker.sock` 的所属组 GID。自动探测失败时可显式覆盖（详见故障排查） |
 | `PUID` | 否 | `1001` | 容器内进程运行用户的 UID，用于对齐宿主机文件权限 |
