@@ -59,7 +59,7 @@ interface CategorySectionProps {
  * 视觉规范（ui-spec §2.6 + §4.5）：
  * - 分类标题：Text as=h2（1.3125rem + bold），primary 色，无横线无下划线
  * - 分类徽章：md 尺寸（32px），与标题视觉重量匹配
- * - 分组间 py-3 留白（比卡片间距 gap-5 紧，避免分区过于空旷）
+ * - 分组间 py-2 留白（比卡片间距 gap-5 紧，避免分区过于空旷）
  * - 标题到网格 mb-3
  * - 未分类排最后
  *
@@ -110,10 +110,10 @@ export function CategorySection({
       : { fontSize: '1.3125rem', fontWeight: 700, lineHeight: '1.875rem' };
   const headerMbClass = isCompact ? 'mb-2' : isCozy ? 'mb-4' : 'mb-3';
   const sectionPyClass = isCompact
-    ? 'py-2 first:pt-0 last:pb-0'
+    ? 'py-1 first:pt-0 last:pb-0'
     : isCozy
-      ? 'py-4 first:pt-0 last:pb-0'
-      : 'py-3 first:pt-0 last:pb-0';
+      ? 'py-2.5 first:pt-0 last:pb-0'
+      : 'py-2 first:pt-0 last:pb-0';
 
   return (
     <section className={`group ${sectionPyClass}`}>

@@ -374,7 +374,7 @@ export function HomeContent({
             style={{
               display: 'flex',
               flexDirection: 'column',
-              gap: 'clamp(0.5rem, 1.5vh, 1.5rem)',
+              gap: 'clamp(0.25rem, 0.8vh, 0.75rem)',
               maxWidth: `${axisWidth}px`,
             }}
           >

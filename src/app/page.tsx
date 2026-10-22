@@ -193,7 +193,7 @@ export default async function HomePage() {
           <VStack
             className="mx-auto w-full max-w-[1360px]"
             style={{
-              paddingTop: 'clamp(3.5rem, 15vh, 15rem)',
+              paddingTop: 'clamp(2rem, 8vh, 8rem)',
               gap: 'clamp(2rem, 4.5vh, 4.5rem)',
             }}
           >
