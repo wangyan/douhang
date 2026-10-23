@@ -16,6 +16,7 @@ import { astryxZh } from '@/lib/astryx-locale-zh';
 import { installContextMenuAnchorFallback } from '@/lib/context-menu-anchor-fallback';
 import { installContextMenuTouchGuard } from '@/lib/context-menu-touch-guard';
 import { GUEST_PREF_KEYS } from '@/lib/guest-preferences';
+import { installLegacyLayerFallback } from '@/lib/legacy-layer-fallback';
 import { errorMiddleware } from '@/lib/request/middleware';
 import { swrFetcher } from '@/lib/request/request';
 import { preferencesApi } from '@/services';
@@ -73,9 +74,11 @@ function AppProviders({
   useEffect(() => {
     const uninstallTouchGuard = installContextMenuTouchGuard();
     const uninstallAnchorFallback = installContextMenuAnchorFallback();
+    const uninstallLegacyLayerFallback = installLegacyLayerFallback();
     return () => {
       uninstallTouchGuard();
       uninstallAnchorFallback?.();
+      uninstallLegacyLayerFallback?.();
     };
   }, []);
 

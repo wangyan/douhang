@@ -1673,3 +1673,51 @@ html[data-entered="1"] .stagger-cards > * {
     }
   }
 }
+
+/* 仅约束带标识的业务浮层，保留常驻通知视口自身的布局与顶层层级 */
+@supports not selector(:popover-open) {
+  [popover][id] {
+    display: none;
+    position: fixed;
+    z-index: var(--z-chrome);
+  }
+}
+
+/* 归零锚点网格边距，交由脚本按触发器几何坐标定位 */
+@supports not (anchor-name: --astryx-probe) {
+  [popover][id] {
+    margin: 0;
+  }
+}
+
+/* 动态变量半透明色值的静态令牌兜底，确保前景对比度 */
+@supports not (color: color-mix(in lab, red, red)) {
+  .home-clock-halo::before {
+    background: none;
+  }
+
+  .settings-shell .settings-side-nav a[href][aria-current="page"],
+  .date-widget-mode-trigger {
+    background-color: var(--color-overlay-hover);
+  }
+
+  button.date-widget-empty:hover .date-widget-empty-icon,
+  .date-widget-mode-trigger:hover,
+  .date-widget-mode-trigger:focus-visible,
+  .bg-highlight,
+  .bg-accent\/5,
+  .bg-accent\/10,
+  .hover\:bg-accent\/8:hover,
+  .hover\:bg-accent\/10:hover {
+    background-color: var(--color-accent-muted);
+  }
+
+  .bg-error\/10,
+  .hover\:bg-error\/5:hover {
+    background-color: var(--color-error-muted);
+  }
+
+  .bg-success\/10 {
+    background-color: var(--color-success-muted);
+  }
+}
