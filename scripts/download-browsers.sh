@@ -127,15 +127,15 @@ else
   fi
 fi
 
-# 10. 360 极速浏览器（Windows 与 macOS）
+# 10. 360 浏览器（Windows、macOS 与 Linux）
 # Windows 安装包有固定别名，始终指向当前版本
 CSE_WIN_URL="https://sedl.360tpcdn.com/cse/360csex_setup.exe"
 CSE_WIN_FILE="$DEST_DIR/360csex_setup.exe"
 if [ ! -s "$CSE_WIN_FILE" ]; then
-  echo "--> 正在下载 360 极速浏览器 for Windows..."
+  echo "--> 正在下载 360 浏览器 for Windows..."
   curl -L -f --progress-bar "$CSE_WIN_URL" -o "$CSE_WIN_FILE"
 else
-  echo "--> 360 极速浏览器 for Windows 已存在 ($(du -h "$CSE_WIN_FILE" | cut -f1))，跳过。"
+  echo "--> 360 浏览器 for Windows 已存在 ($(du -h "$CSE_WIN_FILE" | cut -f1))，跳过。"
 fi
 
 # macOS 安装包文件名带版本号，先从下载页解析当前版本再拼包地址（Intel 与 Apple 芯片各一个）
@@ -148,9 +148,9 @@ CSE_MAC_ARM_NAME="$(printf '%s' "$CSE_MAC_LIST" \
 
 CSE_MAC_INTEL_FILE="$DEST_DIR/360Browser_for_mac.pkg"
 if [ -s "$CSE_MAC_INTEL_FILE" ]; then
-  echo "--> 360 极速浏览器 for Mac (Intel) 已存在 ($(du -h "$CSE_MAC_INTEL_FILE" | cut -f1))，跳过。"
+  echo "--> 360 浏览器 for Mac (Intel) 已存在 ($(du -h "$CSE_MAC_INTEL_FILE" | cut -f1))，跳过。"
 elif [ -n "$CSE_MAC_INTEL_NAME" ]; then
-  echo "--> 正在下载 360 极速浏览器 for Mac (Intel, $CSE_MAC_INTEL_NAME)..."
+  echo "--> 正在下载 360 浏览器 for Mac (Intel, $CSE_MAC_INTEL_NAME)..."
   curl -L -f --progress-bar "https://sedl.360tpcdn.com/cse/${CSE_MAC_INTEL_NAME}" -o "$CSE_MAC_INTEL_FILE"
 else
   echo "!! 未能从 360 下载页解析 Intel 版安装包地址，已跳过（可稍后重跑本脚本）。" >&2
@@ -158,12 +158,48 @@ fi
 
 CSE_MAC_ARM_FILE="$DEST_DIR/360Browser_for_mac_arm.pkg"
 if [ -s "$CSE_MAC_ARM_FILE" ]; then
-  echo "--> 360 极速浏览器 for Mac (Apple 芯片) 已存在 ($(du -h "$CSE_MAC_ARM_FILE" | cut -f1))，跳过。"
+  echo "--> 360 浏览器 for Mac (Apple 芯片) 已存在 ($(du -h "$CSE_MAC_ARM_FILE" | cut -f1))，跳过。"
 elif [ -n "$CSE_MAC_ARM_NAME" ]; then
-  echo "--> 正在下载 360 极速浏览器 for Mac (Apple 芯片, $CSE_MAC_ARM_NAME)..."
+  echo "--> 正在下载 360 浏览器 for Mac (Apple 芯片, $CSE_MAC_ARM_NAME)..."
   curl -L -f --progress-bar "https://sedl.360tpcdn.com/cse/${CSE_MAC_ARM_NAME}" -o "$CSE_MAC_ARM_FILE"
 else
   echo "!! 未能从 360 下载页解析 Apple 芯片安装包地址，已跳过（可稍后重跑本脚本）。" >&2
+fi
+
+# Linux 安装包通过官方下载接口解析统信 UOS x64 当前版本
+CSE_LINUX_FILE="$DEST_DIR/360Browser_for_linux_uos_amd64.deb"
+if [ -s "$CSE_LINUX_FILE" ]; then
+  echo "--> 360 浏览器 for Linux (统信 UOS x64) 已存在 ($(du -h "$CSE_LINUX_FILE" | cut -f1))，跳过。"
+elif ! command -v openssl >/dev/null 2>&1; then
+  echo "!! 未找到 openssl，无法解析 360 Linux 安装包地址，已跳过。" >&2
+else
+  CSE_LINUX_KEY="65626233313536386562623331353638"
+  CSE_LINUX_IV="32363732356139393664346136626332"
+  CSE_LINUX_URL=""
+  for CSE_UOS_OS in uos_v20 uos_v25; do
+    CSE_LINUX_PARAMS="arch=x64&package=3&package_type=1&os=${CSE_UOS_OS}"
+    CSE_LINUX_P2="$(printf '%s' "$CSE_LINUX_PARAMS" \
+      | openssl enc -aes-128-cbc -K "$CSE_LINUX_KEY" -iv "$CSE_LINUX_IV" \
+          -base64 -A)"
+    CSE_LINUX_P2="${CSE_LINUX_P2//+/%2B}"
+    CSE_LINUX_P2="${CSE_LINUX_P2//\//%2F}"
+    CSE_LINUX_P2="${CSE_LINUX_P2//=/%3D}"
+    CSE_LINUX_JSON="$(curl -fsSL --max-time 30 -A 'Mozilla/5.0' \
+      -H 'Referer: https://browser.360.net/gc/download.html' \
+      "https://active.browser.360.net/api/v1/down-package?p2=${CSE_LINUX_P2}" || true)"
+    CSE_LINUX_URL="$(printf '%s' "$CSE_LINUX_JSON" \
+      | grep -oE 'https:[^"]+\.deb' | head -n 1 || true)"
+    if [ -n "$CSE_LINUX_URL" ]; then
+      break
+    fi
+  done
+
+  if [ -n "$CSE_LINUX_URL" ]; then
+    echo "--> 正在下载 360 浏览器 for Linux (统信 UOS x64, $(basename "$CSE_LINUX_URL"))..."
+    curl -L -f --progress-bar "$CSE_LINUX_URL" -o "$CSE_LINUX_FILE"
+  else
+    echo "!! 未能解析 360 Linux 安装包地址，已跳过（可稍后重跑本脚本）。" >&2
+  fi
 fi
 
 echo "=== 下载与检查完成！当前 public/browsers 目录: ==="

@@ -575,7 +575,7 @@
             <rect x="1" y="1" width="22" height="22" rx="6" fill="#3cba55"/>
             <text x="12" y="15.5" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="7.5" font-weight="700" fill="#ffffff">360</text>
           </svg>
-          <span>360 极速版</span>
+          <span>360 浏览器</span>
         </button>
       </div>
 
@@ -692,7 +692,7 @@
               <span>Linux</span>
             </div>
             <div class="header-right">
-              <span class="os-sub">.deb / .rpm</span>
+              <span class="os-sub" id="sub-linux">.deb / .rpm</span>
               <svg id="chevron-linux" class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <polyline points="6 9 12 15 18 9"/>
               </svg>
@@ -703,7 +703,7 @@
             <!-- .deb -->
             <div class="download-row">
               <div class="arch-left">
-                <span class="arch-name">Debian / Ubuntu (.deb 64位)</span>
+                <span class="arch-name" id="label-linux-deb">Debian / Ubuntu (.deb 64位)</span>
                 <span id="badge-linux-deb" class="arch-badge hidden">当前系统</span>
               </div>
               <a id="link-linux-deb" href="/browsers/google-chrome-stable_current_amd64.deb" class="btn-download-tray" title="下载安装包">
@@ -791,11 +791,12 @@
         'linux-deb': '/browsers/firefox.tar.xz',
         'linux-rpm': '/browsers/firefox.tar.xz'
       },
-      // 360 极速浏览器仅提供 Windows 与 macOS 安装包，Linux 行按无包处理，由脚本自动隐藏
+      // 360 浏览器提供 Windows、macOS 与 Linux（统信 UOS x64）安装包
       '360': {
         'mac-arm': '/browsers/360Browser_for_mac_arm.pkg',
         'mac-x64': '/browsers/360Browser_for_mac.pkg',
-        'win-x64': '/browsers/360csex_setup.exe'
+        'win-x64': '/browsers/360csex_setup.exe',
+        'linux-deb': '/browsers/360Browser_for_linux_uos_amd64.deb'
       }
     };
 
@@ -838,6 +839,18 @@
     function updateDownloadLinks() {
       var cfg = DOWNLOAD_MAP[currentBrowser];
       if (!cfg) return;
+
+      var linuxDebLabel = document.getElementById('label-linux-deb');
+      if (linuxDebLabel) {
+        linuxDebLabel.textContent = currentBrowser === '360'
+          ? '统信 UOS（x64 .deb）'
+          : 'Debian / Ubuntu (.deb 64位)';
+      }
+      var linuxSub = document.getElementById('sub-linux');
+      if (linuxSub) {
+        linuxSub.textContent = currentBrowser === '360' ? '.deb' : '.deb / .rpm';
+      }
+
       var available = {};
       var i, j, platform, key, url, a;
       for (i = 0; i < PLATFORMS.length; i++) {
